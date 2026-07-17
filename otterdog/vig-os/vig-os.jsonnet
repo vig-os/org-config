@@ -98,7 +98,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:CI Summary',
             ],
           },
@@ -117,7 +117,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:CI Summary',
               '15368:Dist Check',
             ],
@@ -138,7 +138,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:CI Summary',
               '15368:Dist Check',
             ],
@@ -222,7 +222,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:Test Summary',
             ],
           },
@@ -238,7 +238,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:Test Summary',
             ],
             strict: true,
@@ -259,7 +259,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:Test Summary',
             ],
           },
@@ -304,7 +304,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:CI Summary',
             ],
           },
@@ -318,7 +318,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             required_approving_review_count: 0,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:CI Summary',
             ],
           },
@@ -434,7 +434,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:CI Summary',
             ],
           },
@@ -450,7 +450,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:CI Summary',
             ],
           },
@@ -601,7 +601,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               'Lint',
               'Test (ubuntu-latest)',
             ],
@@ -618,7 +618,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               'Lint',
               'Test (macos-latest)',
               'Test (ubuntu-latest)',
@@ -659,7 +659,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:CI Summary',
             ],
           },
@@ -675,7 +675,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:CI Summary',
               '15368:Dist Check',
             ],
@@ -695,7 +695,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
-            status_checks+: [
+            status_checks: [
               '15368:CI Summary',
               '15368:Dist Check',
             ],
@@ -743,7 +743,7 @@ orgs.newOrg('vig-os', 'vig-os') {
       branch_protection_rules: [
         orgs.newBranchProtectionRule('main') {
           required_approving_review_count: null,
-          required_status_checks+: [
+          required_status_checks: [
             'any:nix flake check',
           ],
           requires_pull_request: false,

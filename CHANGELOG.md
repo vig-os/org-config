@@ -47,4 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Normalize the base template's ECA status check out of all rulesets** ([#17](https://github.com/vig-os/org-config/issues/17)): the first live plan (PR #41, 17 changes) showed `+ "eclipse-eca-validation:eclipsefdn/eca"` on every ruleset with status checks — `newStatusChecks()`/`newBranchProtectionRule()` seed that Eclipse default and the imported config's `status_checks+:` appends inherited it (same class as the `custom_properties` `null + array` fix). All 15 ruleset `status_checks` lists and tessera's branch-protection `required_status_checks` are now plain overrides expressing live state exactly (cross-checked read-only against `gh api .../rulesets`); no other template-seeded injection remains (all other appended fields have empty template defaults). The only remaining plan line is the known benign `vs-dolt` `code_scanning_default_languages` artifact (otterdog's live read filters out `javascript-typescript` while its schema rejects the split values — upstream inconsistency, already baselined in plan.yml's footnote).
+
 ### Security
