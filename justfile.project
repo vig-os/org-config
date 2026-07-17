@@ -92,6 +92,8 @@ clean-artifacts:
 # repo-root zizmor.yml baseline). The jsonnet fmt check and `otterdog validate`
 # skip gracefully until the config lands (#17). Additive to lint/precommit/test
 # — CI drives those unchanged; this recipe is the L0 seam plan/apply reuse.
+# `otterdog validate` needs `--with python-dotenv==1.1.0`: otterdog's `env`
+# credential provider imports python-dotenv, an undeclared upstream dep (#16).
 #
 # Run L0 static validation: workflow lint/security + otterdog config (ADR-0007)
 [group('L0 validation')]
@@ -99,7 +101,7 @@ validate:
     actionlint
     zizmor --offline .github/workflows
     @if [ -d otterdog ]; then find otterdog -type f \( -name '*.jsonnet' -o -name '*.libsonnet' \) -print0 | xargs -0 -r jsonnetfmt --test && echo "jsonnetfmt: OK"; else echo "jsonnetfmt: skipped (otterdog/ config lands in #17)"; fi
-    @if [ -d otterdog ]; then uvx --from otterdog@{{ otterdog_version }} otterdog validate --local; else echo "otterdog validate: skipped (otterdog/ config lands in #17)"; fi
+    @if [ -d otterdog ]; then uvx --with python-dotenv==1.1.0 --from otterdog@{{ otterdog_version }} otterdog validate --local; else echo "otterdog validate: skipped (otterdog/ config lands in #17)"; fi
 
 # ===============================================================================
 # PROJECT-SPECIFIC RECIPES

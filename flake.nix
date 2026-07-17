@@ -65,6 +65,20 @@
           inherit pkgs;
           extraPackages = extraPackages pkgs;
 
+          # `otterdog validate --local` (L0, ADR-0007) always resolves the
+          # `env` credential provider before it evaluates the config, so it
+          # needs OTTERDOG_TOKEN present even though local validation makes no
+          # authenticated call (the org declares no teams, and the per-repo
+          # code-scanning language checks fail soft on 401). Seed a clearly
+          # non-functional placeholder so `just validate` is green out of the
+          # box in the dev shell; a real token in the environment (CI, or a
+          # human running `plan`) always wins via the `:-` default. This is a
+          # dummy, NOT a secret — real credentials land with SOPS/age (#22).
+          shellHook = ''
+            echo "devcontainer dev environment loaded (nix)"
+            export OTTERDOG_TOKEN="''${OTTERDOG_TOKEN:-otterdog-local-validate-placeholder}"
+          '';
+
           # Opt into the flake-generated pre-commit config (#883): the shared
           # base hook set sourced from the pinned vigos toolchain, replacing the
           # hand-managed .pre-commit-config.yaml. In direnv mode CI runs on the
