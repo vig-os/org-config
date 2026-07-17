@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Architecture decision records 0001–0007** ([#1](https://github.com/vig-os/org-config/issues/1), [#8](https://github.com/vig-os/org-config/issues/8)–[#14](https://github.com/vig-os/org-config/issues/14))
+  - `docs/adr/` with the house ADR convention (exo-fleet numbering, EXOPET vault template format) and index: 0001 reconciliation engine (Otterdog), 0002 drift semantics, 0003 secrets backend (SOPS/age), 0004 auth model (GitHub App), 0005 repo tooling, 0006 distribution topology & versioning, 0007 CI & testing strategy.
+- **GitHub App runbook** ([#5](https://github.com/vig-os/org-config/issues/5)): `docs/runbooks/github-app.md` — creation, permissions table, bootstrap-secret handling, key rotation, downstream-org installation.
 - **Adopt vigOS devkit 1.3.1** ([#2](https://github.com/vig-os/org-config/issues/2))
   - Greenfield scaffold of the shared vigOS dev environment in `direnv` mode: `flake.nix` + `.envrc` dev-shell, layered `justfile`s, managed pre-commit and `.github/` CI, and the `.vig-os` project manifest.
   - Pins move in lockstep: `.vig-os` `DEVKIT_VERSION=1.3.1`, `flake.nix` `vigos.url = "github:vig-os/devkit?ref=1.3.1"`, `flake.lock` locked to the 1.3.1 revision.
