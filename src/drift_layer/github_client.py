@@ -26,6 +26,8 @@ class GitHubClient(Protocol):
 
     def list_open_drift_issues(self) -> list[Issue]: ...
 
+    def list_org_repos(self, org: str) -> list[str]: ...
+
     def create_issue(self, title: str, body: str, labels: tuple[str, ...]) -> int: ...
 
     def update_issue(self, number: int, title: str, body: str) -> None: ...
@@ -73,12 +75,35 @@ class RestGitHubClient:
                         title=raw.get("title", ""),
                         body=raw.get("body") or "",
                         state=raw.get("state", "open"),
+                        labels=tuple(
+                            label.get("name", "")
+                            for label in raw.get("labels", [])
+                            if isinstance(label, dict)
+                        ),
                     )
                 )
             if len(batch) < 100:
                 break
             page += 1
         return issues
+
+    def list_org_repos(self, org: str) -> list[str]:
+        """List every repo name in ``org`` (``GET /orgs/{org}/repos``).
+
+        Paginated; the org endpoint defaults to ``type=all`` (public + private,
+        including archived), so the sweep sees the full live inventory. Needs an
+        org-wide read token — the drift workflow's full plan token, not the
+        issues-narrowed one."""
+        names: list[str] = []
+        page = 1
+        while True:
+            path = f"/orgs/{org}/repos?per_page=100&page={page}"
+            batch = self._request("GET", path) or []
+            names.extend(raw["name"] for raw in batch)
+            if len(batch) < 100:
+                break
+            page += 1
+        return names
 
     def create_issue(self, title: str, body: str, labels: tuple[str, ...]) -> int:
         result = self._request(

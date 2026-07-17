@@ -53,3 +53,11 @@ data/
 # Examples (uncomment / add your own):
 #   /scratch/
 #   /secrets.local.yaml
+
+# Python (mirrors .gitignore.project; git reads .gitignore, not .gitignore.project
+# — devkit only folds .gitignore.project into this file on regeneration, so until
+# the next upgrade these must live here to take effect, #21).
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/

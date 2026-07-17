@@ -5,3 +5,14 @@
 [[expected]]
 resource = 'repository[name="vs-dolt"]'
 reason = "code_scanning_default_languages javascript-typescript split — upstream import artifact, cosmetic and expected on every run"
+
+# `managed: false` allow-list (ADR-0002): repos intentionally out of declarative
+# scope. Named here so they stay reviewed, but exempt from undeclared-repo and
+# settings-reconciliation flagging.
+[[unmanaged]]
+repository = "legacy-sandbox"
+reason = "throwaway experiment repo, never brought under config"
+
+[[unmanaged]]
+repository = "external-mirror"
+reason = "read-only mirror managed by an upstream automation, not by us"
