@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Otterdog toolchain integration (L0)** ([#15](https://github.com/vig-os/org-config/issues/15))
+  - Dev-shell (`flake.nix` `extraPackages`) gains `sops`, `age`, `go-jsonnet` (jsonnetfmt), `actionlint`, and `zizmor` (ADR-0005); otterdog itself runs via pinned `uvx` so CI and downstream template repos stay flake-independent.
+  - Flake-generated pre-commit hooks add `jsonnetfmt --test` (otterdog jsonnet, no-op until #17) and `actionlint` (workflows).
+  - `justfile.project` `validate` recipe (new "L0 validation" group) runs `actionlint` + `zizmor` over `.github/workflows` and, guarded on config presence, `jsonnetfmt --test` and `otterdog validate --local`; the otterdog version pin is a single `otterdog_version` variable (ADR-0007).
+  - `zizmor.yml` baselines the devkit-managed workflows (per-audit, per-file) so `just validate` gates only org-config-authored workflows.
 - **Architecture decision records 0001–0007** ([#1](https://github.com/vig-os/org-config/issues/1), [#8](https://github.com/vig-os/org-config/issues/8)–[#14](https://github.com/vig-os/org-config/issues/14))
   - `docs/adr/` with the house ADR convention (exo-fleet numbering, EXOPET vault template format) and index: 0001 reconciliation engine (Otterdog), 0002 drift semantics, 0003 secrets backend (SOPS/age), 0004 auth model (GitHub App), 0005 repo tooling, 0006 distribution topology & versioning, 0007 CI & testing strategy.
 - **GitHub App runbook** ([#5](https://github.com/vig-os/org-config/issues/5)): `docs/runbooks/github-app.md` — creation, permissions table, bootstrap-secret handling, key rotation, downstream-org installation.
