@@ -457,6 +457,20 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
       ],
     },
+    orgs.newRepo('org-config-testbed') {
+      // SACRIFICIAL L3 mutation-E2E target (issue #23, ADR-0007 Axis C). Being
+      // declared here is what makes it a valid test target: apply creates it,
+      // and .github/workflows/testbed-e2e.yml churns + reverts its live state on
+      // a schedule. Only the description is overridden; every other field keeps
+      // the vendored `newRepo` default, all of whose lists (webhooks/secrets/
+      // variables/environments/rulesets/branch_protection_rules) are empty — so
+      // there is nothing seeded to re-inject and the evaluated config is
+      // drift-free-by-construction (the next plan shows exactly one `+ repo`).
+      // The description string is duplicated verbatim into testbed-e2e.yml's
+      // `TESTBED_DESCRIPTION` (its consistency-guard step greps for it here), so
+      // the harness reverts induced drift back to this declared value.
+      description: 'SACRIFICIAL testbed for the L3 mutation E2E harness (issue #23) - its live settings are deliberately churned and reverted by .github/workflows/testbed-e2e.yml on every run; do not rely on any state here.',
+    },
     orgs.newRepo('os-config') {
       allow_merge_commit: true,
       allow_update_branch: false,
