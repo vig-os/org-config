@@ -11,6 +11,7 @@
 # org/CI/secrets/toolchain config whose compromise equals org admin control.
 # `docs/` is deliberately left unowned so ADR/doc PRs to dev stay unblocked.
 /.github/                        @c-vigo
+/otterdog.json                   @c-vigo
 /otterdog/                       @c-vigo
 /secrets/                        @c-vigo
 /flake.nix                       @c-vigo

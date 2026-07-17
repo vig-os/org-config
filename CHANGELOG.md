@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Import `vig-os` Otterdog configuration** ([#17](https://github.com/vig-os/org-config/issues/17))
+  - `otterdog.json` (repo root) declares the `vig-os` org, `org-config` config repo, the `env` credential provider (`OTTERDOG_TOKEN` + dummy web-UI credential keys, unused on the App-token path), the pinned `EclipseFdn/otterdog-defaults@v0.13.1` base template, and `config_dir: otterdog` so all config lives under `otterdog/` (ADR-0006 dogfooding).
+  - `otterdog/vig-os/vig-os.jsonnet`: normalized org config imported from live `vig-os`, declaring all 16 repos including the private `qms` (ADR-0006), plus org settings, secrets, rulesets, environments, and the `type` custom property. Drift-free against live so #18's first `plan` shows an empty diff; the 12 web-UI-only org settings stay unmanaged (spike #16).
+  - Fixes the imported-config evaluation bug (#16): the `type` custom property used an inherited-`null` `default_value+:` merge (`null + array`); expressed as a plain `default_value:` override so evaluation succeeds.
+  - Normalizes the base template's Eclipse-Foundation defaults out of vig-os state (they would otherwise be phantom drift): overrides `custom_properties`, `_repositories`, `security_managers`, and `teams` with `:`/`::` instead of the import's `+:`/`+::` appends, dropping the inherited `eclipse_project` org property, the `.eclipsefdn` example repo, the Eclipse security-manager teams, and the default org teams. vs-dolt's code-scanning languages are collapsed to the schema-valid `javascript-typescript`.
+  - `otterdog/vig-os/vendor/otterdog-defaults/` vendors the base-template libsonnet (jsonnetfmt-formatted) so `otterdog validate --local` runs offline; the Eclipse-Foundation-specific Python validation/PMI hooks are omitted (they enforce Eclipse-only org policy).
+  - Dev shell seeds a placeholder `OTTERDOG_TOKEN` (`flake.nix` `shellHook`) so the guarded `just validate` (jsonnetfmt + `otterdog validate --local`) is green locally; `/otterdog.json` added to `CODEOWNERS`.
 - **Otterdog toolchain integration (L0)** ([#15](https://github.com/vig-os/org-config/issues/15))
   - Dev-shell (`flake.nix` `extraPackages`) gains `sops`, `age`, `go-jsonnet` (jsonnetfmt), `actionlint`, and `zizmor` (ADR-0005); otterdog itself runs via pinned `uvx` so CI and downstream template repos stay flake-independent.
   - Flake-generated pre-commit hooks add `jsonnetfmt --test` (otterdog jsonnet, no-op until #17) and `actionlint` (workflows).

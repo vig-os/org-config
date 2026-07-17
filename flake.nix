@@ -65,6 +65,36 @@
           inherit pkgs;
           extraPackages = extraPackages pkgs;
 
+          # `otterdog validate --local` (L0, ADR-0007) always resolves the
+          # `env` credential provider before it evaluates the config, so it
+          # needs OTTERDOG_TOKEN present even though local validation makes no
+          # authenticated call (the org declares no teams, and the per-repo
+          # code-scanning language checks fail soft on 401). Seed a clearly
+          # non-functional placeholder so `just validate` is green out of the
+          # box in the dev shell; a real token in the environment (CI, or a
+          # human running `plan`) always wins via the `:-` default. This is a
+          # dummy, NOT a secret — real credentials land with SOPS/age (#22).
+          shellHook = ''
+            echo "devcontainer dev environment loaded (nix)"
+            export OTTERDOG_TOKEN="''${OTTERDOG_TOKEN:-otterdog-local-validate-placeholder}"
+            # libstdc++ for native extensions of uvx-run Python tools (otterdog's
+            # rjsonnet): a Nix CPython's loader does not search /usr/lib, so the
+            # manylinux .so fails with "libstdc++.so.6: cannot open shared
+            # object file" (same failure class as the devkit pymarkdown/pyjson5
+            # drop). Exported as a VARIABLE — not a global LD_LIBRARY_PATH,
+            # which would leak the nix libstdc++ into every child process — and
+            # consumed command-scoped by the otterdog invocation in
+            # justfile.project's `validate` recipe. Note: direnv-mode CI
+            # forwards only the dev-shell PATH (setup-devkit-toolchain), never
+            # shellHook env, so this export covers `nix develop`/direnv entry
+            # only; the recipe independently derives the same dir from the
+            # dev-shell `cc` when this variable is absent. The interpolation
+            # also roots the lib in the shell closure. libstdc++.so.6 is
+            # backward-compatible, so pointing a manylinux wheel at nix's
+            # (GCC 15) copy is safe on the CI host runner and on NixOS alike.
+            export VIGOS_STDCPP_LIB="${pkgs.stdenv.cc.cc.lib}/lib"
+          '';
+
           # Opt into the flake-generated pre-commit config (#883): the shared
           # base hook set sourced from the pinned vigos toolchain, replacing the
           # hand-managed .pre-commit-config.yaml. In direnv mode CI runs on the
