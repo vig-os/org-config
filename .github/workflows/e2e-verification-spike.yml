@@ -1,0 +1,345 @@
+# DISPOSABLE VERIFICATION SPIKE — DO NOT MERGE TO `dev`/`main`. This file exists
+# only to run on its OWN draft PR and produce M3 acceptance evidence BEFORE the
+# real scheduled harness activates. Delete it once that evidence is captured.
+#
+# WHY IT EXISTS (registration limitation): the production L3 harness lives in
+# `.github/workflows/testbed-e2e.yml` on `schedule` + `workflow_dispatch`. GitHub
+# registers those triggers ONLY from the DEFAULT branch (`main`), which advances
+# only via a release — so testbed-e2e.yml is UNREGISTERED and cannot be dispatched
+# until the first release (v1.0.0) promotes it onto `main`. That leaves no way to
+# DEMONSTRATE the harness green beforehand. This spike copies testbed-e2e.yml's
+# harness logic verbatim but triggers on `pull_request` (scoped to THIS file only)
+# so it runs on a draft PR now — giving M3 its acceptance run without waiting for
+# the release. It is deliberately NOT the durable path; testbed-e2e.yml remains
+# the one that ships.
+#
+# Same assertions, same cleanup, same two least-privilege App tokens as
+# testbed-e2e.yml (ADR-0004): a FULL, unnarrowed, org-wide installation token for
+# the otterdog read surface and the testbed description flip, and a SECOND token
+# narrowed to `issues: write` on org-config for the drift layer's issue ops.
+# Read-only-ness of the plan leg is enforced by BEHAVIOR (`plan` only issues GETs).
+#
+# Security model: `pull_request` (NOT `pull_request_target`) — the default
+# checkout is read-only. The `if:` restricts the job to SAME-REPO PRs, so fork
+# PRs (which cannot see the App secrets anyway) never reach the credentialed
+# steps (OWASP CICD-SEC-4, Poisoned Pipeline Execution). Because this spike is a
+# same-repo draft PR opened by the maintainer, running the real harness (which
+# flips the sacrificial testbed and writes org-config issues) is intended.
+#
+# Checkout is the PR ref (default), NOT `ref: dev` like testbed-e2e.yml: the spike
+# verifies the harness AS IT EXISTS ON THIS PR, and the PR's merge ref already
+# carries the `dev` base config + drift-layer code plus this file.
+#
+# It is repo-OWNED, so zizmor gates it in full: it is deliberately ABSENT from
+# zizmor.yml, and the only accepted findings are the two scoped, justified
+# `github-app` inline ignores on the full plan/admin token (same pattern as
+# plan/apply/drift/testbed-e2e). Everything else must be fixed here.
+
+name: E2E verification spike (disposable)
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    paths:
+      # Self-only: this spike runs solely on its own draft PR, never on unrelated
+      # changes. Delete the file to retire it.
+      - .github/workflows/e2e-verification-spike.yml
+
+# Join the cross-workflow mutation group so this spike, apply, drift, and the real
+# testbed harness serialize and never cancel each other mid-run (ADR-0007). Same
+# group name as apply.yml / drift.yml / testbed-e2e.yml.
+concurrency:
+  group: otterdog-mutate
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  OWNER: vig-os
+  TESTBED: org-config-testbed
+  # The drift resource identity of the testbed (the reconciler titles its issue
+  # `Drift: <resource>`). Exact-matched in assertions.
+  TESTBED_RESOURCE: 'repository[name="org-config-testbed"]'
+  # Single source of truth: this MUST equal the `description` declared for
+  # `org-config-testbed` in otterdog/vig-os/vig-os.jsonnet (a guard step greps
+  # for it). The harness reverts induced drift back to this declared value.
+  TESTBED_DESCRIPTION: 'SACRIFICIAL testbed for the L3 mutation E2E harness (issue #23) - its live settings are deliberately churned and reverted by .github/workflows/testbed-e2e.yml on every run; do not rely on any state here.'
+
+jobs:
+  spike:
+    name: E2E verification spike on org-config-testbed
+    # SAME-REPO ONLY: never expose org-admin credentials to fork PR code.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions: {}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      # Otterdog version pin: justfile.project (`otterdog_version`) is the single
+      # source of truth (ADR-0005); read it here so CI never carries a second,
+      # drift-prone copy of the pin.
+      - name: Resolve otterdog version pin
+        run: |
+          set -euo pipefail
+          version="$(grep -oP 'otterdog_version\s*:=\s*"\K[^"]+' justfile.project)"
+          if [ -z "${version}" ]; then
+            echo "::error::could not resolve otterdog_version from justfile.project"
+            exit 1
+          fi
+          echo "OTTERDOG_VERSION=${version}" >> "$GITHUB_ENV"
+          echo "Resolved otterdog version: ${version}"
+
+      # SSoT guard: the description the harness reverts to (env TESTBED_DESCRIPTION)
+      # must be the exact string declared in the jsonnet, or a revert would itself
+      # manufacture drift. Fail loudly if they diverge.
+      - name: Guard - declared description matches the jsonnet
+        run: |
+          set -euo pipefail
+          if ! grep -qF -- "${TESTBED_DESCRIPTION}" otterdog/vig-os/vig-os.jsonnet; then
+            echo "::error::TESTBED_DESCRIPTION does not match the org-config-testbed description in otterdog/vig-os/vig-os.jsonnet; update both to keep the revert value in sync."
+            exit 1
+          fi
+          echo "Declared description is in sync with the jsonnet."
+
+      # FULL installation token — NO permission-* narrowing (ADR-0004
+      # Corrections): the App grant is the boundary; a narrowed token cannot read
+      # Actions Variables. `owner: vig-os` makes it org-wide (plan must see every
+      # repo; admin calls target the testbed). zizmor's github-app finding on the
+      # broad token is an acknowledged, deliberate decision recorded INLINE.
+      - name: Mint full App installation token (unnarrowed, org-wide)
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3 # zizmor: ignore[github-app]
+        with:
+          client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+          owner: vig-os  # zizmor: ignore[github-app]
+
+      # SECOND token, narrowed to issues:write on org-config only — the smallest
+      # grant the drift layer's issue ops (and the harness's issue reads) need.
+      - name: Mint narrowed App token for issue ops (issues:write, this repo)
+        id: issues-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+          owner: vig-os
+          repositories: org-config
+          permission-issues: write
+
+      # Skip gracefully if the first environment-gated apply has not created the
+      # testbed yet: it is declared in config and the apply that dogfoods this
+      # repo mints it. Until then there is nothing to mutate — the job stays green
+      # and the summary explains why.
+      - name: Guard - testbed repo exists
+        id: guard
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -uo pipefail
+          if gh api "repos/${OWNER}/${TESTBED}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Testbed ${OWNER}/${TESTBED} exists; proceeding with the spike."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Testbed ${OWNER}/${TESTBED} not found; the first apply has not created it yet. Skipping gracefully."
+          fi
+
+      # The drift leg = the exact production path (drift.yml / testbed-e2e.yml):
+      # read-only full-org `otterdog plan --local --no-web-ui` -> the in-house
+      # `drift-layer` reconciler writing deduplicated drift+critical issues into
+      # org-config. Written once, invoked at each lifecycle stage. It reads
+      # OTTERDOG_TOKEN (full app token), GITHUB_TOKEN (narrowed issues token), and
+      # OTTERDOG_VERSION from the environment set by the caller.
+      - name: Prepare drift-leg helper
+        if: steps.guard.outputs.exists == 'true'
+        run: |
+          set -euo pipefail
+          cat > "${RUNNER_TEMP}/drift_leg.sh" <<'LEG'
+          #!/usr/bin/env bash
+          set -uo pipefail
+          OTTER=(uvx --with python-dotenv==1.1.0 --from "otterdog@${OTTERDOG_VERSION}" otterdog)
+          "${OTTER[@]}" plan --local --no-web-ui -c otterdog.json vig-os >plan.txt 2>&1
+          rc=$?
+          echo "otterdog plan exited ${rc}"
+          if [ "${rc}" != "0" ]; then
+            echo "::error::otterdog plan failed (exit ${rc}) - not drift; check config/auth/harness"
+            cat plan.txt
+            exit 1
+          fi
+          uv run drift-layer \
+            --plan-file plan.txt \
+            --repo "${GITHUB_REPOSITORY}" \
+            --org vig-os \
+            --allowlist drift-allowlist.toml
+          LEG
+          chmod +x "${RUNNER_TEMP}/drift_leg.sh"
+          echo "drift-leg helper written to ${RUNNER_TEMP}/drift_leg.sh"
+
+      # Core lifecycle + assertions in one step so per-stage state (issue number,
+      # comment counts) stays in local shell vars. Every assertion appends a row
+      # (PASS/FAIL + evidence) to the results file for the summary; the step exits
+      # nonzero iff any assertion failed, so the job goes red on failure. The
+      # always-revert cleanup below restores state even if this aborts mid-way.
+      - name: Testbed drift lifecycle and assertions
+        if: steps.guard.outputs.exists == 'true'
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          ISSUES_TOKEN: ${{ steps.issues-token.outputs.token }}
+          # drift-layer reads GITHUB_TOKEN; give it the narrowed issues token.
+          GITHUB_TOKEN: ${{ steps.issues-token.outputs.token }}
+          OTTERDOG_TOKEN: ${{ steps.app-token.outputs.token }}
+          OTTERDOG_DUMMY_USERNAME: spike-dummy-unused
+          OTTERDOG_DUMMY_PASSWORD: spike-dummy-unused
+          OTTERDOG_DUMMY_TWOFA_SEED: spike-dummy-unused
+          NO_COLOR: "1"
+          COLUMNS: "200"
+        run: |
+          set -uo pipefail
+          RESULTS="${RUNNER_TEMP}/results.md"
+          : > "${RESULTS}"
+          FAILED=0
+          EXPECTED_TITLE="Drift: ${TESTBED_RESOURCE}"
+
+          record() {  # $1=PASS|FAIL  $2=assertion  $3=evidence
+            printf '| %s | %s | %s |\n' "$1" "$2" "$3" >> "${RESULTS}"
+            echo "[$1] $2 -- $3"
+            if [ "$1" = "FAIL" ]; then FAILED=1; fi
+          }
+
+          run_leg() {
+            if ! bash "${RUNNER_TEMP}/drift_leg.sh"; then
+              record FAIL "drift leg (otterdog plan + reconcile) ran cleanly" "leg exited nonzero - see log"
+              return 1
+            fi
+          }
+
+          list_open_testbed() {  # -> JSON array of {number, labels[]} for the testbed issue
+            GH_TOKEN="${ISSUES_TOKEN}" gh issue list --repo "${OWNER}/org-config" \
+              --state open --limit 200 --json number,title,labels 2>/dev/null \
+              | jq --arg t "${EXPECTED_TITLE}" \
+                  '[.[] | select(.title == $t) | {number, labels: [.labels[].name]}]' 2>/dev/null \
+              || echo '[]'
+          }
+          comment_count() {  # $1=issue number
+            GH_TOKEN="${ISSUES_TOKEN}" gh api "repos/${OWNER}/org-config/issues/$1/comments" \
+              --jq 'length' 2>/dev/null || echo 0
+          }
+          issue_state() {  # $1=issue number
+            GH_TOKEN="${ISSUES_TOKEN}" gh api "repos/${OWNER}/org-config/issues/$1" \
+              --jq '.state' 2>/dev/null || echo unknown
+          }
+
+          # --- 1. Induce benign out-of-band drift: flip the description ---------
+          SENTINEL="[DRIFT-E2E-SPIKE ${GITHUB_RUN_ID}] induced out-of-band flip; auto-reverted"
+          if GH_TOKEN="${APP_TOKEN}" gh api -X PATCH "repos/${OWNER}/${TESTBED}" \
+               -f description="${SENTINEL}" >/dev/null; then
+            echo "Induced drift: testbed description flipped to a sentinel."
+          else
+            record FAIL "induce out-of-band drift (description flip)" "PATCH failed"
+          fi
+
+          # --- 2. Reconcile: exactly one drift+critical issue for the testbed ---
+          run_leg
+          hits="$(list_open_testbed)"
+          c1="$(echo "${hits}" | jq 'length' 2>/dev/null || echo 0)"
+          n1="$(echo "${hits}" | jq -r '.[0].number // empty' 2>/dev/null || echo '')"
+          has_labels="$(echo "${hits}" | jq -r 'if (.[0].labels | index("drift")) and (.[0].labels | index("critical")) then "yes" else "no" end' 2>/dev/null || echo no)"
+          if [ "${c1}" = "1" ] && [ -n "${n1}" ] && [ "${has_labels}" = "yes" ]; then
+            record PASS "Exactly one drift+critical issue opened for the testbed" "issue #${n1}, count=${c1}, labels=drift+critical"
+          else
+            record FAIL "Exactly one drift+critical issue opened for the testbed" "count=${c1}, number=${n1:-none}, labels_ok=${has_labels}"
+          fi
+          cc1="$( [ -n "${n1}" ] && comment_count "${n1}" || echo 0 )"
+
+          # --- 3. Rerun with drift still present: update, never duplicate -------
+          run_leg
+          hits="$(list_open_testbed)"
+          c2="$(echo "${hits}" | jq 'length' 2>/dev/null || echo 0)"
+          n2="$(echo "${hits}" | jq -r '.[0].number // empty' 2>/dev/null || echo '')"
+          if [ "${c2}" = "1" ] && [ -n "${n2}" ] && [ "${n2}" = "${n1}" ]; then
+            record PASS "Rerun updates the same issue in place (no duplicate)" "still #${n2}, count=${c2}"
+          else
+            record FAIL "Rerun updates the same issue in place (no duplicate)" "count=${c2}, number=${n2:-none}, expected #${n1:-none}"
+          fi
+          cc2="$( [ -n "${n2}" ] && comment_count "${n2}" || echo 0 )"
+          if [ "${cc2:-0}" -gt "${cc1:-0}" ]; then
+            record PASS "Recurrence comment appended on rerun" "comments ${cc1} -> ${cc2}"
+          else
+            record FAIL "Recurrence comment appended on rerun" "comments ${cc1} -> ${cc2}"
+          fi
+
+          # --- 4. Revert to the declared description ----------------------------
+          if GH_TOKEN="${APP_TOKEN}" gh api -X PATCH "repos/${OWNER}/${TESTBED}" \
+               -f description="${TESTBED_DESCRIPTION}" >/dev/null; then
+            echo "Reverted testbed description to the declared value."
+          else
+            record FAIL "revert testbed description to declared value" "PATCH failed"
+          fi
+
+          # --- 5. Rerun with drift resolved: the issue auto-closes --------------
+          run_leg
+          hits="$(list_open_testbed)"
+          c3="$(echo "${hits}" | jq 'length' 2>/dev/null || echo 0)"
+          s3="$( [ -n "${n1}" ] && issue_state "${n1}" || echo unknown )"
+          if [ "${c3}" = "0" ] && [ "${s3}" = "closed" ]; then
+            record PASS "Issue auto-closes after the divergence is resolved" "#${n1:-none} state=${s3}, open testbed issues=${c3}"
+          else
+            record FAIL "Issue auto-closes after the divergence is resolved" "#${n1:-none} state=${s3}, open testbed issues=${c3}"
+          fi
+
+          echo "lifecycle FAILED=${FAILED}"
+          [ "${FAILED}" = "0" ]
+
+      # Idempotent cleanup (ADR-0007): always restore the declared description,
+      # even if an assertion step aborted mid-way. Best-effort — never fails the
+      # job; it only warns so a red run's cause stays the assertion, not cleanup.
+      - name: Cleanup - restore declared state
+        if: always() && steps.guard.outputs.exists == 'true'
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -uo pipefail
+          if GH_TOKEN="${APP_TOKEN}" gh api -X PATCH "repos/${OWNER}/${TESTBED}" \
+               -f description="${TESTBED_DESCRIPTION}" >/dev/null 2>&1; then
+            echo "cleanup: testbed description restored to the declared value."
+          else
+            echo "cleanup: WARNING could not restore the testbed description; check ${OWNER}/${TESTBED}."
+          fi
+
+      # PASS/FAIL summary with per-assertion evidence (or the graceful-skip note).
+      - name: Spike summary
+        if: always()
+        env:
+          GUARD_EXISTS: ${{ steps.guard.outputs.exists }}
+        run: |
+          set -uo pipefail
+          RESULTS="${RUNNER_TEMP}/results.md"
+          {
+            echo "## E2E verification spike — \`org-config-testbed\` (disposable)"
+            echo
+            echo "> **Disposable spike** proving the L3 harness green BEFORE the release registers the real \`testbed-e2e.yml\` (schedule/dispatch register only from the default branch \`main\`). Do not merge; delete once M3 evidence is captured."
+            echo
+            if [ "${GUARD_EXISTS}" != "true" ]; then
+              echo "> **Skipped (no mutations performed).** The testbed repo \`${OWNER}/${TESTBED}\` does not exist yet."
+              echo ">"
+              echo "> It is declared in \`otterdog/vig-os/vig-os.jsonnet\` and is created by the first environment-gated \`apply\`. Re-run this spike after that apply lands."
+            else
+              echo "_Out-of-band drift induced on the sacrificial testbed, reconciled by the real \`drift-layer\` into org-config issues (ADR-0002 issue-only), then reverted and cleaned up (ADR-0007 L3). Nothing here is org-level._"
+              echo
+              echo "| Result | Assertion | Evidence |"
+              echo "| --- | --- | --- |"
+              if [ -s "${RESULTS}" ]; then
+                cat "${RESULTS}"
+              else
+                echo "| FAIL | harness produced results | the lifecycle step did not run to completion |"
+              fi
+            fi
+            echo
+            echo "[Run log](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+          } >> "$GITHUB_STEP_SUMMARY"
