@@ -28,10 +28,22 @@
 # group so apply-vs-drift is serialized too — a reconciler racing itself (or a
 # concurrent apply) manufactures phantom drift.
 #
-# Trigger scope: only `otterdog.json` / `otterdog/**` changes apply anything.
-# Engine or workflow edits carry no config delta, so they are deliberately NOT
-# in `paths:` — editing this file does not trigger an apply. `workflow_dispatch`
-# covers manual reruns.
+# Trigger scope: only `otterdog.json` / `otterdog/**` and the SOPS secret sources
+# (`secrets/**`, `.sops.yaml`) change apply anything — rotating a secret value
+# (#22, ADR-0003) is a normal PR that must re-apply. Engine or workflow edits
+# carry no config delta, so they are deliberately NOT in `paths:` — editing this
+# file does not trigger an apply. `workflow_dispatch` covers manual reruns.
+#
+# SECRETS-AS-CODE (issue #22, ADR-0003, BINDING): committed ciphertext under
+# `secrets/*.yaml` is decrypted IN-MEMORY here and never logged. otterdog has
+# exactly one offline secret-VALUE resolver — the `pass` credential provider
+# (config.py `CredentialResolver.get_secret` routes a `pass:<path>` value to
+# `PassVault.get_secret`, which shells `pass <path>`; the `env` provider that
+# carries the API token raises for secret values). So each decrypted value is
+# loaded into a throwaway, passphrase-less GPG-backed `pass` store generated on
+# this runner and discarded with it — it adds NO bootstrap secret (only
+# `SOPS_AGE_KEY` and the App key stay bootstrap items). Values are masked
+# (`::add-mask::`) and never echoed (no `set -x` over secret vars).
 #
 # Auth (ADR-0004 Corrections, spike #16): otterdog's write surface needs the
 # FULL App installation token — a narrowed token cannot carry Actions Variables
@@ -86,6 +98,8 @@ on:  # yamllint disable-line rule:truthy
     paths:
       - otterdog.json
       - otterdog/**
+      - secrets/**
+      - .sops.yaml
   workflow_dispatch:
 
 # Static, cross-workflow concurrency group so all mutations serialize (never
@@ -133,6 +147,88 @@ jobs:
           fi
           echo "OTTERDOG_VERSION=${version}" >> "$GITHUB_ENV"
           echo "Resolved otterdog version: ${version}"
+
+      # --- Secrets-as-code bridge (issue #22, ADR-0003) --------------------
+      # Install a pinned, checksum-verified sops so the committed age ciphertext
+      # can be decrypted at apply time. sops has age built in and reads the
+      # private identity from `SOPS_AGE_KEY` (a bootstrap env secret), so no
+      # separate `age` binary or key file is needed.
+      - name: Install sops (pinned, checksum-verified)
+        env:
+          SOPS_VERSION: v3.13.1
+          SOPS_SHA256: 620a9d7e3352ababeca6908cea24a6e8b14ce89a448ddbd3f94f1ef3398f470a
+        run: |
+          set -euo pipefail
+          url="https://github.com/getsops/sops/releases/download/${SOPS_VERSION}/sops-${SOPS_VERSION}.linux.amd64"
+          curl -fsSL --retry 3 "${url}" -o /tmp/sops
+          echo "${SOPS_SHA256}  /tmp/sops" | sha256sum -c -
+          sudo install -m 0755 /tmp/sops /usr/local/bin/sops
+          sops --version
+
+      # Decrypt committed ciphertext in-memory and load each value into a
+      # throwaway `pass` store keyed `org-config/<NAME>`, which otterdog resolves
+      # for any secret whose jsonnet `value` is `pass:org-config/<NAME>`. The GPG
+      # key is generated here, passphrase-less, and never leaves the runner: it
+      # is transport for `pass`, not a managed/bootstrap key. Runs only when
+      # ciphertext is present; a no-op otherwise. NO `set -x` — values are piped,
+      # never printed, and masked defensively.
+      - name: Decrypt SOPS secrets into apply-time pass store
+        if: hashFiles('secrets/*.yaml') != ''
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq pass >/dev/null
+
+          # Isolated, ephemeral homes under the runner temp dir; handed to the
+          # apply step via GITHUB_ENV so otterdog's `pass:` resolution finds them.
+          # Discarded with the runner; never persisted, never committed.
+          GNUPGHOME="${RUNNER_TEMP}/otterdog-apply-gnupg"
+          PASSWORD_STORE_DIR="${RUNNER_TEMP}/otterdog-apply-pass"
+          export GNUPGHOME PASSWORD_STORE_DIR
+
+          # Ephemeral, passphrase-less GPG identity — regenerated every run.
+          mkdir -p "${GNUPGHOME}"; chmod 700 "${GNUPGHOME}"
+          cat > "${GNUPGHOME}/keyparams" <<'KEYPARAMS'
+          %no-protection
+          Key-Type: RSA
+          Key-Length: 3072
+          Subkey-Type: RSA
+          Subkey-Length: 3072
+          Name-Real: org-config apply bridge
+          Name-Email: apply-bridge@vig-os.invalid
+          Expire-Date: 0
+          %commit
+          KEYPARAMS
+          gpg --batch --quiet --gen-key "${GNUPGHOME}/keyparams"
+          rm -f "${GNUPGHOME}/keyparams"
+          fpr="$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/{print $10; exit}')"
+          mkdir -p "${PASSWORD_STORE_DIR}"
+          pass init "${fpr}" >/dev/null
+
+          # For each secrets/*.yaml, insert every top-level key as
+          # pass `org-config/<KEY>`. Keys come from a JSON projection; each value
+          # is extracted individually (handles any value shape), masked, and
+          # piped straight into pass — never echoed.
+          count=0
+          shopt -s nullglob
+          for f in secrets/*.yaml; do
+            while IFS= read -r name; do
+              [ -n "${name}" ] || continue
+              value="$(sops -d --extract "[\"${name}\"]" "${f}")"
+              echo "::add-mask::${value}"
+              printf '%s' "${value}" | pass insert -m -f "org-config/${name}" >/dev/null
+              count=$((count + 1))
+            done < <(sops -d --output-type json "${f}" | jq -r 'keys[]')
+          done
+          echo "pass bridge populated with ${count} secret(s) from committed ciphertext"
+
+          # Hand the store/keyring locations to the apply step (and beyond).
+          {
+            echo "GNUPGHOME=${GNUPGHOME}"
+            echo "PASSWORD_STORE_DIR=${PASSWORD_STORE_DIR}"
+          } >> "${GITHUB_ENV}"
 
       # FULL installation token — NO permission-* narrowing (ADR-0004
       # Corrections): the App grant is the boundary; a narrowed token cannot read

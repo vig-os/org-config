@@ -54,6 +54,9 @@ orgs.newOrg('vig-os', 'vig-os') {
     orgs.newOrgSecret('DOCKERHUB_USERNAME') {
       value: '********',
     },
+    orgs.newOrgSecret('ORG_CONFIG_CANARY') {
+      value: 'pass:org-config/ORG_CONFIG_CANARY',
+    },
     orgs.newOrgSecret('RELEASE_APP_CLIENT_ID') {
       value: '********',
     },

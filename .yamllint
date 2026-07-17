@@ -4,6 +4,12 @@
 
 extends: default
 
+# SOPS/age ciphertext (#22) is valid YAML but not human-authored: sops writes
+# `#ENC[...]` comments (no leading space) and long blobs. Lint the structure via
+# check-yaml, not the style rules here. detect-private-keys still scans it.
+ignore: |
+  secrets/
+
 rules:
   # 80 chars should be enough, but don't fail if a line is longer
   line-length: disable

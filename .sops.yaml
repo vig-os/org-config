@@ -1,0 +1,31 @@
+---
+# SOPS/age creation rules for org-config secrets-as-code (ADR-0003, issue #22).
+#
+# WHAT THIS DOES
+#   Any file matching `secrets/*.yaml` is encrypted to the age recipient(s)
+#   below. SOPS encrypts VALUES only — the YAML keys (secret names) stay in
+#   cleartext so a reviewer sees *which* secrets exist without decrypting. The
+#   ciphertext is committed; only the apply workflow decrypts it, in-memory, at
+#   apply time (never logged — see .github/workflows/apply.yml, ADR-0003).
+#
+# ROTATION (a value change is a normal, reviewable PR — never out-of-band):
+#   1. `sops secrets/vig-os.yaml`         # edit the decrypted view, re-encrypts on save
+#      (or `sops -e -i secrets/vig-os.yaml` after editing a plaintext staging copy)
+#   2. Open a PR; review the ciphertext diff; merge to `dev`.
+#   3. Apply-on-merge re-applies the config, pushing the new value live.
+#   To rotate the age KEY itself: add the new recipient here, `sops updatekeys
+#   secrets/*.yaml` to re-wrap every file, remove the old recipient, PR + apply.
+#   A leaked age key exposes this PUBLIC repo's whole history — keep the managed
+#   set small and rotate on any suspicion (ADR-0003 §Public-repo rule).
+#
+# WHAT NEVER GOES HERE (bootstrap exclusions, ADR-0003 — BINDING):
+#   - The GitHub App private key (ORG_CONFIG_APP_PRIVATE_KEY) — it authenticates
+#     the apply; it cannot be bootstrapped by the pipeline it enables.
+#   - The age PRIVATE key (SOPS_AGE_KEY) — it decrypts everything here; it cannot
+#     decrypt itself. Both are provisioned out-of-band as CI/env secrets only.
+#   Blast radius: one poisoned commit must not own both auth AND decryption.
+creation_rules:
+  - path_regex: ^secrets/[^/]+\.yaml$
+    # Public age recipient for `vig-os` org-config. Private half lives ONLY as
+    # the `SOPS_AGE_KEY` Actions secret (bootstrap; never committed).
+    age: age1lzqeqpeqcfkcjze4yq89q0psxh87szxp2vvxlru6zfg36hxdxpesjqwawt
