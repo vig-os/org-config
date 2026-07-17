@@ -53,3 +53,25 @@ def apply_allowlist(
     """Return records with ``expected`` set where the resource is allow-listed."""
     allowed = {e.resource for e in entries}
     return [record.with_expected(expected=record.resource in allowed) for record in records]
+
+
+def load_unmanaged(path: str | Path | None) -> set[str]:
+    """Load the ``managed: false`` repo names from a TOML file (issue #21).
+
+    The file shape is a list of ``[[unmanaged]]`` tables with a ``repository``
+    key (and optional ``reason``). A missing/None path yields an empty set. Repos
+    named here are exempt from both undeclared-repo and settings-reconciliation
+    flagging, yet stay visible/reviewed in the file (ADR-0002).
+    """
+    if path is None:
+        return set()
+    p = Path(path)
+    if not p.exists():
+        return set()
+    data = tomllib.loads(p.read_text())
+    names: set[str] = set()
+    for raw in data.get("unmanaged", []):
+        repository = raw.get("repository")
+        if repository:
+            names.add(repository)
+    return names

@@ -1,7 +1,9 @@
 # Scheduled drift detection — read-only `otterdog plan --local --no-web-ui` of
 # the committed config against live `vig-os`, fed to the in-house strict-drift
 # layer, which reconciles the plan into deduplicated `drift`+`critical` issues
-# (issue #20, ADR-0002 issue-only drift semantics, ADR-0007 L1 core).
+# (issue #20, ADR-0002 issue-only drift semantics, ADR-0007 L1 core). The same
+# run also sweeps the live org repo inventory against the declared set and flags
+# undeclared / absent repos into the SAME lifecycle (issue #21).
 #
 # This is a repo-OWNED workflow (not devkit-managed), so zizmor gates it in full:
 # it is deliberately absent from zizmor.yml, and the only accepted findings are
@@ -21,15 +23,17 @@
 #     (OWASP CICD-SEC-4, Poisoned Pipeline Execution). The `if:` asserts repo
 #     identity as belt-and-braces.
 #   - No `pull_request_target`; the default checkout is read-only.
-#   - Two least-privilege App tokens, each minted for exactly one leg:
-#       * plan leg — the FULL, unnarrowed, org-wide installation token: the
-#         otterdog read surface needs it (a narrowed token cannot carry Actions
-#         Variables; org-variables read is fatal on 403 — ADR-0004 Corrections,
-#         spike #16). Read-only-ness is enforced by BEHAVIOR: `plan` only issues
-#         GETs.
-#       * issue-ops leg — a SECOND token narrowed to `issues: write` on this repo
-#         only. Narrowing works fine for issues, so the divergence-issue writes
-#         run on the smallest possible grant, never the org-admin token.
+#   - Two least-privilege App tokens, each scoped to what it may do:
+#       * FULL, unnarrowed, org-wide installation token — the otterdog `plan`
+#         read surface needs it (a narrowed token cannot carry Actions Variables;
+#         org-variables read is fatal on 403 — ADR-0004 Corrections, spike #16).
+#         Read-only-ness is enforced by BEHAVIOR: `plan` only issues GETs. The
+#         inventory sweep's org-repo read (`GET /orgs/vig-os/repos`, #21) reuses
+#         this same full token (a narrowed token cannot list org repos) and is
+#         likewise read-only by behavior.
+#       * issue-ops token — a SECOND token narrowed to `issues: write` on this
+#         repo only. ALL issue writes (plan-drift AND inventory) run on this
+#         smallest grant, never the org-admin token.
 #
 # `--local` gates ONLY the vendor re-fetch (identical to plan.yml / apply.yml):
 # it skips otterdog's `_init_base_template`, so plan evaluates the exact committed
@@ -154,16 +158,33 @@ jobs:
           repositories: org-config
           permission-issues: write
 
-      - name: Reconcile drift into drift+critical issues
+      # Plan-drift + inventory-sweep reconciliation in one invocation. The sweep
+      # leg (issue #21) lists live org repos and compares them against the
+      # declared set in the committed config, feeding undeclared/absent repos
+      # into the SAME dedup'd drift+critical lifecycle (an `inventory`-labelled
+      # population). Two tokens, each for exactly what it may do:
+      #   - GITHUB_TOKEN     = the issues:write-narrowed token (all issue writes)
+      #   - DRIFT_REPOS_TOKEN = the full plan token, ONLY for the org-repo read
+      #     (`GET /orgs/vig-os/repos`; a narrowed token cannot list org repos).
+      # EXPLICIT DEGRADATION (issue #21 BINDING): a sweep failure (e.g. the live
+      # repo read 403s) must NOT skip reconciliation of plan-drift records. The
+      # CLI catches the live-read failure IN-TOOL, reconciles plan drift anyway,
+      # leaves inventory issues untouched (never phantom-closes them), and exits
+      # 0 — so this step stays green on a degraded sweep WITHOUT a blanket
+      # `continue-on-error` that would also mask a genuine plan-reconcile failure
+      # (an issue-write error still, correctly, reddens the run).
+      - name: Reconcile plan drift + inventory sweep into drift+critical issues
         env:
           GITHUB_TOKEN: ${{ steps.issues-token.outputs.token }}
+          DRIFT_REPOS_TOKEN: ${{ steps.plan-token.outputs.token }}
         run: |
           set -euo pipefail
           uv run drift-layer \
             --plan-file plan.txt \
             --repo "${{ github.repository }}" \
             --org vig-os \
-            --allowlist drift-allowlist.toml
+            --allowlist drift-allowlist.toml \
+            --config-jsonnet otterdog/vig-os/vig-os.jsonnet
 
       - name: Drift run summary
         if: always()
@@ -174,7 +195,7 @@ jobs:
           {
             echo "## Drift reconciliation — \`vig-os\`"
             echo
-            echo "_Read-only \`otterdog plan --local --no-web-ui\` reconciled into deduplicated \`drift\`+\`critical\` issues (ADR-0002). Nothing was applied to org state._"
+            echo "_Read-only \`otterdog plan --local --no-web-ui\` + live repo inventory sweep, reconciled into deduplicated \`drift\`+\`critical\` issues (ADR-0002, #21). Nothing was applied to org state._"
             echo
             echo '```text'
             [ -f plan.txt ] && cat plan.txt || echo "(no plan output produced)"

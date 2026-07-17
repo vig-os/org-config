@@ -8,7 +8,7 @@ that the injected GitHub client executes at the edge (ADR-0007).
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 # otterdog diff symbol -> canonical change type (see the "Actions are indicated
 # with the following symbols" legend every plan prints).
@@ -42,27 +42,32 @@ class DriftRecord:
     change_type: str
     detail: str
     expected: bool = False
+    # Inventory-sweep findings (issue #21) carry a purpose-built title instead of
+    # the generic ``Drift: <resource>`` — e.g. "Undeclared repository: foo". The
+    # ``resource`` still drives the fingerprint, so identity/dedup is unchanged.
+    title_override: str | None = None
 
     @property
     def fingerprint(self) -> str:
-        """Deterministic per-resource key (org + resource), truncated SHA-256."""
+        """Deterministic per-resource key (org + resource), truncated SHA-256.
+
+        The ``resource`` is a namespaced identity: settings drift uses otterdog
+        block headers (``repository[name="x"]``); the inventory sweep uses
+        ``repository-inventory:<name>`` / ``repository-inventory-missing:<name>``.
+        Distinct namespaces never collide, so all findings share one dedup
+        keyspace and the single reconcile()/issue lifecycle (ADR-0002).
+        """
         digest = hashlib.sha256(f"{self.org}\0{self.resource}".encode()).hexdigest()
         return digest[:16]
 
     @property
     def title(self) -> str:
-        """Issue title following the ``Drift: <resource>`` convention."""
-        return f"Drift: {self.resource}"
+        """Issue title: the override if set, else ``Drift: <resource>``."""
+        return self.title_override or f"Drift: {self.resource}"
 
     def with_expected(self, *, expected: bool) -> DriftRecord:
         """Return a copy with the ``expected`` flag set (records are frozen)."""
-        return DriftRecord(
-            org=self.org,
-            resource=self.resource,
-            change_type=self.change_type,
-            detail=self.detail,
-            expected=expected,
-        )
+        return replace(self, expected=expected)
 
 
 @dataclass(frozen=True)
@@ -89,12 +94,18 @@ class ParsedPlan:
 
 @dataclass(frozen=True)
 class Issue:
-    """Minimal view of a live GitHub issue the reconciler needs."""
+    """Minimal view of a live GitHub issue the reconciler needs.
+
+    ``labels`` lets the CLI partition open drift issues into the settings-drift
+    and inventory-sweep populations (the latter carries the ``inventory`` label),
+    so a sweep failure leaves inventory issues untouched (issue #21 degradation).
+    """
 
     number: int
     title: str
     body: str
     state: str = "open"
+    labels: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -16,7 +16,18 @@ from .models import FINGERPRINT_MARKER, DriftRecord, Issue, IssueAction
 
 DRIFT_LABELS: tuple[str, ...] = ("drift", "critical")
 
+# Inventory-sweep findings (issue #21) carry an extra ``inventory`` label so the
+# CLI can partition them into their own issue population — a sweep failure then
+# leaves them untouched while settings drift still reconciles (explicit
+# degradation).
+INVENTORY_LABEL = "inventory"
+INVENTORY_LABELS: tuple[str, ...] = (*DRIFT_LABELS, INVENTORY_LABEL)
+
 _MARKER_RE = re.compile(r"<!-- drift-fingerprint: (?P<fp>[0-9a-f]+) -->")
+
+# Inventory records use a namespaced resource (see inventory.py); their evidence
+# is a sweep finding, not a plan diff.
+_INVENTORY_RESOURCE_PREFIX = "repository-inventory"
 
 
 def extract_fingerprint(body: str) -> str | None:
@@ -28,6 +39,11 @@ def extract_fingerprint(body: str) -> str | None:
 def render_body(record: DriftRecord, *, now: str) -> str:
     """Render the issue body for a divergence (carries the hidden fingerprint)."""
     marker = FINGERPRINT_MARKER.format(fingerprint=record.fingerprint)
+    evidence_label = (
+        "Inventory finding"
+        if record.resource.startswith(_INVENTORY_RESOURCE_PREFIX)
+        else "Plan diff"
+    )
     return "\n".join(
         [
             marker,
@@ -43,7 +59,7 @@ def render_body(record: DriftRecord, *, now: str) -> str:
             "closes this issue (it also closes automatically once the divergence "
             "is resolved).",
             "",
-            "<details><summary>Plan diff</summary>",
+            f"<details><summary>{evidence_label}</summary>",
             "",
             "```text",
             record.detail,
