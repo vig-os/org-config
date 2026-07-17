@@ -57,6 +57,17 @@
           inherit pkgs;
           extraPackages = extraPackages pkgs;
 
+          # Opt into the flake-generated pre-commit config (#883): the shared
+          # base hook set sourced from the pinned vigos toolchain, replacing the
+          # hand-managed .pre-commit-config.yaml. In direnv mode CI runs on the
+          # host runner, where the scaffolded YAML's upstream `pymarkdown` hook
+          # cannot load its `pyjson5` native dep (no FHS libstdc++ off the flake
+          # loader path) — the generated set omits pymarkdown (not in nixpkgs),
+          # matching the sibling direnv consumers (commit-action,
+          # sync-issues-action). .pre-commit-config.yaml is now a generated store
+          # symlink, gitignored via .gitignore.project.
+          hooks = { };
+
           # Opt-in: let the flake GENERATE .pre-commit-config.yaml from the
           # shared base hook set instead of hand-managing the scaffolded
           # YAML — toggle base hooks, add per-hook/global excludes, or add

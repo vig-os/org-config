@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Greenfield scaffold of the shared vigOS dev environment in `direnv` mode: `flake.nix` + `.envrc` dev-shell, layered `justfile`s, managed pre-commit and `.github/` CI, and the `.vig-os` project manifest.
   - Pins move in lockstep: `.vig-os` `DEVKIT_VERSION=1.3.1`, `flake.nix` `vigos.url = "github:vig-os/devkit?ref=1.3.1"`, `flake.lock` locked to the 1.3.1 revision.
   - No language template and no release tag scheme yet (`DEVKIT_TAG_PREFIX`/`DEVKIT_FLOATING_TAGS` unset); the managed `codeql.yml` degrades to the language-less case (`actions` leg only, workflows-only push paths, vig-os/devkit#1142). Release workflows ship dormant.
+  - Pre-commit hooks are flake-generated (`hooks = { }` in `flake.nix`, vig-os/devkit#883), matching the sibling direnv consumers: `.pre-commit-config.yaml` is a generated `/nix/store` symlink (gitignored) and the upstream `pymarkdown` hook is dropped (its `pyjson5` native dep cannot load on the host-runner direnv CI).
 
 ### Changed
 
