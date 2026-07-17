@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Apply-on-merge workflow** ([#19](https://github.com/vig-os/org-config/issues/19))
+  - `.github/workflows/apply.yml` runs a mutating `otterdog apply --local --no-web-ui --force` of the committed config against live `vig-os` on `push` to `dev` touching `otterdog.json`/`otterdog/**` (engine/workflow edits carry no config delta and are excluded from `paths:`), plus `workflow_dispatch` for reruns (ADR-0007 split cadence: config applies from `dev` on merge).
+  - The job runs in the `production` environment (required reviewer `c-vigo`, `dev`-only deployment branch policy): entering it pauses the run until the deployment is approved — the designed human gate before any write token touches live `vig-os`. `push` fires only on this repo (never a fork), so org-admin credentials are never exposed to fork code; an explicit `github.repository` guard asserts this.
+  - A static `otterdog-mutate` concurrency group with `cancel-in-progress: false` serializes all mutations without cancelling mid-apply; the future scheduled drift workflow (#20/#21) must reuse the same group so apply-vs-drift never races.
+  - Uses the full App installation token (ADR-0004 Corrections) with two scoped, justified `github-app` inline zizmor ignores; least-privilege `permissions: contents: read`; `persist-credentials: false` checkout.
+  - `--force` is mandatory for unattended apply (otterdog 1.3.4 prompts and blocks on stdin otherwise); `--local` gates only the vendor re-fetch (same `_init_base_template` skip as `plan`/`validate`), so apply evaluates the exact committed tree; `--delete-resources` is omitted so absent resources are never deleted. Reports otterdog's own apply output to the job summary (truncated safely); a nonzero exit is a failed/partial mutation and reddens the job (unlike plan, mutation errors are not benign report content).
 - **Plan-on-PR workflow (L2)** ([#18](https://github.com/vig-os/org-config/issues/18))
   - `.github/workflows/plan.yml` runs a read-only `otterdog plan --local --no-web-ui` of the committed config against live `vig-os` on same-repo PRs touching `otterdog.json`/`otterdog/**`/the workflow, plus `workflow_dispatch`; forks are excluded per the ADR-0007 same-repo credential guard.
   - `--local` skips otterdog's `_init_base_template` vendor re-fetch, so plan evaluates the exact committed `otterdog/vig-os/vendor/` tree that L0 `otterdog validate --local` checks (no upstream EclipseFdn hooks re-introduced).
