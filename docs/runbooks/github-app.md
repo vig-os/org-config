@@ -54,6 +54,7 @@ permission to **No access**.
 | Repository   | Actions                   | Read         | list repo environments (mapped under Actions)     |
 | Repository   | Administration            | Read & write | repo settings, security, Actions perms, BPRs, rulesets |
 | Repository   | Contents                  | Read         | read committed config (`fetch-config`) — confirmed #16 |
+| Repository   | Custom properties         | Read & write | set repo custom-property VALUES (schema is org-level) |
 | Repository   | Issues                    | Read & write | strict-drift layer opens / updates `drift` issues |
 | Repository   | Metadata                  | Read         | mandatory baseline (auto-selected); never remove  |
 | Repository   | Pages                     | Read & write | Pages config (read at plan, write at apply)       |
@@ -77,6 +78,11 @@ This is the **verified outcome of the #16 spike** (static enumeration of the ott
 - **Organization → Members (Read)** — confirmed and widened in scope: Otterdog's own read path
   requires it (teams, team members, and the teams assigned to the `security_manager` role), not
   just the inventory sweep.
+- **Repository → Custom properties (Read & write)** — confirmed by the first live `apply` (run
+  `29584038705`, verified 2026-07-17): setting a repo's custom-property **values** (the `type`
+  property) 403'd with only the org-level grant. Organization → Custom properties covers the
+  property **schema** (definitions); writing a repository's property **value** needs the separate
+  repository-level permission. Granted, then the apply re-ran green.
 - Write levels are granted **now** so `apply` (#19) needs no second App-settings round-trip. Because
   otterdog jobs run on the **full installation token** (narrowing cannot carry Actions Variables —
   see below), this grant is the permission boundary for **every** otterdog job, `plan` / `drift`
