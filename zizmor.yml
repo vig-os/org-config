@@ -1,0 +1,61 @@
+# zizmor configuration — GitHub Actions security auditing (ADR-0007, L0).
+#
+# zizmor gates org-config's OWN plan/apply/drift workflows against Poisoned
+# Pipeline Execution (ADR-0007 §Public-repo credential rules; #18/#19). Those
+# workflows are intentionally NOT listed below, so every finding in them fails
+# `just validate`.
+#
+# The entries below BASELINE the devkit-managed workflows: they are regenerated
+# by the vigOS devkit on every upgrade (their header banners say so), org-config
+# does not own them, and devkit does not run zizmor over its own output — so
+# their findings are accepted here rather than being unfixable from this repo.
+# Scope is per-audit and per-file (never a `*.yml` glob) precisely so a
+# repo-authored workflow can never inherit a managed file's exemption.
+#
+# Maintenance: a devkit upgrade that adds/renames a managed workflow, or a new
+# audit, surfaces as fresh `just validate` findings — add the managed file here
+# (or fix upstream in vig-os/devkit) as part of that upgrade PR.
+rules:
+  artipacked:
+    ignore:
+      - ci.yml
+      - codeql.yml
+      - prepare-release.yml
+      - promote-release.yml
+      - release-core.yml
+      - release-publish.yml
+      - release.yml
+      - renovate-changelog-build.yml
+      - sync-issues.yml
+      - sync-main-to-dev.yml
+  dangerous-triggers:
+    ignore:
+      - renovate-changelog-commit.yml
+  github-app:
+    ignore:
+      - prepare-release.yml
+      - promote-release.yml
+      - release-core.yml
+      - release-publish.yml
+      - release.yml
+      - renovate-changelog-commit.yml
+      - sync-issues.yml
+      - sync-main-to-dev.yml
+  secrets-inherit:
+    ignore:
+      - prepare-release.yml
+      - release.yml
+  template-injection:
+    ignore:
+      - sync-main-to-dev.yml
+  unpinned-images:
+    ignore:
+      - ci.yml
+      - prepare-release.yml
+      - promote-release.yml
+      - release-core.yml
+      - release-publish.yml
+      - release.yml
+      - renovate-changelog-build.yml
+      - sync-issues.yml
+      - sync-main-to-dev.yml

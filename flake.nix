@@ -47,7 +47,15 @@
         #   ];
         # ────────────────────────────────────────────────────────────────────
         extraPackages = pkgs: [
-          # add project tools here
+          # Otterdog toolchain (ADR-0005). otterdog itself is run via `uvx`
+          # (pinned in justfile.project) so CI and downstream template repos
+          # stay self-sufficient without this flake; the dev-shell carries the
+          # supporting tools so humans do not hand-install them.
+          pkgs.sops # secrets: SOPS/age backend (ADR-0003)
+          pkgs.age # secrets: age keys for SOPS
+          pkgs.go-jsonnet # jsonnet + jsonnetfmt (config renderer / L0 fmt)
+          pkgs.actionlint # L0: GitHub Actions workflow linter
+          pkgs.zizmor # L0: GitHub Actions security auditor
         ];
       in
       {
@@ -66,7 +74,36 @@
           # matching the sibling direnv consumers (commit-action,
           # sync-issues-action). .pre-commit-config.yaml is now a generated store
           # symlink, gitignored via .gitignore.project.
-          hooks = { };
+          #
+          # L0 config-specific hooks (ADR-0007) composed on top of the shared
+          # base set. Custom `language = "system"` hooks resolve their tools
+          # from the dev-shell PATH (extraPackages above), the same pattern the
+          # devkit base uses for actionlint/shellcheck. zizmor is deliberately
+          # NOT a hook — it needs the repo-root zizmor.yml baseline and stays in
+          # `just validate` only (see justfile.project) so a devkit-managed
+          # workflow finding can never turn `just precommit`/CI red.
+          hooks = {
+            # jsonnetfmt --test: fail on unformatted otterdog jsonnet. No-op
+            # until the config lands (#17): with no matching files prek skips
+            # it. go-jsonnet's implementation, per ADR-0005.
+            jsonnetfmt = {
+              enable = true;
+              name = "jsonnetfmt (check otterdog jsonnet formatting)";
+              entry = "jsonnetfmt --test";
+              language = "system";
+              files = "^otterdog/.*\\.(jsonnet|libsonnet)$";
+            };
+            # actionlint over this repo's workflows (auto-discovery, like the
+            # devkit base hook — pass_filenames = false).
+            actionlint = {
+              enable = true;
+              name = "actionlint (lint GitHub Actions workflows)";
+              entry = "actionlint";
+              language = "system";
+              files = "^\\.github/workflows/.*\\.ya?ml$";
+              pass_filenames = false;
+            };
+          };
 
           # Opt-in: let the flake GENERATE .pre-commit-config.yaml from the
           # shared base hook set instead of hand-managing the scaffolded
