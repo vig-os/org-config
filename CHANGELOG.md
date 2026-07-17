@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Plan-on-PR workflow (L2)** ([#18](https://github.com/vig-os/org-config/issues/18))
+  - `.github/workflows/plan.yml` runs a read-only `otterdog plan --local --no-web-ui` of the committed config against live `vig-os` on same-repo PRs touching `otterdog.json`/`otterdog/**`/the workflow, plus `workflow_dispatch`; forks are excluded per the ADR-0007 same-repo credential guard.
+  - `--local` skips otterdog's `_init_base_template` vendor re-fetch, so plan evaluates the exact committed `otterdog/vig-os/vendor/` tree that L0 `otterdog validate --local` checks (no upstream EclipseFdn hooks re-introduced).
+  - Uses the full App installation token (ADR-0004 Corrections) with two scoped, justified `github-app` inline zizmor ignores; least-privilege `permissions:` (`contents: read`, `pull-requests: write`); per-PR concurrency with cancel-in-progress.
+  - Posts the plan as a marker-keyed PR comment updated in place (truncated safely, with run link) and to the job summary; the job fails only on validation/auth/harness errors — drift (exit 0) is report content, not failure. A fixed footnote flags the expected benign `vs-dolt` `code_scanning_default_languages` drift.
 - **Import `vig-os` Otterdog configuration** ([#17](https://github.com/vig-os/org-config/issues/17))
   - `otterdog.json` (repo root) declares the `vig-os` org, `org-config` config repo, the `env` credential provider (`OTTERDOG_TOKEN` + dummy web-UI credential keys, unused on the App-token path), the pinned `EclipseFdn/otterdog-defaults@v0.13.1` base template, and `config_dir: otterdog` so all config lives under `otterdog/` (ADR-0006 dogfooding).
   - `otterdog/vig-os/vig-os.jsonnet`: normalized org config imported from live `vig-os`, declaring all 16 repos including the private `qms` (ADR-0006), plus org settings, secrets, rulesets, environments, and the `type` custom property. Drift-free against live so #18's first `plan` shows an empty diff; the 12 web-UI-only org settings stay unmanaged (spike #16).
