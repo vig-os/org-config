@@ -13,6 +13,33 @@ from pathlib import Path
 import pytest
 
 FIXTURES = Path(__file__).parent / "fixtures"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# The real declared repo set committed in otterdog/vig-os/vig-os.jsonnet. Kept
+# here as the L1 ground truth: the inventory sweep must extract exactly this set
+# from the committed config (verified equal to a full go-jsonnet evaluation of
+# the same file — see test_inventory).
+DECLARED_REPOS: frozenset[str] = frozenset(
+    {
+        "commit-action",
+        "devkit",
+        "devkit-smoke-test",
+        "h5v",
+        "meta",
+        "nvd-mirror",
+        "org-config",
+        "org-config-testbed",
+        "os-config",
+        "part-registry",
+        "qms",
+        "qx",
+        "scitadel",
+        "sync-issues-action",
+        "tessera",
+        "vigos-mvp",
+        "vs-dolt",
+    }
+)
 
 
 def _read(name: str) -> str:
@@ -45,5 +72,17 @@ def plan_mixed() -> str:
 
 @pytest.fixture
 def allowlist_path() -> Path:
-    """Allow-list flagging the vs-dolt divergence as expected."""
+    """Allow-list flagging vs-dolt (expected) + two `[[unmanaged]]` repos."""
     return FIXTURES / "allowlist.toml"
+
+
+@pytest.fixture
+def declared_jsonnet() -> str:
+    """The real committed otterdog config — the declared-set extraction source."""
+    return (REPO_ROOT / "otterdog" / "vig-os" / "vig-os.jsonnet").read_text()
+
+
+@pytest.fixture
+def declared_repos() -> frozenset[str]:
+    """The known committed declared repo set (ground truth)."""
+    return DECLARED_REPOS

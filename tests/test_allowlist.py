@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from drift_layer.allowlist import apply_allowlist, load_allowlist
+from drift_layer.allowlist import apply_allowlist, load_allowlist, load_unmanaged
 from drift_layer.parser import parse_plan
 
 
@@ -35,3 +35,13 @@ def test_apply_with_no_entries_flags_nothing(plan_pr42: str) -> None:
     parsed = parse_plan(plan_pr42)
     flagged = apply_allowlist(parsed.records, [])
     assert all(not r.expected for r in flagged)
+
+
+def test_load_unmanaged_reads_repository_names(allowlist_path: Path) -> None:
+    names = load_unmanaged(allowlist_path)
+    assert names == {"legacy-sandbox", "external-mirror"}
+
+
+def test_load_unmanaged_missing_is_empty(tmp_path: Path) -> None:
+    assert load_unmanaged(None) == set()
+    assert load_unmanaged(tmp_path / "nope.toml") == set()
