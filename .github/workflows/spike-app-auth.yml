@@ -126,10 +126,20 @@ jobs:
           OTTERDOG_TOKEN: ${{ steps.app-token.outputs.token }}
           WORKDIR: ${{ runner.temp }}/otterdog-spike
         run: |
-          set -uo pipefail
+          # Strict mode guards the harness only. GitHub's default shell is
+          # `bash -e {0}`; probe invocations run under a scoped `set +e` inside
+          # run_probe so probe outcomes are report content, never step status —
+          # the control probe is EXPECTED to fail without reddening the job.
+          set -euo pipefail
           CFG="$WORKDIR/otterdog.json"
           LOGDIR="$WORKDIR/logs"
-          OTTER=(uvx --from "otterdog@${OTTERDOG_VERSION}" otterdog)
+          mkdir -p "$LOGDIR"
+          # otterdog 1.3.4's `env` credential provider does `from dotenv import
+          # load_dotenv`, but python-dotenv is missing from its published
+          # dependency set (mintotp and playwright ARE declared) — without the
+          # pinned --with injection every probe dies with
+          # "No module named 'dotenv'" (spike run 29573080546).
+          OTTER=(uvx --with python-dotenv==1.1.0 --from "otterdog@${OTTERDOG_VERSION}" otterdog)
 
           {
             echo "# SPIKE REPORT — App-token coverage of Otterdog settings (#16)"
@@ -144,12 +154,18 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           # run_probe <label> <note> -- <command...>
+          # Never aborts the step: the probe runs with errexit suspended, its
+          # exit code is captured, its full log lands in $LOGDIR, and a PASS/FAIL
+          # section is appended to the job summary. Always returns 0.
           run_probe() {
             local label="$1"; local note="$2"; shift 3   # drop label, note, "--"
             local log="$LOGDIR/${label// /_}.log"
+            local rc
             echo "::group::${label}"
+            set +e
             "$@" >"$log" 2>&1
-            local rc=$?
+            rc=$?
+            set -e
             cat "$log"
             echo "::endgroup::"
             local status
