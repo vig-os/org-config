@@ -101,7 +101,7 @@ validate:
     actionlint
     zizmor --offline .github/workflows
     @if [ -d otterdog ]; then find otterdog -type f \( -name '*.jsonnet' -o -name '*.libsonnet' \) -print0 | xargs -0 -r jsonnetfmt --test && echo "jsonnetfmt: OK"; else echo "jsonnetfmt: skipped (otterdog/ config lands in #17)"; fi
-    @if [ -d otterdog ]; then uvx --with python-dotenv==1.1.0 --from otterdog@{{ otterdog_version }} otterdog validate --local; else echo "otterdog validate: skipped (otterdog/ config lands in #17)"; fi
+    @if [ -d otterdog ]; then OTTERDOG_TOKEN="${OTTERDOG_TOKEN:-otterdog-local-validate-placeholder}" uvx --with python-dotenv==1.1.0 --from otterdog@{{ otterdog_version }} otterdog validate --local; else echo "otterdog validate: skipped (otterdog/ config lands in #17)"; fi
 
 # ===============================================================================
 # PROJECT-SPECIFIC RECIPES
