@@ -13,11 +13,18 @@
 # secret, so the probe must run inside GitHub Actions — triggered by a same-repo
 # draft PR that touches this file, or by workflow_dispatch for reruns.
 #
-# The mechanism that makes App-only operation possible: `otterdog plan -n`
-# (`--no-web-ui`) resolves credentials with `only_token=True`
-# (otterdog 1.3.4, providers/github diff_operation.py), so ONLY the api_token is
-# used and the 12 web-UI-only org settings are skipped. Running plan WITHOUT -n
-# forces Otterdog to demand web credentials — the control step below proves it.
+# The mechanism that makes App-only operation possible (otterdog 1.3.4 source):
+# - `plan -n` (`--no-web-ui`) resolves credentials with `only_token=True`
+#   (operations/diff_operation.py:132), so ONLY the api_token is needed.
+# - `import -n` resolves FULL credentials regardless (operations/
+#   import_configuration.py:78 calls get_credentials without only_token), but
+#   never USES the web credentials: WebClient.__init__ only stores them
+#   (providers/github/web.py), Playwright launches solely inside
+#   WebClient.get_org_settings, and that call is gated by `if not no_web_ui`
+#   (providers/github/__init__.py:113). Dummy username/password/twofa_seed
+#   values therefore satisfy resolution and are provably never exercised.
+# Running plan WITHOUT -n drives the real web machinery — the control step
+# below proves that path demands non-App auth (browser + human account creds).
 #
 # Triggers: pull_request (only when THIS file changes) · workflow_dispatch
 # Not part of managed CI and never merges (ADR-0007). Do not add to CHANGELOG.
@@ -110,7 +117,10 @@ jobs:
                 "config_repo": "org-config",
                 "credentials": {
                   "provider": "env",
-                  "api_token": "OTTERDOG_TOKEN"
+                  "api_token": "OTTERDOG_TOKEN",
+                  "username": "SPIKE_DUMMY_USERNAME",
+                  "password": "SPIKE_DUMMY_PASSWORD",
+                  "twofa_seed": "SPIKE_DUMMY_TWOFA_SEED"
                 }
               }
             ]
@@ -124,6 +134,13 @@ jobs:
           # The env credential provider reads the token from this variable; the
           # value is the read-only App installation token minted above.
           OTTERDOG_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Dummy web credentials: `import` resolves full credentials even with
+          # --no-web-ui (import_configuration.py:78, run 29573312085 failed with
+          # "required key 'username' not found"), but never uses them on that
+          # path (see header). Clearly-fake values keep the spike App-only.
+          SPIKE_DUMMY_USERNAME: spike-dummy-unused
+          SPIKE_DUMMY_PASSWORD: spike-dummy-unused
+          SPIKE_DUMMY_TWOFA_SEED: spike-dummy-unused
           WORKDIR: ${{ runner.temp }}/otterdog-spike
         run: |
           # Strict mode guards the harness only. GitHub's default shell is
@@ -155,8 +172,10 @@ jobs:
 
           # run_probe <label> <note> -- <command...>
           # Never aborts the step: the probe runs with errexit suspended, its
-          # exit code is captured, its full log lands in $LOGDIR, and a PASS/FAIL
-          # section is appended to the job summary. Always returns 0.
+          # exit code is captured (also exported as LAST_PROBE_RC for gating),
+          # its full log lands in $LOGDIR, and a PASS/FAIL section is appended
+          # to the job summary. Always returns 0.
+          LAST_PROBE_RC=0
           run_probe() {
             local label="$1"; local note="$2"; shift 3   # drop label, note, "--"
             local log="$LOGDIR/${label// /_}.log"
@@ -166,6 +185,7 @@ jobs:
             "$@" >"$log" 2>&1
             rc=$?
             set -e
+            LAST_PROBE_RC=$rc
             cat "$log"
             echo "::endgroup::"
             local status
@@ -183,9 +203,13 @@ jobs:
             return 0
           }
 
-          # 1. What does the App token actually grant? Direct coverage evidence.
+          # 1. Kept for the record, with a caveat: this otterdog check inspects
+          #    the X-OAuth-Scopes response header, which only classic PATs carry.
+          #    App installation tokens have fine-grained permissions and NO such
+          #    header, so "empty granted scopes" here is expected and meaningless
+          #    (run 29573312085) — it is NOT evidence of a missing permission.
           run_probe "check-token-permissions" \
-            "Lists the scopes the App installation token grants (App-reach ceiling)." \
+            "CAVEAT — otterdog reads the X-OAuth-Scopes header, which exists only for classic PATs. App installation tokens never carry it, so empty/missing granted scopes here is EXPECTED and says nothing about App-token coverage. Kept only for the record; coverage evidence comes from the import/plan probes below." \
             -- "${OTTER[@]}" check-token-permissions -c "$CFG" -l vig-os
 
           # 2. fetch-config: mandated by #16. Pulls otterdog/vig-os.jsonnet from
@@ -198,24 +222,42 @@ jobs:
           # 3. import --no-web-ui: THE coverage probe. Reads the full LIVE
           #    org+repo settings surface via the App token (REST/GraphQL only) and
           #    writes orgs/vig-os.jsonnet. 403/404s here mark settings the token
-          #    cannot read within the requested scopes.
+          #    cannot read within the requested scopes. import resolves full
+          #    credentials (import_configuration.py:78) — the dummy web creds
+          #    satisfy that — but with --no-web-ui the web client is never used
+          #    (get_org_settings gated at providers/github/__init__.py:113), so
+          #    the API reads are App-token-only.
           run_probe "import (--no-web-ui)" \
-            "Reads the full live settings surface with the App token only and generates the local config. HTTP 403/404 lines = settings outside App reach or requested scopes." \
+            "Reads the full live settings surface with the App token only and generates the local config. Dummy web credentials satisfy otterdog's unconditional credential resolution but are provably never used with --no-web-ui. HTTP 403/404 lines = settings outside App reach or requested scopes." \
             -- "${OTTER[@]}" import -c "$CFG" --no-web-ui -f vig-os
+          IMPORT_RC=$LAST_PROBE_RC
 
           # 4. plan --no-web-ui: mandated by #16. Diffs the imported local config
           #    against live using only_token=True (App token only). Should show
-          #    little/no drift if import succeeded — confirms the read path.
-          run_probe "plan (--no-web-ui)" \
-            "Diffs local vs live with the App token only (only_token=True). Confirms App-only plan works end to end." \
-            -- "${OTTER[@]}" plan -c "$CFG" --no-web-ui vig-os
+          #    little/no drift if import succeeded — THE App-only-plan
+          #    confirmation. Gated: without a successful import there is no local
+          #    config to diff, so the probe would only re-report import's failure.
+          if [ "$IMPORT_RC" -eq 0 ]; then
+            run_probe "plan (--no-web-ui)" \
+              "Diffs the just-imported local config against live with the App token only (only_token=True, diff_operation.py:132). Little/no drift expected — this is the critical App-only-plan confirmation." \
+              -- "${OTTER[@]}" plan -c "$CFG" --no-web-ui vig-os
+          else
+            {
+              echo "### plan (--no-web-ui) — SKIPPED"
+              echo
+              echo "Skipped: import failed (exit ${IMPORT_RC}), so no local config exists to diff."
+              echo "Fix the import failure first — this probe is the critical App-only-plan confirmation."
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-          # 5. CONTROL: plan WITHOUT --no-web-ui. Otterdog now resolves web
-          #    credentials (only_token=False) and, lacking username/password/TOTP,
-          #    fails fast. This is the empirical proof that the web-UI settings
-          #    demand non-App auth. Expected to FAIL — failure is the point.
+          # 5. CONTROL: plan WITHOUT --no-web-ui. Credential resolution now
+          #    succeeds (dummy web creds), so the failure moves into the web
+          #    machinery itself: Playwright browser launch / GitHub web login,
+          #    which needs a real human account + TOTP. Expected to FAIL —
+          #    empirical proof that the web-UI settings demand non-App auth.
           run_probe "plan (web-ui, control)" \
-            "CONTROL — plan without --no-web-ui forces Otterdog to demand web credentials (username/password/TOTP). Expected FAIL: proves the web-UI settings need non-App auth." \
+            "CONTROL — plan without --no-web-ui exercises the web-UI path (Playwright + username/password/TOTP). With dummy creds it fails inside the web machinery (browser launch or GitHub login). Expected FAIL: proves the 12 web-UI settings need non-App auth." \
             -- "${OTTER[@]}" plan -c "$CFG" vig-os
 
           # Static enumeration from otterdog 1.3.4 resources/schemas/settings.json
