@@ -1,0 +1,233 @@
+# Apply-on-merge — mutating `otterdog apply` of the committed config against live
+# `vig-os`, run from trunk `dev` after a config change merges (issue #19,
+# ADR-0007 split cadence: "config applies from `dev` on merge").
+#
+# This is a repo-OWNED workflow (not devkit-managed), so zizmor gates it in full:
+# it is deliberately absent from zizmor.yml, and the only accepted findings are
+# the two scoped, justified `github-app` inline ignores below. Everything else
+# must be fixed here, not baselined.
+#
+# HUMAN GATE ON MUTATIONS (ADR-0007 §Public-repo credential rules, BINDING):
+#   - The job runs in the `production` environment, which on this repo requires
+#     reviewer `c-vigo` and restricts deployments to the `dev` branch. Entering
+#     that environment pauses the run until the reviewer approves — this wait IS
+#     the designed manual gate before any write token touches live `vig-os`. No
+#     `apply` mutates without a human first approving the deployment.
+#   - `apply` runs ONLY from trunk `dev`: `push` events fire on this repo, never
+#     on a fork (a fork cannot push to the base repo), so org-admin credentials
+#     are never exposed to fork code (OWASP CICD-SEC-4, Poisoned Pipeline
+#     Execution). The `if:` below asserts the repo identity as belt-and-braces.
+#   - Least-privilege `permissions: contents: read` — the job only reads the
+#     committed config; all write capability rides the App installation token,
+#     not GITHUB_TOKEN.
+#
+# SERIALIZED MUTATIONS (ADR-0007 BINDING): the static `otterdog-mutate`
+# concurrency group with `cancel-in-progress: false` means overlapping applies
+# queue and run one at a time, never cancelling a run mid-mutation. The future
+# scheduled drift workflow (#20/#21) MUST declare this SAME `otterdog-mutate`
+# group so apply-vs-drift is serialized too — a reconciler racing itself (or a
+# concurrent apply) manufactures phantom drift.
+#
+# Trigger scope: only `otterdog.json` / `otterdog/**` changes apply anything.
+# Engine or workflow edits carry no config delta, so they are deliberately NOT
+# in `paths:` — editing this file does not trigger an apply. `workflow_dispatch`
+# covers manual reruns.
+#
+# Auth (ADR-0004 Corrections, spike #16): otterdog's write surface needs the
+# FULL App installation token — a narrowed token cannot carry Actions Variables
+# (GitHub's token-narrowing schema has no key for them), and otterdog's
+# org-variables read is fatal on 403. The App grant is the permission boundary;
+# write capability is scoped to this one environment-gated, serialized job, per
+# ADR-0004's "write only in `apply`".
+#
+# Non-interactive apply (otterdog 1.3.4, verified from installed source):
+#   - `--force` (`-f`) is MANDATORY. Without it, `ApplyOperation.handle_finish`
+#     (operations/apply.py:110-121) prompts "Do you want to perform these
+#     actions?" and blocks on `get_approval()` -> `input()` (utils.py:581);
+#     under CI stdin the read hits EOF and the process aborts (exit 2) without
+#     applying. `--force` sets `force_processing=True` (cli.py apply option
+#     -f/--force), skipping the prompt so the apply runs unattended.
+#   - `--no-web-ui` (`-n`) skips the 12 web-UI-only settings no App token can
+#     reach (ADR-0004 Corrections) and resolves credentials token-only, so the
+#     dummy web-cred vars are never exercised (same as plan).
+#   - `--local` gates ONLY the vendor re-fetch, identically to plan: it is a
+#     shared `StdCommand` option (cli.py:89-98), flows to
+#     `JsonnetConfig(local_only=...)` (config.py:117), and `init_template` skips
+#     `_init_base_template` when `local_only` is set (jsonnet.py:~92) — the same
+#     `_init_base_template` gate `plan --local` and `validate --local` use. So
+#     apply evaluates the EXACT committed `otterdog/vig-os/vendor/` tree that L0
+#     validate and L2 plan check; credentials and the live diff are unaffected.
+#   - `--delete-resources` is deliberately OMITTED: resources absent from the
+#     config are NOT deleted (apply.py:142-144 skips REMOVE patches without the
+#     flag). Destructive deletions stay a manual, explicitly-flagged operation.
+#
+# Exit-code contract (apply.py + diff_operation.py + cli.py `_execute_operation`):
+#   - 0  = success: all live patches applied, or nothing to apply. This is the
+#          ONLY green outcome.
+#   - N>0 = N live-patch applications failed; each `patch.apply` RuntimeError is
+#          caught and counted (apply.py:146-153), the apply is PARTIAL, and
+#          `handle_finish` returns the error count -> the job must go red.
+#   - 1  = invalid credentials / config load failure / RuntimeError abort
+#          (diff_operation.py:118-126, 155-165).
+#   - 2  = uncaught exception, e.g. config-load failure in `StdCommand.invoke`
+#          or the EOF-on-prompt path if `--force` were ever dropped
+#          (cli.py:113-115, `_execute_operation` except).
+# Unlike plan (where a nonzero exit is benign-config signal rendered as report
+# content), an apply error IS a failed mutation: it reddens the job. The job
+# summary still records otterdog's own apply output so a reviewer can see
+# exactly what was and was not applied.
+
+name: Apply
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - dev
+    paths:
+      - otterdog.json
+      - otterdog/**
+  workflow_dispatch:
+
+# Static, cross-workflow concurrency group so all mutations serialize (never
+# cancel mid-apply). The scheduled drift workflow (#20/#21) MUST reuse this
+# exact group name so apply and drift never run concurrently.
+concurrency:
+  group: otterdog-mutate
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  apply:
+    name: Apply committed config to live vig-os
+    # ADR-0007 BINDING: apply runs only from this repo's trunk; a fork cannot
+    # push to the base repo, so this is trivially true and here to be explicit.
+    if: github.repository == 'vig-os/org-config'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # The production environment (required reviewer c-vigo, dev-only deployment
+    # branch policy) is the human approval gate on mutations — the run pauses
+    # here until the deployment is approved.
+    environment: production
+    permissions:
+      contents: read          # read the committed otterdog config
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      # Otterdog version pin: justfile.project (`otterdog_version`) is the single
+      # source of truth (ADR-0005); read it here so CI never carries a second,
+      # drift-prone copy of the pin.
+      - name: Resolve otterdog version pin
+        run: |
+          set -euo pipefail
+          version="$(grep -oP 'otterdog_version\s*:=\s*"\K[^"]+' justfile.project)"
+          if [ -z "${version}" ]; then
+            echo "::error::could not resolve otterdog_version from justfile.project"
+            exit 1
+          fi
+          echo "OTTERDOG_VERSION=${version}" >> "$GITHUB_ENV"
+          echo "Resolved otterdog version: ${version}"
+
+      # FULL installation token — NO permission-* narrowing (ADR-0004
+      # Corrections): the App grant is the boundary; a narrowed token cannot read
+      # Actions Variables. `owner: vig-os` makes it org-wide because apply must
+      # write across every managed repo. zizmor's github-app finding on the broad
+      # token is an acknowledged, deliberate decision recorded INLINE (never in
+      # zizmor.yml, which would silently exempt future edits of this file).
+      - name: Mint full App installation token (unnarrowed, org-wide)
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3 # zizmor: ignore[github-app]
+        with:
+          client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+          owner: vig-os  # zizmor: ignore[github-app]
+
+      - name: Run otterdog apply (mutating, committed config)
+        id: apply
+        env:
+          # The `env` credential provider reads the token from this variable.
+          OTTERDOG_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Dummy web credentials. `apply --no-web-ui` resolves credentials with
+          # only_token=True (diff_operation.py:132), so these are not exercised;
+          # they are supplied to satisfy the env provider's declared keys
+          # robustly and are provably never used on the --no-web-ui path.
+          OTTERDOG_DUMMY_USERNAME: apply-dummy-unused
+          OTTERDOG_DUMMY_PASSWORD: apply-dummy-unused
+          OTTERDOG_DUMMY_TWOFA_SEED: apply-dummy-unused
+          # Deterministic, unwrapped rich output for a clean code block.
+          NO_COLOR: "1"
+          COLUMNS: "200"
+        run: |
+          # No errexit around otterdog: its exit code is captured and reported,
+          # then reflected as job status in a later step so the apply output
+          # always reaches the summary first.
+          set -uo pipefail
+          OTTER=(uvx --with python-dotenv==1.1.0 --from "otterdog@${OTTERDOG_VERSION}" otterdog)
+          set +e
+          "${OTTER[@]}" apply --local --no-web-ui --force -c otterdog.json vig-os >apply.txt 2>&1
+          rc=$?
+          set -e
+          echo "rc=${rc}" >> "$GITHUB_OUTPUT"
+          echo "otterdog apply exited ${rc}"
+          cat apply.txt
+
+      - name: Build apply report (job summary)
+        if: always() && steps.apply.outcome != 'skipped'
+        env:
+          APPLY_RC: ${{ steps.apply.outputs.rc }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          [ -f apply.txt ] || echo "(no apply output was produced — the apply step did not run to completion)" > apply.txt
+
+          if [ "${APPLY_RC:-1}" = "0" ]; then
+            status="Apply completed cleanly (exit 0): all changes were applied to live \`vig-os\`, or there was nothing to apply."
+          else
+            status="Apply exited with code \`${APPLY_RC}\`. \`apply\` is nonzero only on a failed or partial mutation (or invalid config/auth/harness) — the apply did **not** fully succeed. See the run log; the job is failed."
+          fi
+
+          # --- Job summary (generous 1 MiB budget; truncate very large output) ---
+          MAX_APPLY_BYTES=900000
+          if [ "$(wc -c < apply.txt)" -gt "${MAX_APPLY_BYTES}" ]; then
+            head -c "${MAX_APPLY_BYTES}" apply.txt > apply.summary.txt
+            printf '\n... [output truncated for the summary — see the full log in the run] ...\n' >> apply.summary.txt
+          else
+            cp apply.txt apply.summary.txt
+          fi
+
+          {
+            echo "## Otterdog apply — \`vig-os\` (mutating)"
+            echo
+            echo "_\`apply --local --no-web-ui --force\` against the committed config — the exact tree L0 \`otterdog validate --local\` checks and L2 \`plan\` previewed. Changes were written to live \`vig-os\`._"
+            echo
+            echo "${status}"
+            echo
+            echo '```text'
+            cat apply.summary.txt
+            echo '```'
+            echo
+            echo "[Run log](${RUN_URL}) · triggered by \`${EVENT_NAME}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Reflect otterdog's exit code as the job status AFTER the summary is
+      # written, so a failed/partial mutation reddens the check while the summary
+      # still shows exactly what was applied. A nonzero apply IS a failed
+      # mutation (not benign drift), so it fails the job.
+      - name: Fail on apply error
+        if: always() && steps.apply.outcome != 'skipped'
+        env:
+          APPLY_RC: ${{ steps.apply.outputs.rc }}
+        run: |
+          set -euo pipefail
+          if [ "${APPLY_RC:-1}" != "0" ]; then
+            echo "::error::otterdog apply failed (exit ${APPLY_RC}); the mutation was partial or aborted — check the config, auth, or harness and re-run."
+            exit 1
+          fi
+          echo "otterdog apply succeeded (exit 0); the committed config is live on vig-os."
