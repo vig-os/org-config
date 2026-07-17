@@ -91,16 +91,34 @@ private key is a **per-org bootstrap secret** held outside managed config per `o
 
 ## Open items
 
-> **OPEN ITEM (issue #16, M2):** App-token coverage of the Otterdog settings surface is *assumed complete*
-> (issue #1 reevaluation) but not yet empirically verified — Otterdog has historically also supported
-> credential-based web flows for a few settings. The M2 spike runs `fetch-config` + `plan` + a scoped
-> `apply` against `vig-os` with an App token only, documents any setting requiring non-App auth, and
-> decides manage-vs-exclude per setting. **This ADR's Corrections log is the designated landing place for
-> that outcome** if the assumption breaks.
+> **RESOLVED (issue #16, M2 — run 29574758804):** App-token coverage of the Otterdog settings surface
+> was *assumed complete* (issue #1 reevaluation) but unverified. The M2 spike ran `import` + `plan`
+> against `vig-os` with an App token only and confirmed App-token-only operation is viable, with one
+> structural constraint: installation-token narrowing cannot express Actions Variables, so otterdog
+> jobs use the **full** installation token (App grant = boundary). It also found **12 web-UI-only org
+> settings** that no App token can reach (excluded from managed config). Both outcomes, plus the
+> `import` dummy-credential quirk, are recorded in the **Corrections** log below — the designated
+> landing place. No open item remains here.
 
 ## Corrections
 
-_None yet._ The issue #16 spike outcome lands here if the App-token coverage assumption above is falsified.
+> **2026-07-17 — spike #16 (definitive run 29574758804):** the Decision above assumed per-job
+> least-privilege token **narrowing for all workflows** (read-only `plan` / `drift`, write-only
+> `apply`). The spike falsified this for the otterdog jobs. GitHub's installation-token narrowing API
+> (`app-permissions` on create-installation-access-token) has **no key for Actions Variables**, while
+> otterdog's `GET /orgs/{org}/actions/variables` read is **fatal on 403** — an empirical 14-scope
+> narrowed read token failed at exactly and only that endpoint. **Correction:** the otterdog jobs
+> (`plan`, `apply`, and the otterdog leg of scheduled `drift`) run on the **full installation
+> token**; the App's own grant is the permission boundary, not a per-job `permissions:` block.
+> Per-job narrowing survives **only** for the drift layer's issue operations. Two further spike
+> facts recorded here: (a) **12 org settings are web-UI-only** (otterdog schema `"provider": "web"`,
+> e.g. `default_branch_name`, `two_factor_requirement`, `has_discussions`) — unreachable by any App
+> token, hence excluded from managed config; (b) `otterdog import` resolves the **full** web
+> credentials even under `--no-web-ui` but never exercises them with `-n`, so supplying **dummy**
+> `username` / `password` / `twofa_seed` env values unblocks it (the App token does the actual work;
+> `plan -n` is token-only by construction). The auth-model verdict — App-only identity plus
+> break-glass PAT — stands unchanged; only the narrowing *granularity* is amended, so status remains
+> **Accepted**.
 
 ## Supersession triggers
 

@@ -14,9 +14,11 @@ One GitHub App is the machine identity for the whole fleet:
 - **One App**, suggested slug `vig-os-org-config`, **owned by the `vig-os` org**.
 - **Installed once per managed org** (`vig-os` first; `exo-pet`, `exoma-ch`, `MorePET` at rollout),
   scoped to **all repositories** on that org.
-- Each org's config repo mints **per-job, least-privilege installation tokens** from it via
-  `actions/create-github-app-token` — read-only for `plan` and scheduled `drift`, write only in
-  `apply` (ADR-0004).
+- Each org's config repo authenticates its otterdog jobs (`plan`, `apply`, scheduled `drift`) with
+  the **full installation token** minted via `actions/create-github-app-token`: GitHub's
+  token-narrowing API cannot express the Actions Variables scope otterdog reads, so the App's own
+  grant — not a per-job `permissions:` block — is the permission boundary. Per-job narrowing is
+  retained **only** for the drift layer's issue operations (ADR-0004).
 
 One App owned centrally, installed per org, keeps a single identity and a single key-rotation
 surface while the audit trail for each org's changes stays inside that org's own config repo.
@@ -47,27 +49,58 @@ Grant the minimum surface Otterdog needs to read and apply org + repo settings, 
 write the strict-drift layer uses to open deduplicated `drift` issues. Set every unlisted
 permission to **No access**.
 
-| Category     | Permission     | Access       | Why                                                       |
-| ------------ | -------------- | ------------ | --------------------------------------------------------- |
-| Repository   | Administration | Read & write | repo settings, branch protection, repo rulesets           |
-| Repository   | Contents       | Read         | read config / CODEOWNERS — verify in #16                  |
-| Repository   | Issues         | Read & write | strict-drift layer opens / updates `drift` issues         |
-| Repository   | Metadata       | Read         | mandatory baseline (auto-selected); never remove          |
-| Organization | Administration | Read & write | org settings and org rulesets                             |
-| Organization | Members        | Read         | inventory sweep only; membership mgmt deferred — verify in #16 |
-| Organization | Secrets        | Read & write | apply org Actions secrets (SOPS/age plaintext at apply)   |
-| Organization | Variables      | Read & write | apply org Actions variables                               |
+| Category     | Permission                | Access       | Why                                               |
+| ------------ | ------------------------- | ------------ | ------------------------------------------------- |
+| Repository   | Actions                   | Read         | list repo environments (mapped under Actions)     |
+| Repository   | Administration            | Read & write | repo settings, security, Actions perms, BPRs, rulesets |
+| Repository   | Contents                  | Read         | read committed config (`fetch-config`) — confirmed #16 |
+| Repository   | Issues                    | Read & write | strict-drift layer opens / updates `drift` issues |
+| Repository   | Metadata                  | Read         | mandatory baseline (auto-selected); never remove  |
+| Repository   | Pages                     | Read & write | Pages config (read at plan, write at apply)       |
+| Repository   | Secrets                   | Read & write | repo Actions secrets (read names, write at apply) |
+| Repository   | Variables                 | Read & write | repo Actions variables — see narrowing gap below  |
+| Repository   | Webhooks                  | Read & write | repo webhooks                                     |
+| Organization | Administration            | Read & write | org settings, Actions perms, installs, rulesets   |
+| Organization | Custom organization roles | Read         | `security_manager` role lookup on every plan      |
+| Organization | Custom properties         | Read & write | property schema (read at plan, write at apply)    |
+| Organization | Members                   | Read         | teams + team members — confirmed in #16           |
+| Organization | Secrets                   | Read & write | org Actions secrets (SOPS/age plaintext at apply) |
+| Organization | Variables                 | Read & write | org Actions variables — see narrowing gap below   |
+| Organization | Webhooks                  | Read & write | org webhooks                                      |
 
-Two rows are marked **verify in #16** — their need is not yet confirmed and the M2 spike
-(issue #16, "verify App-token coverage of the Otterdog settings surface") settles them:
+This is the **verified outcome of the #16 spike** (static enumeration of the otterdog 1.3.4
+`import` / `plan --no-web-ui` read path, endpoint→permission mapping per GitHub's
+[permissions-required-for-github-apps] reference), replacing the earlier "verify in #16" flags:
 
-- **Repository → Contents (Read)** — expected for reading a repo's config / CODEOWNERS, but whether
-  Otterdog's apply path actually requires it (vs. Metadata alone) is unconfirmed.
-- **Organization → Members (Read)** — teams / membership management is a v1 non-goal; this is only
-  the inventory sweep's undeclared-actor check. Drop it if #16 shows apply does not touch it.
+- **Repository → Contents (Read)** — confirmed: `fetch-config` reads the committed config via the
+  contents API.
+- **Organization → Members (Read)** — confirmed and widened in scope: Otterdog's own read path
+  requires it (teams, team members, and the teams assigned to the `security_manager` role), not
+  just the inventory sweep.
+- Write levels are granted **now** so `apply` (#19) needs no second App-settings round-trip. Because
+  otterdog jobs run on the **full installation token** (narrowing cannot carry Actions Variables —
+  see below), this grant is the permission boundary for **every** otterdog job, `plan` / `drift`
+  included; ADR-0004's Corrections log records the full-token decision.
+- **Variables narrowing gap (the reason otterdog jobs run un-narrowed):** GitHub's token-narrowing
+  schema (`app-permissions` in the create-installation-access-token API) has **no key for Actions
+  Variables**, so a *narrowed* token can never carry this permission even though the App grant
+  exists — and otterdog's `GET /orgs/{org}/actions/variables` read is **fatal on 403**. The #16
+  spike (run 29574758804) confirmed a 14-scope narrowed read token failed at exactly and only that
+  endpoint. Otterdog jobs therefore use the **full installation token** and the App grant is their
+  boundary; per-job narrowing is reserved for the drift layer's issue operations. The full-token
+  decision and the manage-vs-exclude reasoning live in ADR-0004's Corrections log (#16).
 
-If #16 finds a managed setting that an installation token **cannot** reach, record it in ADR-0004's
-Corrections log and decide manage-vs-exclude there — do not silently widen this table.
+The #16 spike also confirmed the **web-UI-only settings surface**: 12 org settings (in otterdog's
+schema marked `"provider": "web"`, e.g. `default_branch_name`, `two_factor_requirement`,
+`has_discussions`) are reachable only via browser automation with a human account's
+username/password/TOTP — **no App permission covers them**. They are excluded from App-managed
+config; details and the manage-vs-exclude decision live in ADR-0004's Corrections log.
+
+If a future change finds another managed setting that an installation token **cannot** reach,
+record it in ADR-0004's Corrections log and decide manage-vs-exclude there — do not silently widen
+this table.
+
+[permissions-required-for-github-apps]: https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps
 
 ### Webhooks
 
@@ -104,10 +137,26 @@ They are set once, by hand, in the repo's Actions secrets and rotated by hand.
 Application secrets and variables that this App *manages* (via Otterdog + SOPS/age) are a separate
 concern and do live as code — these two entries do not.
 
-Per-job least privilege is enforced downstream: every workflow job mints its own installation token
-with `actions/create-github-app-token`, narrowing `permissions:` to exactly what that job needs —
-read-only for `plan` / `drift`, write only for `apply` (ADR-0004). The stored key itself is never
-handed to a job at full breadth.
+Downstream, otterdog jobs mint the **full installation token** with `actions/create-github-app-token`
+(no `permissions:` narrowing): the token-narrowing API cannot express the Actions Variables scope
+otterdog reads, so the App grant is the permission boundary for `plan`, `apply`, and `drift`'s
+otterdog leg alike (ADR-0004). Per-job narrowing is retained **only** for the drift layer's issue
+operations. The stored private key is never handed to a job directly — a short-lived installation
+token is always minted per job.
+
+## Running otterdog with the installation token
+
+The engine consumes the installation token through otterdog's **env credential provider**. Two
+mechanics, both confirmed by the #16 spike, are load-bearing and easy to miss:
+
+- **`python-dotenv` is an undeclared dependency of the env provider.** Install otterdog with it
+  pinned (e.g. `uvx --with python-dotenv==1.1.0 …` in the CI/local invocation); otherwise the env
+  provider fails to load before any auth is attempted.
+- **`import` resolves *full* web credentials even under `--no-web-ui`.** `import_configuration.py`
+  reads `username` / `password` / `twofa_seed` from the env provider regardless of `--no-web-ui`,
+  but never exercises them with `-n`. Supply **dummy** values for those three env vars to unblock
+  `import` — the App installation token does the actual work. `plan -n` is token-only by
+  construction (`diff_operation.py`) and needs no such dummies.
 
 ## Key rotation
 
@@ -151,8 +200,10 @@ Keep the surface exactly at the table above. In particular, do **not** grant or 
 - **Any billing or plan permission** — this is **not App-capable anyway** (billing, plan upgrades,
   and seat changes are account/owner actions). `exo-pet`'s Team upgrade (#6) is a human billing step,
   never something this App does.
-- **Anything beyond the confirmed least-privilege set** — no Actions (workflow) write, no Packages,
-  Pages, Deployments, or Pull-requests scopes unless a future spike proves a concrete need and
-  records it in ADR-0004. Widen the table only through that path, never opportunistically.
+- **Anything beyond the confirmed least-privilege set** — no Actions **write** (Read is granted only
+  for the environments read mapping), no Workflows, Packages, Deployments, or Pull-requests scopes
+  unless a future spike proves a concrete need and records it in ADR-0004. The #16 spike is the
+  precedent: it widened this table by exactly its enumerated read path, nothing more. Widen only
+  through that path, never opportunistically.
 - **Repo-transfer or App-management scope** — likewise not App-capable; these remain human owner
   actions and must not be worked around.
