@@ -1,0 +1,249 @@
+# Spike: App-token coverage of the Otterdog settings surface (issue #16, M2)
+#
+# ADR-0004 assumes a GitHub App installation token reaches the ENTIRE Otterdog
+# settings surface. Otterdog has historically also scraped a handful of org
+# settings through the GitHub *web UI* (Playwright + username/password/TOTP),
+# because they are not exposed by the REST/GraphQL API. This spike verifies the
+# assumption empirically and enumerates exactly which settings fall outside App
+# reach, so ADR-0004's Corrections log can record the truth.
+#
+# STRICTLY READ-ONLY. The App token is minted narrowed to read-only permissions
+# via actions/create-github-app-token; no write scope is ever requested and
+# `otterdog apply` is never run. The App private key exists only as an Actions
+# secret, so the probe must run inside GitHub Actions — triggered by a same-repo
+# draft PR that touches this file, or by workflow_dispatch for reruns.
+#
+# The mechanism that makes App-only operation possible: `otterdog plan -n`
+# (`--no-web-ui`) resolves credentials with `only_token=True`
+# (otterdog 1.3.4, providers/github diff_operation.py), so ONLY the api_token is
+# used and the 12 web-UI-only org settings are skipped. Running plan WITHOUT -n
+# forces Otterdog to demand web credentials — the control step below proves it.
+#
+# Triggers: pull_request (only when THIS file changes) · workflow_dispatch
+# Not part of managed CI and never merges (ADR-0007). Do not add to CHANGELOG.
+
+name: Spike App auth (#16)
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    paths:
+      - .github/workflows/spike-app-auth.yml
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why this spike is being re-run (recorded in the log)
+        required: false
+        default: manual rerun
+
+concurrency:
+  group: spike-app-auth-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  probe:
+    name: Probe App-token coverage (read-only)
+    # ADR-0007 binding rule: never expose org-admin credentials to fork PRs.
+    # Secrets are unavailable to fork PRs anyway; this is belt-and-braces.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      OTTERDOG_VERSION: "1.3.4"
+      # Canonical Otterdog defaults library (pinned tag); base_template must be a
+      # github.com URL (otterdog jsonnet.py enforces this).
+      BASE_TEMPLATE: "https://github.com/EclipseFdn/otterdog-defaults#otterdog-defaults.libsonnet@v0.13.1"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      # Read-only installation token, narrowed to exactly the scopes a read of
+      # the org+repo settings surface needs (ADR-0004 least privilege). Any 403
+      # Otterdog hits is the empirical signal this spike is looking for.
+      - name: Mint read-only App installation token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+          # Repo access scoped to this one repo (least privilege, zizmor-clean).
+          # Org-level read scopes below are installation-wide regardless, so this
+          # still exercises the full org+repo settings surface for the spike.
+          repositories: org-config
+          permission-contents: read
+          permission-administration: read
+          permission-organization-administration: read
+          permission-members: read
+          permission-issues: read
+
+      - name: Write minimal Otterdog config
+        env:
+          WORKDIR: ${{ runner.temp }}/otterdog-spike
+        run: |
+          set -euo pipefail
+          mkdir -p "$WORKDIR/logs"
+          cat > "$WORKDIR/otterdog.json" <<JSON
+          {
+            "defaults": {
+              "jsonnet": {
+                "base_template": "${BASE_TEMPLATE}",
+                "config_dir": "orgs"
+              },
+              "github": {
+                "config_repo": "org-config"
+              }
+            },
+            "organizations": [
+              {
+                "name": "vig-os",
+                "github_id": "vig-os",
+                "config_repo": "org-config",
+                "credentials": {
+                  "provider": "env",
+                  "api_token": "OTTERDOG_TOKEN"
+                }
+              }
+            ]
+          }
+          JSON
+          echo "Wrote $WORKDIR/otterdog.json:"
+          cat "$WORKDIR/otterdog.json"
+
+      - name: Run spike probes and build SPIKE REPORT
+        env:
+          # The env credential provider reads the token from this variable; the
+          # value is the read-only App installation token minted above.
+          OTTERDOG_TOKEN: ${{ steps.app-token.outputs.token }}
+          WORKDIR: ${{ runner.temp }}/otterdog-spike
+        run: |
+          set -uo pipefail
+          CFG="$WORKDIR/otterdog.json"
+          LOGDIR="$WORKDIR/logs"
+          OTTER=(uvx --from "otterdog@${OTTERDOG_VERSION}" otterdog)
+
+          {
+            echo "# SPIKE REPORT — App-token coverage of Otterdog settings (#16)"
+            echo
+            echo "- Otterdog: \`${OTTERDOG_VERSION}\` (via uvx)"
+            echo "- Org: \`vig-os\` · credential provider: \`env\` (App installation token in \$OTTERDOG_TOKEN)"
+            echo "- Token scopes requested (read-only): contents, administration, organization-administration, members, issues"
+            echo "- Trigger: \`${GITHUB_EVENT_NAME}\`"
+            echo
+            echo "## Probe results"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # run_probe <label> <note> -- <command...>
+          run_probe() {
+            local label="$1"; local note="$2"; shift 3   # drop label, note, "--"
+            local log="$LOGDIR/${label// /_}.log"
+            echo "::group::${label}"
+            "$@" >"$log" 2>&1
+            local rc=$?
+            cat "$log"
+            echo "::endgroup::"
+            local status
+            if [ "$rc" -eq 0 ]; then status="PASS (exit 0)"; else status="FAIL (exit $rc)"; fi
+            {
+              echo "### ${label} — ${status}"
+              echo
+              echo "${note}"
+              echo
+              echo '```text'
+              tail -n 40 "$log"
+              echo '```'
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+            return 0
+          }
+
+          # 1. What does the App token actually grant? Direct coverage evidence.
+          run_probe "check-token-permissions" \
+            "Lists the scopes the App installation token grants (App-reach ceiling)." \
+            -- "${OTTER[@]}" check-token-permissions -c "$CFG" -l vig-os
+
+          # 2. fetch-config: mandated by #16. Pulls otterdog/vig-os.jsonnet from
+          #    the config repo default branch — expected to FAIL until the config
+          #    lands in #17. Run before import so it never clobbers import output.
+          run_probe "fetch-config" \
+            "Fetches committed config from the org-config default branch. Expected to fail pre-#17 (no otterdog/vig-os.jsonnet yet); an auth error here instead of 'not found' would be the signal." \
+            -- "${OTTER[@]}" fetch-config -c "$CFG" vig-os
+
+          # 3. import --no-web-ui: THE coverage probe. Reads the full LIVE
+          #    org+repo settings surface via the App token (REST/GraphQL only) and
+          #    writes orgs/vig-os.jsonnet. 403/404s here mark settings the token
+          #    cannot read within the requested scopes.
+          run_probe "import (--no-web-ui)" \
+            "Reads the full live settings surface with the App token only and generates the local config. HTTP 403/404 lines = settings outside App reach or requested scopes." \
+            -- "${OTTER[@]}" import -c "$CFG" --no-web-ui -f vig-os
+
+          # 4. plan --no-web-ui: mandated by #16. Diffs the imported local config
+          #    against live using only_token=True (App token only). Should show
+          #    little/no drift if import succeeded — confirms the read path.
+          run_probe "plan (--no-web-ui)" \
+            "Diffs local vs live with the App token only (only_token=True). Confirms App-only plan works end to end." \
+            -- "${OTTER[@]}" plan -c "$CFG" --no-web-ui vig-os
+
+          # 5. CONTROL: plan WITHOUT --no-web-ui. Otterdog now resolves web
+          #    credentials (only_token=False) and, lacking username/password/TOTP,
+          #    fails fast. This is the empirical proof that the web-UI settings
+          #    demand non-App auth. Expected to FAIL — failure is the point.
+          run_probe "plan (web-ui, control)" \
+            "CONTROL — plan without --no-web-ui forces Otterdog to demand web credentials (username/password/TOTP). Expected FAIL: proves the web-UI settings need non-App auth." \
+            -- "${OTTER[@]}" plan -c "$CFG" vig-os
+
+          # Static enumeration from otterdog 1.3.4 resources/schemas/settings.json
+          # (properties with "provider": "web"): the org settings that are NEVER
+          # reachable with an App token — only via the web UI (Playwright + a human
+          # account's username/password/TOTP).
+          {
+            echo "## Non-App settings surface (web-UI only) — from otterdog ${OTTERDOG_VERSION} schema"
+            echo
+            echo "These 12 org settings carry \`\"provider\": \"web\"\` and are fetched/updated"
+            echo "by browser automation, NOT the REST API. An App token cannot read or write"
+            echo "them; \`--no-web-ui\` skips them (and the control step above fails without web creds):"
+            echo
+            echo "| Org setting (web-UI only) |"
+            echo "| --- |"
+            for k in \
+              default_branch_name \
+              discussion_source_repository \
+              has_discussions \
+              members_can_change_project_visibility \
+              members_can_change_repo_visibility \
+              members_can_create_teams \
+              members_can_delete_issues \
+              members_can_delete_repositories \
+              packages_containers_internal \
+              packages_containers_public \
+              readers_can_create_discussions \
+              two_factor_requirement ; do
+              echo "| \`$k\` |"
+            done
+            echo
+            echo "**Decision input for ADR-0004:** manage-vs-exclude each of the above."
+            echo "App-only governance covers everything else; these 12 are either excluded"
+            echo "from managed config or set once by hand (org-singletons, plan-only per ADR-0007)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload fetched/imported config and probe logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: spike-app-auth-vig-os-config-and-logs
+          path: |
+            ${{ runner.temp }}/otterdog-spike/orgs/
+            ${{ runner.temp }}/otterdog-spike/logs/
+            ${{ runner.temp }}/otterdog-spike/otterdog.json
+          if-no-files-found: warn
+          retention-days: 14
