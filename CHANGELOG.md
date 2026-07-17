@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Harden org-config self-protection** ([#4](https://github.com/vig-os/org-config/issues/4))
+  - Release tags now carry the `v` prefix (`DEVKIT_TAG_PREFIX=v`, actions-ecosystem convention; dormant until the first release).
+  - `.github/CODEOWNERS` now gates admin-critical paths (`/.github/`, `/otterdog/`, `/secrets/`, `flake.nix`, `flake.lock`, `.vig-os`); `docs/` is intentionally left unowned so ADR/doc PRs to `dev` stay unblocked.
+
 ### Deprecated
 
 ### Removed

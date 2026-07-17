@@ -7,5 +7,12 @@
 # Each line defines a file pattern and the GitHub users/teams required to review
 # changes to matching files. Later rules take precedence over earlier ones.
 
-# Default: all files require review from the maintainer
-#*                               @username
+# Only admin-critical paths carry the code-owner gate (enforced on main): the
+# org/CI/secrets/toolchain config whose compromise equals org admin control.
+# `docs/` is deliberately left unowned so ADR/doc PRs to dev stay unblocked.
+/.github/                        @c-vigo
+/otterdog/                       @c-vigo
+/secrets/                        @c-vigo
+/flake.nix                       @c-vigo
+/flake.lock                      @c-vigo
+/.vig-os                         @c-vigo
