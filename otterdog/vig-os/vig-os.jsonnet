@@ -419,6 +419,20 @@ orgs.newOrg('vig-os', 'vig-os') {
         orgs.newRepoSecret('ORG_CONFIG_APP_PRIVATE_KEY') {
           value: '********',
         },
+        orgs.newRepoSecret('SOPS_AGE_KEY') {
+          value: '********',
+        },
+      ],
+      environments: [
+        orgs.newEnvironment('production') {
+          branch_policies+: [
+            'dev',
+          ],
+          deployment_branch_policy: 'selected',
+          reviewers+: [
+            '@c-vigo',
+          ],
+        },
       ],
       rulesets: [
         orgs.newRepoRuleset('Dev protection') {
