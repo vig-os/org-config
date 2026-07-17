@@ -62,6 +62,15 @@
 # same PR-to-`dev` review, so pinning `ref: dev` opens no injection surface the
 # existing merge-apply path does not already carry.
 
+# REUSABLE INTERFACE (issue #24, ADR-0006): this workflow ALSO exposes
+# `workflow_call` so a downstream org's private `org-config` repo (from the
+# `template/` skeleton) can run its own scheduled drift, pinned to an exact
+# tag/SHA. A downstream caller owns the `schedule:` trigger in its thin caller
+# workflow and passes its org via `inputs`; the reusable body here reads the
+# committed config, drift-layer code, and allow-list from the CALLER's checkout.
+# Inputs default to `vig-os`/`org-config` and the App credentials fall through to
+# this repo's own bootstrap secrets on a non-`workflow_call` event, so this repo's
+# own daily `schedule` keeps byte-identical semantics.
 name: Drift
 
 on:  # yamllint disable-line rule:truthy
@@ -69,11 +78,40 @@ on:  # yamllint disable-line rule:truthy
     # 03:17 UTC daily — off-peak, odd minute to dodge cron congestion.
     - cron: "17 3 * * *"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      org_github_id:
+        description: >-
+          GitHub login of the org to scan — the `otterdog plan` positional arg,
+          the App-token `owner`, the `--org` the reconciler reports on, and the
+          `otterdog/<org>/<org>.jsonnet` inventory source. Defaults to `vig-os`.
+        type: string
+        default: vig-os
+      config_repo:
+        description: >-
+          Name of the org's config repo — the `repositories:` scope of the
+          narrowed issue-ops token. Defaults to `org-config`.
+        type: string
+        default: org-config
+    # Secret names MATCH this repo's bootstrap Actions secrets (github-app.md), so
+    # the credential references below are byte-identical whether reached on this
+    # repo's own schedule (repo secrets) or via `workflow_call` (caller-passed). A
+    # downstream caller passes its own identically-named secrets.
+    secrets:
+      ORG_CONFIG_APP_CLIENT_ID:
+        description: Client ID of the org-management GitHub App (ADR-0004).
+        required: true
+      ORG_CONFIG_APP_PRIVATE_KEY:
+        description: PEM private key of the org-management GitHub App (ADR-0004).
+        required: true
 
 # Join the cross-workflow mutation group so drift and apply serialize and never
-# cancel each other mid-run (ADR-0007). Same group name as apply.yml.
+# cancel each other mid-run (ADR-0007). Caller-scoped: the org suffix is EMPTY on
+# this repo's own events, so the group stays literally `otterdog-mutate` here —
+# byte-identical, still shared with apply.yml + testbed-e2e.yml. A downstream
+# caller passes its org, yielding `otterdog-mutate-<org>`.
 concurrency:
-  group: otterdog-mutate
+  group: otterdog-mutate${{ inputs.org_github_id && format('-{0}', inputs.org_github_id) || '' }}
   cancel-in-progress: false
 
 permissions: {}
@@ -81,9 +119,13 @@ permissions: {}
 jobs:
   drift:
     name: Detect drift and reconcile drift+critical issues
-    # ADR-0007 BINDING: drift runs only on this repo (scheduled/manual events do
-    # not originate from forks); here to be explicit.
-    if: github.repository == 'vig-os/org-config'
+    # ADR-0007 BINDING: drift runs only on the config repo itself (scheduled/
+    # manual/called events do not originate from forks); here to be explicit.
+    # Generalized from the `vig-os/org-config` literal to the caller's own
+    # `<org>/<config_repo>` (defaults resolve to `vig-os/org-config` on this
+    # repo's own events — same truth value), so a downstream caller asserts its
+    # OWN repo identity.
+    if: github.repository == format('{0}/{1}', inputs.org_github_id || 'vig-os', inputs.config_repo || 'org-config')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions: {}
@@ -128,13 +170,16 @@ jobs:
         with:
           client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
           private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
-          owner: vig-os  # zizmor: ignore[github-app]
+          owner: ${{ inputs.org_github_id || 'vig-os' }}  # zizmor: ignore[github-app]
 
       - name: Run otterdog plan (read-only, committed config)
         id: plan
         env:
           # The `env` credential provider reads the token from this variable.
           OTTERDOG_TOKEN: ${{ steps.plan-token.outputs.token }}
+          # Org selector, via env (never inline `${{ }}` in `run:`) to keep the
+          # zizmor template-injection surface closed. Empty inputs -> vig-os.
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
           # Dummy web credentials. `plan --no-web-ui` resolves credentials with
           # only_token=True, so these are never exercised; supplied only to
           # satisfy the env provider's declared keys.
@@ -151,7 +196,7 @@ jobs:
           set -uo pipefail
           OTTER=(uvx --with python-dotenv==1.1.0 --from "otterdog@${OTTERDOG_VERSION}" otterdog)
           set +e
-          "${OTTER[@]}" plan --local --no-web-ui -c otterdog.json vig-os >plan.txt 2>&1
+          "${OTTER[@]}" plan --local --no-web-ui -c otterdog.json "${ORG_GITHUB_ID}" >plan.txt 2>&1
           rc=$?
           set -e
           echo "rc=${rc}" >> "$GITHUB_OUTPUT"
@@ -180,10 +225,12 @@ jobs:
         id: issues-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
+          # This token narrows fine (issues:write is expressible), scoped to the
+          # caller's own config repo only.
           client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
           private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
-          owner: vig-os
-          repositories: org-config
+          owner: ${{ inputs.org_github_id || 'vig-os' }}
+          repositories: ${{ inputs.config_repo || 'org-config' }}
           permission-issues: write
 
       # Plan-drift + inventory-sweep reconciliation in one invocation. The sweep
@@ -205,14 +252,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.issues-token.outputs.token }}
           DRIFT_REPOS_TOKEN: ${{ steps.plan-token.outputs.token }}
+          # Org selector, via env (never inline `${{ }}` in `run:`). Empty inputs
+          # -> vig-os, so `--org`/`--config-jsonnet` are byte-identical here.
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
         run: |
           set -euo pipefail
           uv run drift-layer \
             --plan-file plan.txt \
             --repo "${{ github.repository }}" \
-            --org vig-os \
+            --org "${ORG_GITHUB_ID}" \
             --allowlist drift-allowlist.toml \
-            --config-jsonnet otterdog/vig-os/vig-os.jsonnet
+            --config-jsonnet "otterdog/${ORG_GITHUB_ID}/${ORG_GITHUB_ID}.jsonnet"
 
       - name: Drift run summary
         if: always()

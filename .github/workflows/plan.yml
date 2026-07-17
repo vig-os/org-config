@@ -40,6 +40,16 @@
 # stale committed vendor — which is the intended, reviewed source of truth for a
 # vendored-defaults repo, so the two stay consistent.
 
+# REUSABLE INTERFACE (issue #24, ADR-0006): this workflow ALSO exposes
+# `workflow_call` so downstream orgs' private `org-config` repos (created from the
+# `template/` skeleton) can call it, pinned to an exact tag/SHA of THIS public
+# repo. The inputs default to `vig-os`/`org-config`, so this repo's own
+# `pull_request`/`workflow_dispatch` triggers keep their exact prior semantics:
+# on a non-`workflow_call` event the `inputs` context is empty, so every
+# `inputs.X || '<default>'` resolves to the vig-os default, and every
+# `secrets.<alias> || secrets.<REPO_SECRET>` resolves to this repo's own
+# bootstrap secret (the caller-passed alias is empty). Callers pass the App
+# credentials as `secrets:` (callable cross-org because this repo is public).
 name: Plan
 
 on:  # yamllint disable-line rule:truthy
@@ -51,10 +61,38 @@ on:  # yamllint disable-line rule:truthy
       - otterdog/**
       - .github/workflows/plan.yml
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      org_github_id:
+        description: >-
+          GitHub login of the org to plan — the `otterdog plan` positional arg
+          (selects the org from otterdog.json) and the App-token `owner`.
+          Defaults to `vig-os` so this repo's own triggers are unchanged.
+        type: string
+        default: vig-os
+      config_repo:
+        description: >-
+          Name of the org's config repo. Defaults to `org-config`.
+        type: string
+        default: org-config
+    # Secret names MATCH this repo's bootstrap Actions secrets (github-app.md), so
+    # the credential references below are byte-identical whether reached on this
+    # repo's own events (repo secrets) or via `workflow_call` (caller-passed). A
+    # downstream caller passes its own identically-named secrets (or `inherit`).
+    secrets:
+      ORG_CONFIG_APP_CLIENT_ID:
+        description: Client ID of the org-management GitHub App (ADR-0004).
+        required: true
+      ORG_CONFIG_APP_PRIVATE_KEY:
+        description: PEM private key of the org-management GitHub App (ADR-0004).
+        required: true
 
 # Per-PR concurrency; plan is read-only, so cancelling a superseded run is safe.
+# Caller-scoped: the org suffix (empty on this repo's own events, byte-identical
+# to the prior `${{ github.workflow }}-<pr>` group) keeps a downstream caller's
+# plans from serializing against vig-os's.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}${{ inputs.org_github_id && format('-{0}', inputs.org_github_id) || '' }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions: {}
@@ -106,13 +144,16 @@ jobs:
         with:
           client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
           private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
-          owner: vig-os  # zizmor: ignore[github-app]
+          owner: ${{ inputs.org_github_id || 'vig-os' }}  # zizmor: ignore[github-app]
 
       - name: Run otterdog plan (read-only, committed config)
         id: plan
         env:
           # The `env` credential provider reads the token from this variable.
           OTTERDOG_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Org selector, via env (never inline `${{ }}` in `run:`) to keep the
+          # zizmor template-injection surface closed. Empty inputs -> vig-os.
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
           # Dummy web credentials. `plan --no-web-ui` resolves credentials with
           # only_token=True (diff_operation.py:132), so these are not exercised;
           # they are supplied to satisfy the env provider's declared keys
@@ -131,7 +172,7 @@ jobs:
           set -uo pipefail
           OTTER=(uvx --with python-dotenv==1.1.0 --from "otterdog@${OTTERDOG_VERSION}" otterdog)
           set +e
-          "${OTTER[@]}" plan --local --no-web-ui -c otterdog.json vig-os >plan.txt 2>&1
+          "${OTTER[@]}" plan --local --no-web-ui -c otterdog.json "${ORG_GITHUB_ID}" >plan.txt 2>&1
           rc=$?
           set -e
           echo "rc=${rc}" >> "$GITHUB_OUTPUT"
