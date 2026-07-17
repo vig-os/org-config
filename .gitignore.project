@@ -21,3 +21,9 @@
 # Examples (uncomment / add your own):
 #   /scratch/
 #   /secrets.local.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/

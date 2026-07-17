@@ -1,0 +1,30 @@
+Installed 53 packages in 39ms
+Planning execution:
+
+Actions are indicated with the following symbols:
+  + create
+  ~ modify
+  ! forced update
+  - delete
+
+Project vig-os[github_id=vig-os] (1/1)
+  there have been 3 validation infos, enable verbose output to display them.
+
+
+  + repository[name="new-repo"] {
+    + name                            = "new-repo"
+    + description                     = "freshly created out of band"
+    + private                         = true
+  + }
+
+
+  ! branch_protection_rule[pattern="main", repository=devkit] {
+    ! allows_force_pushes = false -> true
+  ! }
+
+
+  - repo_ruleset[name="Legacy protection", repository=tessera] {
+    - name = "Legacy protection"
+  - }
+
+  Plan: 1 to add, 1 to change, 1 to delete.

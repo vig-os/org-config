@@ -1,0 +1,14 @@
+Installed 53 packages in 41ms
+Planning execution:
+
+Actions are indicated with the following symbols:
+  + create
+  ~ modify
+  ! forced update
+  - delete
+
+Project vig-os[github_id=vig-os] (1/1)
+  there have been 17 validation infos, enable verbose output to display them.
+
+
+  Plan: 0 to add, 0 to change, 0 to delete.
