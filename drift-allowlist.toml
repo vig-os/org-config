@@ -1,0 +1,16 @@
+# Expected-drift allow-list (ADR-0002) — resources whose divergence is known,
+# benign, and by design, excluded from `drift`+`critical` issue creation. Adding
+# an entry is governance state: it goes through the normal PR flow, so "what is
+# intentionally tolerated" stays reviewable and versioned.
+#
+# Each entry matches an otterdog plan resource header exactly.
+
+[[expected]]
+resource = 'repository[name="vs-dolt"]'
+reason = """
+code_scanning_default_languages always reports as changed: GitHub's import splits
+`javascript-typescript` into `[javascript, typescript]`, a form otterdog's own
+validator rejects, so the committed config keeps the schema-valid
+`javascript-typescript`. The diff is cosmetic and expected on every run (see
+plan.yml footnote and ADR-0002).
+"""

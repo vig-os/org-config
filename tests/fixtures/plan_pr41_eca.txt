@@ -1,0 +1,177 @@
+Downloading pygments (1.2MiB)
+Downloading aiohttp (1.7MiB)
+Downloading pynacl (1.3MiB)
+Downloading playwright (45.2MiB)
+Downloading cryptography (4.5MiB)
+Downloading rjsonnet (1.2MiB)
+   Building jsonbender==0.9.3
+ Downloaded rjsonnet
+      Built jsonbender==0.9.3
+ Downloaded pynacl
+ Downloaded aiohttp
+ Downloaded cryptography
+ Downloaded pygments
+ Downloaded playwright
+Installed 53 packages in 40ms
+Planning execution:
+
+Actions are indicated with the following symbols:
+  + create
+  ~ modify
+  ! forced update
+  - delete
+
+Project vig-os[github_id=vig-os] (1/1)
+  there have been 17 validation infos, enable verbose output to display them.
+
+
+  ~ repo_ruleset[name="Dev protection", repository=devkit] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Main protection", repository=devkit] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Release protection", repository=devkit] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Dev protection", repository=sync-issues-action] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Main protection", repository=sync-issues-action] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Release protection", repository=sync-issues-action] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Dev protection", repository=commit-action] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Main protection", repository=commit-action] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Release protection", repository=commit-action] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ branch_protection_rule[pattern="main", repository=tessera] {
+    ~ required_status_checks = [
+      + "eclipse-eca-validation:eclipsefdn/eca"
+    ~ ]
+  ~ }
+
+
+  ~ repository[name="vs-dolt"] {
+    ~ code_scanning_default_languages = [
+      ~ "javascript"          -> "javascript-typescript"
+      - "typescript"
+    ~ ]
+  ~ }
+
+
+  ~ repo_ruleset[name="Dev protection", repository=devkit-smoke-test] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Main protection", repository=devkit-smoke-test] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="dev protection", repository=scitadel] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="main protection", repository=scitadel] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Dev protection", repository=org-config] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+
+  ~ repo_ruleset[name="Main protection", repository=org-config] {
+    ~ required_status_checks     = {
+      ~ status_checks              = [
+        + "eclipse-eca-validation:eclipsefdn/eca"
+      ~ ]
+    ~ }
+  ~ }
+
+  Plan: 0 to add, 17 to change, 0 to delete.

@@ -1,0 +1,184 @@
+# Scheduled drift detection — read-only `otterdog plan --local --no-web-ui` of
+# the committed config against live `vig-os`, fed to the in-house strict-drift
+# layer, which reconciles the plan into deduplicated `drift`+`critical` issues
+# (issue #20, ADR-0002 issue-only drift semantics, ADR-0007 L1 core).
+#
+# This is a repo-OWNED workflow (not devkit-managed), so zizmor gates it in full:
+# it is deliberately absent from zizmor.yml, and the only accepted findings are
+# the two scoped, justified `github-app` inline ignores on the full plan token.
+# Everything else must be fixed here, not baselined.
+#
+# SERIALIZED WITH APPLY (ADR-0007 BINDING): this run JOINS the same static
+# `otterdog-mutate` concurrency group as apply.yml with `cancel-in-progress:
+# false`, so drift never runs concurrently with an apply (or another drift) —
+# a reconciler racing a mutation manufactures phantom drift. Drift issue-ops are
+# a mutation of repo state (issues), hence the shared group, not a plan-style
+# per-run group.
+#
+# Security model (ADR-0007 §Public-repo credential rules, BINDING):
+#   - Scheduled / manual only; `schedule` and `workflow_dispatch` never carry
+#     fork-supplied code, so org-admin credentials are never exposed to a fork
+#     (OWASP CICD-SEC-4, Poisoned Pipeline Execution). The `if:` asserts repo
+#     identity as belt-and-braces.
+#   - No `pull_request_target`; the default checkout is read-only.
+#   - Two least-privilege App tokens, each minted for exactly one leg:
+#       * plan leg — the FULL, unnarrowed, org-wide installation token: the
+#         otterdog read surface needs it (a narrowed token cannot carry Actions
+#         Variables; org-variables read is fatal on 403 — ADR-0004 Corrections,
+#         spike #16). Read-only-ness is enforced by BEHAVIOR: `plan` only issues
+#         GETs.
+#       * issue-ops leg — a SECOND token narrowed to `issues: write` on this repo
+#         only. Narrowing works fine for issues, so the divergence-issue writes
+#         run on the smallest possible grant, never the org-admin token.
+#
+# `--local` gates ONLY the vendor re-fetch (identical to plan.yml / apply.yml):
+# it skips otterdog's `_init_base_template`, so plan evaluates the exact committed
+# `otterdog/vig-os/vendor/` tree that L0 `validate` and L2 `plan` check. Live diff
+# and credentials are unaffected.
+
+name: Drift
+
+on:  # yamllint disable-line rule:truthy
+  schedule:
+    # 03:17 UTC daily — off-peak, odd minute to dodge cron congestion.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+# Join the cross-workflow mutation group so drift and apply serialize and never
+# cancel each other mid-run (ADR-0007). Same group name as apply.yml.
+concurrency:
+  group: otterdog-mutate
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  drift:
+    name: Detect drift and reconcile drift+critical issues
+    # ADR-0007 BINDING: drift runs only on this repo (scheduled/manual events do
+    # not originate from forks); here to be explicit.
+    if: github.repository == 'vig-os/org-config'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions: {}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      # Otterdog version pin: justfile.project (`otterdog_version`) is the single
+      # source of truth (ADR-0005); read it here so CI never carries a second,
+      # drift-prone copy of the pin.
+      - name: Resolve otterdog version pin
+        run: |
+          set -euo pipefail
+          version="$(grep -oP 'otterdog_version\s*:=\s*"\K[^"]+' justfile.project)"
+          if [ -z "${version}" ]; then
+            echo "::error::could not resolve otterdog_version from justfile.project"
+            exit 1
+          fi
+          echo "OTTERDOG_VERSION=${version}" >> "$GITHUB_ENV"
+          echo "Resolved otterdog version: ${version}"
+
+      # FULL installation token — NO permission-* narrowing (ADR-0004
+      # Corrections): the App grant is the boundary; a narrowed token cannot read
+      # Actions Variables. `owner: vig-os` makes it org-wide because plan must see
+      # every repo. This is the plan (read) leg only; the issue writes use the
+      # separate narrowed token below. zizmor's github-app finding on the broad
+      # token is an acknowledged, deliberate decision recorded INLINE.
+      - name: Mint full App installation token for plan (unnarrowed, org-wide)
+        id: plan-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3 # zizmor: ignore[github-app]
+        with:
+          client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+          owner: vig-os  # zizmor: ignore[github-app]
+
+      - name: Run otterdog plan (read-only, committed config)
+        id: plan
+        env:
+          # The `env` credential provider reads the token from this variable.
+          OTTERDOG_TOKEN: ${{ steps.plan-token.outputs.token }}
+          # Dummy web credentials. `plan --no-web-ui` resolves credentials with
+          # only_token=True, so these are never exercised; supplied only to
+          # satisfy the env provider's declared keys.
+          OTTERDOG_DUMMY_USERNAME: drift-dummy-unused
+          OTTERDOG_DUMMY_PASSWORD: drift-dummy-unused
+          OTTERDOG_DUMMY_TWOFA_SEED: drift-dummy-unused
+          # Deterministic, unwrapped output the parser can rely on.
+          NO_COLOR: "1"
+          COLUMNS: "200"
+        run: |
+          # No errexit: otterdog's exit code is a signal we inspect, not an abort
+          # reason. `plan` exits 0 on a non-empty diff; nonzero means invalid
+          # config / auth / harness failure.
+          set -uo pipefail
+          OTTER=(uvx --with python-dotenv==1.1.0 --from "otterdog@${OTTERDOG_VERSION}" otterdog)
+          set +e
+          "${OTTER[@]}" plan --local --no-web-ui -c otterdog.json vig-os >plan.txt 2>&1
+          rc=$?
+          set -e
+          echo "rc=${rc}" >> "$GITHUB_OUTPUT"
+          echo "otterdog plan exited ${rc}"
+          cat plan.txt
+
+      # Fail fast on a genuine plan error (invalid config / auth / harness):
+      # reconciling a broken plan would misread it as "no drift" and wrongly
+      # close live issues. Drift (exit 0) proceeds to reconciliation.
+      - name: Fail on plan error
+        env:
+          PLAN_RC: ${{ steps.plan.outputs.rc }}
+        run: |
+          set -euo pipefail
+          if [ "${PLAN_RC:-1}" != "0" ]; then
+            echo "::error::otterdog plan failed (exit ${PLAN_RC}); not drift — check config, auth, or harness. Skipping reconciliation to avoid closing live issues on a broken plan."
+            exit 1
+          fi
+          echo "otterdog plan succeeded (exit 0); reconciling drift issues."
+
+      # SECOND token, narrowed to issues:write on this repo only — the smallest
+      # grant the issue-ops leg needs. Narrowing works fine for issues (unlike
+      # the Actions-Variables read the plan leg needs), so the divergence-issue
+      # writes never ride the org-admin token.
+      - name: Mint narrowed App token for issue ops (issues:write, this repo)
+        id: issues-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+          owner: vig-os
+          repositories: org-config
+          permission-issues: write
+
+      - name: Reconcile drift into drift+critical issues
+        env:
+          GITHUB_TOKEN: ${{ steps.issues-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          uv run drift-layer \
+            --plan-file plan.txt \
+            --repo "${{ github.repository }}" \
+            --org vig-os \
+            --allowlist drift-allowlist.toml
+
+      - name: Drift run summary
+        if: always()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Drift reconciliation — \`vig-os\`"
+            echo
+            echo "_Read-only \`otterdog plan --local --no-web-ui\` reconciled into deduplicated \`drift\`+\`critical\` issues (ADR-0002). Nothing was applied to org state._"
+            echo
+            echo '```text'
+            [ -f plan.txt ] && cat plan.txt || echo "(no plan output produced)"
+            echo '```'
+            echo
+            echo "[Run log](${RUN_URL})"
+          } >> "$GITHUB_STEP_SUMMARY"
