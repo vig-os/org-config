@@ -94,6 +94,18 @@ clean-artifacts:
 # — CI drives those unchanged; this recipe is the L0 seam plan/apply reuse.
 # `otterdog validate` needs `--with python-dotenv==1.1.0`: otterdog's `env`
 # credential provider imports python-dotenv, an undeclared upstream dep (#16).
+# It also carries a COMMAND-SCOPED LD_LIBRARY_PATH: otterdog's rjsonnet native
+# extension needs libstdc++.so.6, and on a non-Python repo the direnv-mode CI
+# preamble keeps the Nix CPython on PATH (setup-devkit-toolchain #1028), whose
+# loader does not search /usr/lib — the manylinux wheel then fails to import
+# (run 29577969319; same class as the devkit pymarkdown/pyjson5 drop). The lib
+# dir comes from VIGOS_STDCPP_LIB (dev-shell export, flake.nix shellHook) when
+# present; CI forwards only PATH (no shellHook env), so the fallback derives it
+# from the dev-shell `cc` wrapper via -print-file-name (leading-/ check: gcc
+# echoes the bare name back when it cannot resolve the file). Scoping the
+# variable to this one command keeps the nix libstdc++ out of every other
+# tool's process; with neither source available the prefix degrades to the
+# caller's own LD_LIBRARY_PATH (or empty — a no-op).
 #
 # Run L0 static validation: workflow lint/security + otterdog config (ADR-0007)
 [group('L0 validation')]
@@ -101,7 +113,16 @@ validate:
     actionlint
     zizmor --offline .github/workflows
     @if [ -d otterdog ]; then find otterdog -type f \( -name '*.jsonnet' -o -name '*.libsonnet' \) -print0 | xargs -0 -r jsonnetfmt --test && echo "jsonnetfmt: OK"; else echo "jsonnetfmt: skipped (otterdog/ config lands in #17)"; fi
-    @if [ -d otterdog ]; then OTTERDOG_TOKEN="${OTTERDOG_TOKEN:-otterdog-local-validate-placeholder}" uvx --with python-dotenv==1.1.0 --from otterdog@{{ otterdog_version }} otterdog validate --local; else echo "otterdog validate: skipped (otterdog/ config lands in #17)"; fi
+    @if [ -d otterdog ]; then \
+      stdcpp_lib="${VIGOS_STDCPP_LIB:-}"; \
+      if [ -z "$stdcpp_lib" ] && command -v cc >/dev/null 2>&1; then \
+        p="$(cc -print-file-name=libstdc++.so.6)"; \
+        case "$p" in /*) stdcpp_lib="$(dirname "$p")" ;; esac; \
+      fi; \
+      OTTERDOG_TOKEN="${OTTERDOG_TOKEN:-otterdog-local-validate-placeholder}" \
+      LD_LIBRARY_PATH="$stdcpp_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+      uvx --with python-dotenv==1.1.0 --from otterdog@{{ otterdog_version }} otterdog validate --local; \
+    else echo "otterdog validate: skipped (otterdog/ config lands in #17)"; fi
 
 # ===============================================================================
 # PROJECT-SPECIFIC RECIPES

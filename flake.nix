@@ -77,6 +77,22 @@
           shellHook = ''
             echo "devcontainer dev environment loaded (nix)"
             export OTTERDOG_TOKEN="''${OTTERDOG_TOKEN:-otterdog-local-validate-placeholder}"
+            # libstdc++ for native extensions of uvx-run Python tools (otterdog's
+            # rjsonnet): a Nix CPython's loader does not search /usr/lib, so the
+            # manylinux .so fails with "libstdc++.so.6: cannot open shared
+            # object file" (same failure class as the devkit pymarkdown/pyjson5
+            # drop). Exported as a VARIABLE — not a global LD_LIBRARY_PATH,
+            # which would leak the nix libstdc++ into every child process — and
+            # consumed command-scoped by the otterdog invocation in
+            # justfile.project's `validate` recipe. Note: direnv-mode CI
+            # forwards only the dev-shell PATH (setup-devkit-toolchain), never
+            # shellHook env, so this export covers `nix develop`/direnv entry
+            # only; the recipe independently derives the same dir from the
+            # dev-shell `cc` when this variable is absent. The interpolation
+            # also roots the lib in the shell closure. libstdc++.so.6 is
+            # backward-compatible, so pointing a manylinux wheel at nix's
+            # (GCC 15) copy is safe on the CI host runner and on NixOS alike.
+            export VIGOS_STDCPP_LIB="${pkgs.stdenv.cc.cc.lib}/lib"
           '';
 
           # Opt into the flake-generated pre-commit config (#883): the shared
