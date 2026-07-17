@@ -13,3 +13,10 @@ unexcepted = "unexcepted"
 Nd = "Nd"
 # podman rootless-networking helper package name (#1106), not a misspelling
 passt = "passt"
+# gpg `--with-colons` output field name for a key fingerprint (#22 apply bridge)
+fpr = "fpr"
+
+[files]
+# SOPS/age ciphertext (#22) is base64 blobs, not prose — spell-checking it only
+# yields false positives. detect-private-keys / check-yaml still cover it.
+extend-exclude = ["secrets/"]
