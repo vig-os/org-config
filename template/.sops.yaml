@@ -1,0 +1,28 @@
+---
+# SOPS/age creation rules — downstream org-config skeleton (ADR-0003).
+#
+# PLACEHOLDER: replace the age recipient below with THIS org's own age PUBLIC
+# key before committing any ciphertext. Generate a keypair with `age-keygen`;
+# the PUBLIC key goes here, the PRIVATE half goes ONLY into the SOPS_AGE_KEY
+# Actions secret (bootstrap — never committed). Do NOT reuse another org's key:
+# each org's secrets must be isolated to its own key (blast-radius containment).
+#
+# WHAT THIS DOES
+#   Any file matching `secrets/*.yaml` is encrypted to the age recipient(s)
+#   below. SOPS encrypts VALUES only — the YAML keys (secret names) stay in
+#   cleartext so a reviewer sees which secrets exist without decrypting. The
+#   ciphertext is committed; only the apply workflow decrypts it, in-memory, at
+#   apply time (never logged).
+#
+# ROTATION: editing a value is a normal reviewable PR (`sops secrets/<org>.yaml`
+#   re-encrypts on save); rotating the KEY adds the new recipient here then
+#   `sops updatekeys secrets/*.yaml` to re-wrap every file.
+#
+# WHAT NEVER GOES HERE (bootstrap exclusions, ADR-0003 — BINDING):
+#   - The GitHub App private key (ORG_CONFIG_APP_PRIVATE_KEY).
+#   - The age PRIVATE key (SOPS_AGE_KEY).
+#   Both are provisioned out-of-band as Actions secrets only — one poisoned
+#   commit must never own both auth AND decryption.
+creation_rules:
+  - path_regex: ^secrets/[^/]+\.yaml$
+    age: age1REPLACE_WITH_THIS_ORGS_OWN_AGE_PUBLIC_KEY0000000000000000000000

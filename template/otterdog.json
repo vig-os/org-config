@@ -1,0 +1,26 @@
+{
+  "_comment": "Downstream org-config skeleton (ADR-0006). Replace every YOUR_ORG placeholder with this org's GitHub login, then remove this _comment key. `config_dir: otterdog` keeps all config under otterdog/<org>/. The env credential provider reads the App installation token from OTTERDOG_TOKEN (minted by the reusable workflow); the dummy web-cred keys satisfy otterdog's env provider on the --no-web-ui path and are never exercised.",
+  "defaults": {
+    "jsonnet": {
+      "base_template": "https://github.com/EclipseFdn/otterdog-defaults#otterdog-defaults.libsonnet@v0.13.1",
+      "config_dir": "otterdog"
+    },
+    "github": {
+      "config_repo": "org-config"
+    }
+  },
+  "organizations": [
+    {
+      "name": "YOUR_ORG",
+      "github_id": "YOUR_ORG",
+      "config_repo": "org-config",
+      "credentials": {
+        "provider": "env",
+        "api_token": "OTTERDOG_TOKEN",
+        "username": "OTTERDOG_DUMMY_USERNAME",
+        "password": "OTTERDOG_DUMMY_PASSWORD",
+        "twofa_seed": "OTTERDOG_DUMMY_TWOFA_SEED"
+      }
+    }
+  ]
+}

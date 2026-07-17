@@ -89,6 +89,14 @@
 # summary still records otterdog's own apply output so a reviewer can see
 # exactly what was and was not applied.
 
+# REUSABLE INTERFACE (issue #24, ADR-0006): this workflow ALSO exposes
+# `workflow_call` so a downstream org's private `org-config` repo (from the
+# `template/` skeleton) can call it pinned to an exact tag/SHA. Inputs default to
+# `vig-os`/`org-config` and the App/age credentials fall through to this repo's
+# own bootstrap secrets on a non-`workflow_call` event, so this repo's own `push`
+# to `dev` keeps byte-identical semantics. NOTE (ADR-0006 sequencing): a Free
+# downstream org onboards read-only (plan+drift) and only wires this apply caller
+# AFTER upgrading to Team — apply is the write path.
 name: Apply
 
 on:  # yamllint disable-line rule:truthy
@@ -101,12 +109,45 @@ on:  # yamllint disable-line rule:truthy
       - secrets/**
       - .sops.yaml
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      org_github_id:
+        description: >-
+          GitHub login of the org to apply — the `otterdog apply` positional arg
+          and the App-token `owner`. Defaults to `vig-os`.
+        type: string
+        default: vig-os
+      config_repo:
+        description: >-
+          Name of the org's config repo. Defaults to `org-config`.
+        type: string
+        default: org-config
+    # Secret names MATCH this repo's bootstrap Actions secrets (github-app.md /
+    # ADR-0003), so the credential references below are byte-identical whether
+    # reached on this repo's own push (repo secrets) or via `workflow_call`
+    # (caller-passed). A downstream caller passes its identically-named secrets.
+    secrets:
+      ORG_CONFIG_APP_CLIENT_ID:
+        description: Client ID of the org-management GitHub App (ADR-0004).
+        required: true
+      ORG_CONFIG_APP_PRIVATE_KEY:
+        description: PEM private key of the org-management GitHub App (ADR-0004).
+        required: true
+      SOPS_AGE_KEY:
+        description: >-
+          age private identity that decrypts the committed `secrets/*.yaml`
+          ciphertext (ADR-0003). Only needed when the config declares secrets;
+          the decrypt step is skipped when no `secrets/*.yaml` exist.
+        required: false
 
 # Static, cross-workflow concurrency group so all mutations serialize (never
-# cancel mid-apply). The scheduled drift workflow (#20/#21) MUST reuse this
-# exact group name so apply and drift never run concurrently.
+# cancel mid-apply). Caller-scoped: the org suffix is EMPTY on this repo's own
+# events, so the group stays literally `otterdog-mutate` here — byte-identical,
+# and drift.yml + testbed-e2e.yml keep sharing it. A downstream caller passes its
+# org, yielding `otterdog-mutate-<org>`, so its mutations never serialize against
+# vig-os's.
 concurrency:
-  group: otterdog-mutate
+  group: otterdog-mutate${{ inputs.org_github_id && format('-{0}', inputs.org_github_id) || '' }}
   cancel-in-progress: false
 
 permissions: {}
@@ -114,9 +155,13 @@ permissions: {}
 jobs:
   apply:
     name: Apply committed config to live vig-os
-    # ADR-0007 BINDING: apply runs only from this repo's trunk; a fork cannot
-    # push to the base repo, so this is trivially true and here to be explicit.
-    if: github.repository == 'vig-os/org-config'
+    # ADR-0007 BINDING: apply runs only from the config repo's own trunk; a fork
+    # cannot push to the base repo, so this is trivially true and here to be
+    # explicit. Generalized from the `vig-os/org-config` literal to the
+    # caller's own `<org>/<config_repo>` (defaults resolve to `vig-os/org-config`
+    # on this repo's own push — same truth value), so a downstream caller asserts
+    # its OWN repo identity, not vig-os's.
+    if: github.repository == format('{0}/{1}', inputs.org_github_id || 'vig-os', inputs.config_repo || 'org-config')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # The production environment (required reviewer c-vigo, dev-only deployment
@@ -242,13 +287,16 @@ jobs:
         with:
           client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
           private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
-          owner: vig-os  # zizmor: ignore[github-app]
+          owner: ${{ inputs.org_github_id || 'vig-os' }}  # zizmor: ignore[github-app]
 
       - name: Run otterdog apply (mutating, committed config)
         id: apply
         env:
           # The `env` credential provider reads the token from this variable.
           OTTERDOG_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Org selector, via env (never inline `${{ }}` in `run:`) to keep the
+          # zizmor template-injection surface closed. Empty inputs -> vig-os.
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
           # Dummy web credentials. `apply --no-web-ui` resolves credentials with
           # only_token=True (diff_operation.py:132), so these are not exercised;
           # they are supplied to satisfy the env provider's declared keys
@@ -266,7 +314,7 @@ jobs:
           set -uo pipefail
           OTTER=(uvx --with python-dotenv==1.1.0 --from "otterdog@${OTTERDOG_VERSION}" otterdog)
           set +e
-          "${OTTER[@]}" apply --local --no-web-ui --force -c otterdog.json vig-os >apply.txt 2>&1
+          "${OTTER[@]}" apply --local --no-web-ui --force -c otterdog.json "${ORG_GITHUB_ID}" >apply.txt 2>&1
           rc=$?
           set -e
           echo "rc=${rc}" >> "$GITHUB_OUTPUT"
