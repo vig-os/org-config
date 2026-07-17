@@ -1,0 +1,38 @@
+# vig-os devcontainer configuration — declarative project manifest (#885).
+# Flat KEY=VALUE lines with '#' comments; consumers parse line-based and
+# ignore unknown keys. init-workspace.sh resolves every value on (re)scaffold
+# (flag/env > .vig-os > prompt/default) and writes the result back here, so
+# upgrades need no mode/identity flags. Future per-project devkit flags
+# (e.g. the #883 hook opt-out) live in this file too.
+
+# Scaffold/image version pin (managed by release automation). Readers also
+# accept the legacy DEVCONTAINER_VERSION key for un-migrated consumers (#781).
+DEVKIT_VERSION=1.3.1
+
+# Delivery mode: devcontainer | direnv | both | bare. Ships empty (= unset:
+# resolved and written back on scaffold) so an aborted upgrade can never
+# persist a mode this repo did not choose.
+DEVKIT_MODE=direnv
+
+# Project identity (persisted SHORT_NAME / ORG_NAME / GITHUB_REPOSITORY);
+# written back by init-workspace.sh — edit only to deliberately rename.
+DEVKIT_PROJECT=org_config
+DEVKIT_ORG=vig-os
+DEVKIT_REPO=vig-os/org-config
+
+# Reserved: space-separated capability modules for the project dev-shell,
+# mirroring mkProjectShell's `modules = [ ... ]` in flake.nix (#884).
+DEVKIT_MODULES=""
+
+# Release tag prefix applied ONLY at the publishing edge — the pushed tag name
+# and the changelog release link. Empty (default) => bare X.Y.Z tags (no change
+# for devkit or existing consumers). Action-publishing repos set `v` for the
+# `actions/checkout@v5` ecosystem convention (#1044). The `version` input, the
+# `release/X.Y.Z` branch name, and the `## [X.Y.Z]` freeze heading stay bare.
+DEVKIT_TAG_PREFIX=
+
+# Opt-in floating major/minor tags, force-moved at promote to the final release
+# commit (comma-separated subset of `major,minor`; empty/absent => off). e.g.
+# `major,minor` moves <prefix>X and <prefix>X.Y so consumers can pin
+# `uses: owner/repo@v0`. Composes with DEVKIT_TAG_PREFIX; final releases only (#1045).
+DEVKIT_FLOATING_TAGS=
