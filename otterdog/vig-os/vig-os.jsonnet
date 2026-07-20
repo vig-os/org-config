@@ -215,6 +215,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         orgs.newRepoRuleset('Dev protection') {
           allows_creations: true,
           bypass_actors+: [
+            '#OrganizationAdmin',
             'commit-action-bot',
           ],
           include_refs+: [
@@ -232,6 +233,9 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
         orgs.newRepoRuleset('Main protection') {
           allows_creations: true,
+          bypass_actors+: [
+            '#OrganizationAdmin',
+          ],
           include_refs+: [
             'refs/heads/main',
           ],
@@ -251,6 +255,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           allows_creations: true,
           allows_deletions: true,
           bypass_actors+: [
+            '#OrganizationAdmin',
             'commit-action-bot',
           ],
           include_refs+: [
