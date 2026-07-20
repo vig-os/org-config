@@ -93,6 +93,14 @@ on:  # yamllint disable-line rule:truthy
           narrowed issue-ops token. Defaults to `org-config`.
         type: string
         default: org-config
+      otterdog_version:
+        description: >-
+          Otterdog version to run. Downstream callers MUST pass their own pin
+          (kept in the caller workflow beside the engine SHA pin, issue #56);
+          when empty — this repo's own events — the pin is read from
+          `justfile.project` (ADR-0005 SSoT).
+        type: string
+        default: ''
     # Secret names MATCH this repo's bootstrap Actions secrets (github-app.md), so
     # the credential references below are byte-identical whether reached on this
     # repo's own schedule (repo secrets) or via `workflow_call` (caller-passed). A
@@ -144,13 +152,23 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
 
-      # Otterdog version pin: justfile.project (`otterdog_version`) is the single
-      # source of truth (ADR-0005); read it here so CI never carries a second,
-      # drift-prone copy of the pin.
+      # Otterdog version pin: on this repo's own events, justfile.project
+      # (`otterdog_version`) is the single source of truth (ADR-0005). Downstream
+      # callers check out THEIR repo (no justfile.project — template/ ships none,
+      # issue #56), so they pass the pin as the `otterdog_version` input instead.
       - name: Resolve otterdog version pin
+        env:
+          OTTERDOG_VERSION_INPUT: ${{ inputs.otterdog_version || '' }}
         run: |
           set -euo pipefail
-          version="$(grep -oP 'otterdog_version\s*:=\s*"\K[^"]+' justfile.project)"
+          if [ -n "${OTTERDOG_VERSION_INPUT}" ]; then
+            version="${OTTERDOG_VERSION_INPUT}"
+          elif [ -f justfile.project ]; then
+            version="$(grep -oP 'otterdog_version\s*:=\s*"\K[^"]+' justfile.project)"
+          else
+            echo "::error::no otterdog_version input and no justfile.project in the checkout (downstream callers must pass the input — issue #56)"
+            exit 1
+          fi
           if [ -z "${version}" ]; then
             echo "::error::could not resolve otterdog_version from justfile.project"
             exit 1
