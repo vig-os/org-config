@@ -411,6 +411,9 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'GitHub Organization Management',
       has_projects: false,
       has_wiki: false,
+      // Template repo: downstream orgs' private org-config repos are created
+      // from this one (ADR-0006; marked live via one-time gh API action, #52).
+      is_template: true,
       merge_commit_message: 'PR_BODY',
       merge_commit_title: 'PR_TITLE',
       secret_scanning: 'disabled',
