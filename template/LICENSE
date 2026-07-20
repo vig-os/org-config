@@ -1,0 +1,23 @@
+Copyright (c) YYYY YOUR_ORG. All rights reserved.
+
+This repository contains the proprietary and confidential GitHub organization
+configuration for YOUR_ORG. It is NOT open source and is NOT distributed under the
+Apache-2.0 license of the vig-os/org-config engine it consumes.
+
+No permission is granted to use, copy, modify, merge, publish, distribute,
+sublicense, or sell any part of this repository, in whole or in part, without the
+prior written consent of YOUR_ORG.
+
+THE CONTENTS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED.
+
+--------------------------------------------------------------------------------
+Onboarding note (delete this block once filled in):
+
+- Replace `YYYY` with the current year and `YOUR_ORG` with this org's legal /
+  GitHub name.
+- The vig-os/org-config ENGINE is Apache-2.0; this downstream config repo carries
+  its OWN proprietary notice because it holds org-admin-equivalent configuration
+  and (encrypted) secrets. Do NOT copy the engine's Apache-2.0 LICENSE here.
+- If your org has a standard proprietary/all-rights-reserved license text, use it
+  instead of this placeholder.

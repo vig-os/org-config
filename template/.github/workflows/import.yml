@@ -1,0 +1,95 @@
+# Import bootstrap (downstream org-config skeleton, ADR-0006).
+#
+# ONE-TIME onboarding helper. Unlike plan/apply/drift, this is NOT a thin caller
+# of a reusable engine workflow — the engine ships no reusable `import` workflow,
+# so this standalone `workflow_dispatch` runs `otterdog import` directly in THIS
+# repo to bootstrap `otterdog/<org>/<org>.jsonnet` from the live org.
+#
+# It is READ-ONLY against the org: `otterdog import` only issues GETs and writes
+# the generated config into the workspace. This workflow does NOT commit or push
+# and does NOT mutate org state — it uploads the generated jsonnet as a build
+# ARTIFACT for you to download, review, normalize (strip base-template defaults so
+# the first `plan` shows an empty diff), and commit via a normal PR to `dev`.
+#
+# After onboarding you may delete this file — it is only needed for the initial
+# import (re-runnable if you ever re-bootstrap).
+#
+# PREREQS: the GitHub App is installed on this org (read scope) and the two App
+# secrets are set on this repo (see the onboarding runbook). `otterdog.json` and
+# the vendored base template under `otterdog/<org>/vendor/` must be present.
+name: Import
+
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      org_github_id:
+        description: "GitHub login of the org to import (e.g. exo-pet)."
+        required: true
+        type: string
+      otterdog_version:
+        description: >-
+          Otterdog version to run — keep in lockstep with the engine pin (#56).
+        required: false
+        type: string
+        default: "1.3.4"
+
+permissions: {}
+
+jobs:
+  import:
+    name: Import ${{ inputs.org_github_id }} config from live org
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read          # read the committed otterdog.json + vendor tree
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      # FULL installation token (ADR-0004 Corrections): otterdog's read surface
+      # needs the unnarrowed App token; the App grant is the permission boundary
+      # and read-only-ness is enforced by BEHAVIOR (`import` only issues GETs).
+      - name: Mint full App installation token (org-wide)
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3 # zizmor: ignore[github-app]
+        with:
+          client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+          owner: ${{ inputs.org_github_id }}  # zizmor: ignore[github-app]
+
+      - name: Run otterdog import (read-only, writes config to workspace)
+        env:
+          # The `env` credential provider reads the token from this variable.
+          OTTERDOG_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Org selector via env (never inline `${{ }}` in `run:`) — keeps the
+          # zizmor template-injection surface closed.
+          ORG_GITHUB_ID: ${{ inputs.org_github_id }}
+          OTTERDOG_VERSION: ${{ inputs.otterdog_version }}
+          # Dummy web credentials satisfy the env provider's declared keys; the
+          # `--no-web-ui` path resolves credentials with only_token=True and never
+          # exercises them.
+          OTTERDOG_DUMMY_USERNAME: import-dummy-unused
+          OTTERDOG_DUMMY_PASSWORD: import-dummy-unused
+          OTTERDOG_DUMMY_TWOFA_SEED: import-dummy-unused
+          NO_COLOR: "1"
+        run: |
+          set -euo pipefail
+          OTTER=(uvx --with python-dotenv==1.1.0 --from "otterdog@${OTTERDOG_VERSION}" otterdog)
+          # --local: never re-fetch the base template (evaluate the committed
+          #   vendor tree). --no-web-ui: token-only, skip web-UI-only settings.
+          #   --force: unattended, skip interactive approvals.
+          "${OTTER[@]}" import --local --no-web-ui --force -c otterdog.json "${ORG_GITHUB_ID}"
+          echo "Imported config:"
+          find "otterdog/${ORG_GITHUB_ID}" -name '*.jsonnet' -print
+
+      - name: Upload imported config for review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: imported-otterdog-config
+          path: otterdog/${{ inputs.org_github_id }}/**/*.jsonnet
+          if-no-files-found: error
