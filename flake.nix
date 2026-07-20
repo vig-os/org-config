@@ -13,7 +13,7 @@
     #   vigos.url = "github:vig-os/devkit?ref=<tag>";
     # Policy: https://github.com/vig-os/devkit/blob/main/docs/NIX.md
     # "Home-manager modules - versioning & release policy".
-    vigos.url = "github:vig-os/devkit?ref=1.4.0-rc3";
+    vigos.url = "github:vig-os/devkit?ref=1.4.0-rc5";
     # Follow vigos's pinned nixpkgs + flake-utils so your tools match the
     # toolchain exactly (one resolved nixpkgs, no drift).
     nixpkgs.follows = "vigos/nixpkgs";
