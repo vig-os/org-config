@@ -466,6 +466,9 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
         orgs.newRepoRuleset('Main protection') {
           allows_creations: true,
+          bypass_actors+: [
+            '#OrganizationAdmin',
+          ],
           include_refs+: [
             'refs/heads/main',
           ],
@@ -479,6 +482,17 @@ orgs.newOrg('vig-os', 'vig-os') {
               '15368:CI Summary',
             ],
           },
+        },
+        orgs.newRepoRuleset('Signed commits') {
+          allows_creations: true,
+          allows_deletions: true,
+          allows_force_pushes: true,
+          include_refs+: [
+            '~ALL',
+          ],
+          required_pull_request: null,
+          required_status_checks: null,
+          requires_commit_signatures: true,
         },
       ],
     },
