@@ -54,8 +54,9 @@ name: Plan
 
 on:  # yamllint disable-line rule:truthy
   pull_request:
+    # Trunk model (#63): PRs target `main`, the single applied-state branch.
     branches:
-      - dev
+      - main
     paths:
       - otterdog.json
       - otterdog/**

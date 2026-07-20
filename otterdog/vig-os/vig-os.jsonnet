@@ -437,7 +437,7 @@ orgs.newOrg('vig-os', 'vig-os') {
       environments: [
         orgs.newEnvironment('production') {
           branch_policies+: [
-            'dev',
+            'main',
           ],
           deployment_branch_policy: 'selected',
           reviewers+: [
@@ -446,24 +446,6 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
       ],
       rulesets: [
-        orgs.newRepoRuleset('Dev protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/dev',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-            ],
-          },
-        },
         orgs.newRepoRuleset('Main protection') {
           allows_creations: true,
           bypass_actors+: [
