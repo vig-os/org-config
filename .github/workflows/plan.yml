@@ -75,6 +75,14 @@ on:  # yamllint disable-line rule:truthy
           Name of the org's config repo. Defaults to `org-config`.
         type: string
         default: org-config
+      otterdog_version:
+        description: >-
+          Otterdog version to run. Downstream callers MUST pass their own pin
+          (kept in the caller workflow beside the engine SHA pin, issue #56);
+          when empty — this repo's own events — the pin is read from
+          `justfile.project` (ADR-0005 SSoT).
+        type: string
+        default: ''
     # Secret names MATCH this repo's bootstrap Actions secrets (github-app.md), so
     # the credential references below are byte-identical whether reached on this
     # repo's own events (repo secrets) or via `workflow_call` (caller-passed). A
@@ -99,7 +107,7 @@ permissions: {}
 
 jobs:
   plan:
-    name: Plan committed config against live vig-os
+    name: Plan committed config against live ${{ inputs.org_github_id || 'vig-os' }}
     # ADR-0007 BINDING: never expose org-admin credentials to fork PRs.
     if: >-
       github.event_name == 'workflow_dispatch'
@@ -118,13 +126,23 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
 
-      # Otterdog version pin: justfile.project (`otterdog_version`) is the single
-      # source of truth (ADR-0005); read it here so CI never carries a second,
-      # drift-prone copy of the pin.
+      # Otterdog version pin: on this repo's own events, justfile.project
+      # (`otterdog_version`) is the single source of truth (ADR-0005). Downstream
+      # callers check out THEIR repo (no justfile.project — template/ ships none,
+      # issue #56), so they pass the pin as the `otterdog_version` input instead.
       - name: Resolve otterdog version pin
+        env:
+          OTTERDOG_VERSION_INPUT: ${{ inputs.otterdog_version || '' }}
         run: |
           set -euo pipefail
-          version="$(grep -oP 'otterdog_version\s*:=\s*"\K[^"]+' justfile.project)"
+          if [ -n "${OTTERDOG_VERSION_INPUT}" ]; then
+            version="${OTTERDOG_VERSION_INPUT}"
+          elif [ -f justfile.project ]; then
+            version="$(grep -oP 'otterdog_version\s*:=\s*"\K[^"]+' justfile.project)"
+          else
+            echo "::error::no otterdog_version input and no justfile.project in the checkout (downstream callers must pass the input — issue #56)"
+            exit 1
+          fi
           if [ -z "${version}" ]; then
             echo "::error::could not resolve otterdog_version from justfile.project"
             exit 1
@@ -185,6 +203,7 @@ jobs:
           PLAN_RC: ${{ steps.plan.outputs.rc }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           EVENT_NAME: ${{ github.event_name }}
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
         run: |
           set -euo pipefail
           MARKER='<!-- otterdog-plan-report -->'
@@ -196,18 +215,22 @@ jobs:
             status="Plan exited with code \`${PLAN_RC}\`. \`plan\` returns 0 on drift, so a nonzero code means invalid config, auth, or a harness error — not drift. See the run log."
           fi
 
-          footnote=$(cat <<'FOOT'
+          # vig-os-specific known artifact; downstream orgs get no footnote (#56).
+          footnote=""
+          if [ "${ORG_GITHUB_ID}" = "vig-os" ]; then
+            footnote=$(cat <<'FOOT'
           > **Expected benign drift — do not chase:** `vs-dolt` › `code_scanning_default_languages`
           > always reports as changed. GitHub's import splits `javascript-typescript` into
           > `[javascript, typescript]`, a form otterdog's own validator rejects, so the committed
           > config keeps the schema-valid `javascript-typescript`. The diff is cosmetic and expected
           > on every run.
           FOOT
-          )
+            )
+          fi
 
           # --- Job summary (generous 1 MiB budget: full output) ---
           {
-            echo "## Otterdog plan — \`vig-os\` (read-only)"
+            echo "## Otterdog plan — \`${ORG_GITHUB_ID}\` (read-only)"
             echo
             echo "_\`plan --local --no-web-ui\` against the committed config — the exact tree L0 \`otterdog validate --local\` checks. Nothing is applied._"
             echo
@@ -235,7 +258,7 @@ jobs:
 
           {
             echo "${MARKER}"
-            echo "## Otterdog plan — \`vig-os\` (read-only)"
+            echo "## Otterdog plan — \`${ORG_GITHUB_ID}\` (read-only)"
             echo
             echo "_\`plan --local --no-web-ui\` against the committed config — the exact tree L0 \`otterdog validate --local\` checks. Nothing is applied._"
             echo
