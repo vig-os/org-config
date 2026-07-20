@@ -1,0 +1,155 @@
+# Seeded by vigOS devkit — yours to edit; upgrades never overwrite this file.
+# Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
+# ===============================================================================
+# PROJECT RECIPES - Team-shared customizations
+# This file is git-tracked and preserved during devcontainer upgrades.
+# Add team-shared recipes here that everyone on the project should use.
+# ===============================================================================
+# ===============================================================================
+# PROJECT VARIABLES
+# ===============================================================================
+
+project := "org_config"
+
+# Otterdog version pin (ADR-0005) — single source of truth. CI and downstream
+# template repos run otterdog via `uvx` at this exact version without this
+# repo's Nix flake; the pin also anchors the L1 plan-fixture format (ADR-0007).
+# Bumped by Renovate; a bump implies re-checking the dev-shell path.
+otterdog_version := "1.3.4"
+# ===============================================================================
+# INFO
+# ===============================================================================
+
+# Show project information
+[group('info')]
+info:
+    @echo "Project: {{ project }}"
+
+# -------------------------------------------------------------------------------
+# CODE QUALITY
+# -------------------------------------------------------------------------------
+
+# Run all linters
+[group('quality')]
+lint:
+    @if [ -f pyproject.toml ]; then uv run ruff check .; fi
+
+# Format code
+[group('quality')]
+format:
+    @if [ -f pyproject.toml ]; then uv run ruff format .; fi
+
+# Run pre-commit hooks on all files (plus L0 validation, so CI's lint job gates it)
+[group('quality')]
+precommit: validate
+    prek run --all-files
+
+# -------------------------------------------------------------------------------
+# TESTING
+# -------------------------------------------------------------------------------
+
+# Run tests with pytest
+[group('test')]
+test *args:
+    @if [ -f pyproject.toml ]; then uv run pytest {{ args }}; fi
+
+# Run tests with coverage
+[group('test')]
+test-cov *args:
+    @if [ -f pyproject.toml ]; then uv run pytest --cov --cov-report=term-missing {{ args }}; fi
+
+# -------------------------------------------------------------------------------
+# DEPENDENCIES
+# -------------------------------------------------------------------------------
+
+# Sync dependencies (all groups; extras are opt-in, e.g. `just sync --all-extras`)
+[group('deps')]
+sync *args="--all-groups":
+    @if [ -f pyproject.toml ]; then uv sync {{ args }}; fi
+
+# Update all dependencies
+[group('deps')]
+update:
+    uv lock --upgrade
+    @just sync
+
+# -------------------------------------------------------------------------------
+# BUILD
+# -------------------------------------------------------------------------------
+
+# Clean build artifacts
+[group('build')]
+clean-artifacts:
+    rm -rf .pytest_cache .ruff_cache .coverage htmlcov dist build *.egg-info
+    find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+# -------------------------------------------------------------------------------
+# L0 VALIDATION
+# -------------------------------------------------------------------------------
+
+# actionlint + zizmor always run over .github/workflows (zizmor reads the
+# repo-root zizmor.yml baseline). The jsonnet fmt check and `otterdog validate`
+# skip gracefully until the config lands (#17). Additive to lint/precommit/test
+# — CI drives those unchanged; this recipe is the L0 seam plan/apply reuse.
+# `otterdog validate` needs `--with python-dotenv==1.1.0`: otterdog's `env`
+# credential provider imports python-dotenv, an undeclared upstream dep (#16).
+# It also carries a COMMAND-SCOPED LD_LIBRARY_PATH: otterdog's rjsonnet native
+# extension needs libstdc++.so.6, and on a non-Python repo the direnv-mode CI
+# preamble keeps the Nix CPython on PATH (setup-devkit-toolchain #1028), whose
+# loader does not search /usr/lib — the manylinux wheel then fails to import
+# (run 29577969319; same class as the devkit pymarkdown/pyjson5 drop). The lib
+# dir comes from VIGOS_STDCPP_LIB (dev-shell export, flake.nix shellHook) when
+# present; CI forwards only PATH (no shellHook env), so the fallback derives it
+# from the dev-shell `cc` wrapper via -print-file-name (leading-/ check: gcc
+# echoes the bare name back when it cannot resolve the file). Scoping the
+# variable to this one command keeps the nix libstdc++ out of every other
+# tool's process; with neither source available the prefix degrades to the
+# caller's own LD_LIBRARY_PATH (or empty — a no-op).
+#
+# Run L0 static validation: workflow lint/security + otterdog config (ADR-0007)
+[group('L0 validation')]
+validate:
+    actionlint
+    zizmor --offline .github/workflows
+    @if [ -d otterdog ]; then find otterdog -type f \( -name '*.jsonnet' -o -name '*.libsonnet' \) -print0 | xargs -0 -r jsonnetfmt --test && echo "jsonnetfmt: OK"; else echo "jsonnetfmt: skipped (otterdog/ config lands in #17)"; fi
+    @if [ -d otterdog ]; then \
+      stdcpp_lib="${VIGOS_STDCPP_LIB:-}"; \
+      if [ -z "$stdcpp_lib" ] && command -v cc >/dev/null 2>&1; then \
+        p="$(cc -print-file-name=libstdc++.so.6)"; \
+        case "$p" in /*) stdcpp_lib="$(dirname "$p")" ;; esac; \
+      fi; \
+      OTTERDOG_TOKEN="${OTTERDOG_TOKEN:-otterdog-local-validate-placeholder}" \
+      LD_LIBRARY_PATH="$stdcpp_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+      uvx --with python-dotenv==1.1.0 --from otterdog@{{ otterdog_version }} otterdog validate --local; \
+    else echo "otterdog validate: skipped (otterdog/ config lands in #17)"; fi
+
+# ===============================================================================
+# PROJECT-SPECIFIC RECIPES
+# ===============================================================================
+# Uncomment and customize for your project:
+# # Run the application
+# [group('app')]
+# run *args:
+#     uv run python -m {{project}} {{args}}
+#
+# # Boot the local dev services declared in flake.nix (mkProjectServices,
+# # #795): daemonless process-compose stack, state in ./data (gitignore it).
+# [group('services')]
+# services *args:
+#     nix run .#services -- {{args}}
+#
+# # Prepare release branch (manual workflow dispatch helper)
+# [group('release')]
+# prepare-release version:
+#     gh workflow run prepare-release.yml --ref dev -f "version={{ version }}"
+#
+# # Finalize and publish release (manual workflow dispatch helper)
+# [group('release')]
+# finalize-release version:
+#     gh workflow run release.yml --ref release/{{ version }} -f "version={{ version }}" -f "release-kind=final" -f "dry-run=false"
+#
+# # Publish candidate release (manual workflow dispatch helper)
+# [group('release')]
+# publish-candidate version:
+#     gh workflow run release.yml --ref release/{{ version }} -f "version={{ version }}" -f "release-kind=candidate" -f "dry-run=false"

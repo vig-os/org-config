@@ -1,0 +1,227 @@
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
+# Language-neutral base .gitignore
+#
+# This is a MANAGED scaffold file: init-workspace.sh overwrites it on every
+# upgrade and appends a per-language fragment (Python / Node / Rust) detected
+# from the repo's marker files (pyproject.toml / package.json / Cargo.toml).
+# Do not hand-edit durable ignores here — they will not survive an upgrade.
+# Put repo-specific root ignores in .gitignore.project (preserved on upgrade);
+# init-workspace.sh appends its contents here on every regeneration (#1092).
+
+# Environments
+.env
+# .envrc (use flake) is committed for nix-direnv onboarding (#640); the local
+# evaluation cache and any per-user overrides are not.
+.direnv/
+.envrc.local
+
+# Editors / IDEs (uncomment to ignore local editor state)
+# .idea/
+# .vscode/
+
+# Personal justfile recipes
+justfile.local
+
+# Pre-commit cache
+.pre-commit-cache/
+
+# process-compose / services-flake local dev services state (#795)
+data/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+# Appended to the language-neutral base by init-workspace.sh when a
+# pyproject.toml marks the repo as Python. Derived from github/gitignore's
+# Python template.
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+#   For a library or package, you might want to ignore these files since the code is
+#   intended to run in multiple environments; otherwise, check them in:
+# .python-version
+
+# pipenv / uv / poetry / pdm lock files are generally committed for reproducibility;
+# leave them tracked (see each tool's docs).
+.pdm-python
+.pdm-build/
+.pixi
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# Redis
+*.rdb
+*.aof
+*.pid
+
+# Message brokers (RabbitMQ / ActiveMQ)
+mnesia/
+rabbitmq/
+rabbitmq-data/
+activemq-data/
+
+# SageMath parsed files
+*.sage.py
+
+# Virtual environments
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder / Rope project settings
+.spyderproject
+.spyproject
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# Abstra
+.abstra/
+
+# Ruff stuff:
+.ruff_cache/
+
+# PyPI configuration file
+.pypirc
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Repo-specific root .gitignore entries — yours to edit; upgrades never
+# overwrite this file. This is the durable committed home for repo-ROOT ignores:
+# git honors a root ignore only from the root .gitignore, which devkit
+# regenerates on every upgrade, so entries added HERE are appended to that
+# regenerated .gitignore and survive. Put durable repo-root ignores below (not
+# in the managed .gitignore, where hand edits are lost).
+#
+# Flake-generated pre-commit config: this repo opts into flake-sourced hooks
+# (`hooks = { }` in flake.nix), which installs .pre-commit-config.yaml as a
+# /nix/store symlink. It must never be committed — the target is machine-local.
+# (The #1092 auto-seed only fires when the store symlink is resolvable at
+# scaffold time; a direnv-mode upgrade runs in a container without /nix/store,
+# so it is pinned here in the durable consumer-owned ignore instead.)
+.pre-commit-config.yaml
+
+# Otterdog runtime cache: `otterdog validate`/`plan` (the L0 `just validate`
+# recipe, #17) writes an async-HTTP cache into ./.cache in the working dir.
+# Machine-local, never committed.
+/.cache/
+
+# Examples (uncomment / add your own):
+#   /scratch/
+#   /secrets.local.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/

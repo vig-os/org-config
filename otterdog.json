@@ -1,0 +1,25 @@
+{
+  "defaults": {
+    "jsonnet": {
+      "base_template": "https://github.com/EclipseFdn/otterdog-defaults#otterdog-defaults.libsonnet@v0.13.1",
+      "config_dir": "otterdog"
+    },
+    "github": {
+      "config_repo": "org-config"
+    }
+  },
+  "organizations": [
+    {
+      "name": "vig-os",
+      "github_id": "vig-os",
+      "config_repo": "org-config",
+      "credentials": {
+        "provider": "env",
+        "api_token": "OTTERDOG_TOKEN",
+        "username": "OTTERDOG_DUMMY_USERNAME",
+        "password": "OTTERDOG_DUMMY_PASSWORD",
+        "twofa_seed": "OTTERDOG_DUMMY_TWOFA_SEED"
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+# Drift allow-list (ADR-0002) — two sections, both governance state: adding an
+# entry goes through the normal PR flow, so "what is intentionally tolerated /
+# unmanaged" stays reviewable and versioned.
+#
+# [[expected]] — resources whose *settings* divergence is known, benign, and by
+#   design, excluded from `drift`+`critical` issue creation. Each entry matches
+#   an otterdog plan resource header exactly.
+#
+# [[unmanaged]] — the `managed: false` allow-list (inventory sweep, #21): repos
+#   intentionally out of declarative scope. A repo named here is exempt from
+#   BOTH undeclared-repo flagging (it may exist live without a config
+#   declaration) AND settings-reconciliation flagging, in both directions
+#   (a declared-but-absent finding is suppressed too). Its name stays visible
+#   and reviewed here — absence from config is by design, not silent drift.
+#   Empty today: every live `vig-os` repo is declared. Add entries as:
+#     [[unmanaged]]
+#     repository = "some-repo"
+#     reason = "why it is intentionally not under declarative management"
+
+[[expected]]
+resource = 'repository[name="vs-dolt"]'
+reason = """
+code_scanning_default_languages always reports as changed: GitHub's import splits
+`javascript-typescript` into `[javascript, typescript]`, a form otterdog's own
+validator rejects, so the committed config keeps the schema-valid
+`javascript-typescript`. The diff is cosmetic and expected on every run (see
+plan.yml footnote and ADR-0002).
+"""
+
+# [[unmanaged]] entries go here — none at present.

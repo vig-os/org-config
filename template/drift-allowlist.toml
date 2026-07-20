@@ -1,0 +1,22 @@
+# Drift allow-list (ADR-0002) — downstream org-config starter.
+#
+# Two sections, both governance state: adding an entry is a normal reviewable PR,
+# so "what is intentionally tolerated / unmanaged" stays versioned. Start EMPTY
+# and add entries only as real, understood drift appears.
+#
+# [[expected]] — resources whose SETTINGS divergence is known, benign, and by
+#   design, excluded from drift+critical issue creation. `resource` must match an
+#   otterdog plan resource header exactly. Example:
+#     [[expected]]
+#     resource = 'repository[name="some-repo"]'
+#     reason = "why this divergence is expected on every run"
+#
+# [[unmanaged]] — the `managed: false` allow-list (inventory sweep): repos
+#   intentionally out of declarative scope. A repo named here is exempt from BOTH
+#   undeclared-repo flagging AND settings-reconciliation flagging, in both
+#   directions. Its name stays visible and reviewed here. Example:
+#     [[unmanaged]]
+#     repository = "some-private-repo"
+#     reason = "why it is intentionally not under declarative management"
+
+# No [[expected]] or [[unmanaged]] entries yet.

@@ -1,0 +1,18 @@
+# CODEOWNERS — downstream org-config skeleton (placeholder).
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# This repo is org-admin-equivalent (it holds the App credentials and the config
+# that rewrites org settings), so gate every admin-critical path with a required
+# code-owner review. Replace @YOUR_ORG_ADMIN with this org's owner (a user or a
+# team, e.g. @your-org/admins).
+#
+# NOTE (ADR-0006): on the GitHub Free plan a PRIVATE repo has no ENFORCEABLE
+# branch protection or CODEOWNERS gate — this file is advisory until the org is
+# on Team+. Keep it correct now so protection takes effect on upgrade.
+
+/.github/                        @YOUR_ORG_ADMIN
+/otterdog.json                   @YOUR_ORG_ADMIN
+/otterdog/                       @YOUR_ORG_ADMIN
+/secrets/                        @YOUR_ORG_ADMIN
+/.sops.yaml                      @YOUR_ORG_ADMIN
+/drift-allowlist.toml            @YOUR_ORG_ADMIN

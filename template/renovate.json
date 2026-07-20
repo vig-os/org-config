@@ -1,0 +1,17 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Etc/UTC",
+  "baseBranchPatterns": ["dev"],
+  "enabledManagers": ["github-actions"],
+  "packageRules": [
+    {
+      "description": "Bump the pinned vig-os/org-config reusable-workflow tag/SHA in the caller workflows (ADR-0006). Renovate updates the `@vX.Y.Z` / `@<sha>` ref in `uses: vig-os/org-config/.github/workflows/*.yml@...`.",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["vig-os/org-config"],
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "org-config-engine"
+    }
+  ],
+  "_sha_pinning_note": "For SHA pinning (recommended for medtech / exo-pet, ADR-0006): pin `uses: ...@<40-char-sha>` and add a trailing `# vX.Y.Z` comment. Renovate keeps the digest current and updates the comment. To auto-convert tag pins to digests fleet-wide, also add \"helpers:pinGitHubActionDigests\" to `extends`. Remove this key — it is documentation only."
+}

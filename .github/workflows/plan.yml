@@ -1,0 +1,318 @@
+# Plan-on-PR — read-only `otterdog plan` of the committed config against live
+# `vig-os`, posted back to the PR (issue #18, ADR-0007 L2 "free E2E read path").
+#
+# This is a repo-OWNED workflow (not devkit-managed), so zizmor gates it in full:
+# it is deliberately absent from zizmor.yml, and the only accepted findings are
+# the two scoped, justified `github-app` inline ignores below. Everything else
+# must be fixed here, not baselined.
+#
+# Security model (ADR-0007 §Public-repo credential rules, BINDING):
+#   - Runs ONLY on same-repo PRs (`head.repo.full_name == github.repository`) or
+#     manual dispatch; fork PRs get L0 static checks only, never a plan — this is
+#     the standard Poisoned-Pipeline-Execution guard (OWASP CICD-SEC-4). Fork PRs
+#     also cannot see the App secrets, so this `if:` is belt-and-braces.
+#   - No `pull_request_target`; the default `pull_request` checkout is read-only.
+#   - Least-privilege `permissions:`: `contents: read` to read the config,
+#     `pull-requests: write` only to post the plan comment (via GITHUB_TOKEN, not
+#     the App token). `plan` is non-mutating, so this workflow never applies.
+#
+# Auth (ADR-0004 Corrections, spike #16): the otterdog read surface needs the
+# FULL App installation token — a narrowed token cannot carry Actions Variables
+# (GitHub's token-narrowing schema has no key for them), and otterdog's
+# org-variables read is fatal on 403. The App grant is the permission boundary;
+# read-only-ness is enforced by BEHAVIOR (`plan` only issues GETs; `apply` is a
+# separate, environment-gated workflow — #19), not by a `permission-*` block.
+#
+# Template re-fetch trap (SOLVED with `--local`): a non-local `plan` runs
+# `JsonnetConfig.init_template`, which calls `_init_base_template`
+# (otterdog 1.3.4 jsonnet.py:98-99) — that `rmtree`s `otterdog/vig-os/vendor`
+# (jsonnet.py:378) and re-clones the upstream EclipseFdn defaults over it,
+# re-introducing the Eclipse `.py` policy hooks that #17 deliberately drops from
+# the vendored tree. `--local` sets `local_only=True`
+# (cli.py:89-98 -> config.py:117 -> jsonnet.py:68), which skips
+# `_init_base_template` entirely (jsonnet.py:98) and evaluates the COMMITTED
+# vendor as-is. This is the exact same mode `just validate` uses
+# (`otterdog validate --local`), so plan and L0 validate agree on one config.
+# `--local` only gates the vendor re-fetch; credentials and the live-GitHub diff
+# are unaffected (it is the sole use of `local_only` in the codebase).
+# Failure mode: if `otterdog.json`'s `base_template` ref is bumped but the
+# committed vendor is not refreshed to match, plan (like validate) uses the
+# stale committed vendor — which is the intended, reviewed source of truth for a
+# vendored-defaults repo, so the two stay consistent.
+
+# REUSABLE INTERFACE (issue #24, ADR-0006): this workflow ALSO exposes
+# `workflow_call` so downstream orgs' private `org-config` repos (created from the
+# `template/` skeleton) can call it, pinned to an exact tag/SHA of THIS public
+# repo. The inputs default to `vig-os`/`org-config`, so this repo's own
+# `pull_request`/`workflow_dispatch` triggers keep their exact prior semantics:
+# on a non-`workflow_call` event the `inputs` context is empty, so every
+# `inputs.X || '<default>'` resolves to the vig-os default, and every
+# `secrets.<alias> || secrets.<REPO_SECRET>` resolves to this repo's own
+# bootstrap secret (the caller-passed alias is empty). Callers pass the App
+# credentials as `secrets:` (callable cross-org because this repo is public).
+name: Plan
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    # Trunk model (#63): PRs target `main`, the single applied-state branch.
+    branches:
+      - main
+    paths:
+      - otterdog.json
+      - otterdog/**
+      - .github/workflows/plan.yml
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      org_github_id:
+        description: >-
+          GitHub login of the org to plan — the `otterdog plan` positional arg
+          (selects the org from otterdog.json) and the App-token `owner`.
+          Defaults to `vig-os` so this repo's own triggers are unchanged.
+        type: string
+        default: vig-os
+      config_repo:
+        description: >-
+          Name of the org's config repo. Defaults to `org-config`.
+        type: string
+        default: org-config
+      otterdog_version:
+        description: >-
+          Otterdog version to run. Downstream callers MUST pass their own pin
+          (kept in the caller workflow beside the engine SHA pin, issue #56);
+          when empty — this repo's own events — the pin is read from
+          `justfile.project` (ADR-0005 SSoT).
+        type: string
+        default: ''
+    # Secret names MATCH this repo's bootstrap Actions secrets (github-app.md), so
+    # the credential references below are byte-identical whether reached on this
+    # repo's own events (repo secrets) or via `workflow_call` (caller-passed). A
+    # downstream caller passes its own identically-named secrets (or `inherit`).
+    secrets:
+      ORG_CONFIG_APP_CLIENT_ID:
+        description: Client ID of the org-management GitHub App (ADR-0004).
+        required: true
+      ORG_CONFIG_APP_PRIVATE_KEY:
+        description: PEM private key of the org-management GitHub App (ADR-0004).
+        required: true
+
+# Per-PR concurrency; plan is read-only, so cancelling a superseded run is safe.
+# Caller-scoped: the org suffix (empty on this repo's own events, byte-identical
+# to the prior `${{ github.workflow }}-<pr>` group) keeps a downstream caller's
+# plans from serializing against vig-os's.
+concurrency:
+  group: ${{ github.workflow }}${{ inputs.org_github_id && format('-{0}', inputs.org_github_id) || '' }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  plan:
+    name: Plan committed config against live ${{ inputs.org_github_id || 'vig-os' }}
+    # ADR-0007 BINDING: never expose org-admin credentials to fork PRs.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read          # read the committed otterdog config
+      pull-requests: write     # post / update the plan comment (GITHUB_TOKEN)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      # Otterdog version pin: on this repo's own events, justfile.project
+      # (`otterdog_version`) is the single source of truth (ADR-0005). Downstream
+      # callers check out THEIR repo (no justfile.project — template/ ships none,
+      # issue #56), so they pass the pin as the `otterdog_version` input instead.
+      - name: Resolve otterdog version pin
+        env:
+          OTTERDOG_VERSION_INPUT: ${{ inputs.otterdog_version || '' }}
+        run: |
+          set -euo pipefail
+          if [ -n "${OTTERDOG_VERSION_INPUT}" ]; then
+            version="${OTTERDOG_VERSION_INPUT}"
+          elif [ -f justfile.project ]; then
+            version="$(grep -oP 'otterdog_version\s*:=\s*"\K[^"]+' justfile.project)"
+          else
+            echo "::error::no otterdog_version input and no justfile.project in the checkout (downstream callers must pass the input — issue #56)"
+            exit 1
+          fi
+          if [ -z "${version}" ]; then
+            echo "::error::could not resolve otterdog_version from justfile.project"
+            exit 1
+          fi
+          echo "OTTERDOG_VERSION=${version}" >> "$GITHUB_ENV"
+          echo "Resolved otterdog version: ${version}"
+
+      # FULL installation token — NO permission-* narrowing (ADR-0004
+      # Corrections): the App grant is the boundary; a narrowed token cannot read
+      # Actions Variables. `owner: vig-os` makes it org-wide because plan must see
+      # every repo. zizmor's github-app finding on the broad token is an
+      # acknowledged, deliberate decision recorded INLINE (never in zizmor.yml,
+      # which would silently exempt future edits of this file).
+      - name: Mint full App installation token (unnarrowed, org-wide)
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3 # zizmor: ignore[github-app]
+        with:
+          client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+          owner: ${{ inputs.org_github_id || 'vig-os' }}  # zizmor: ignore[github-app]
+
+      - name: Run otterdog plan (read-only, committed config)
+        id: plan
+        env:
+          # The `env` credential provider reads the token from this variable.
+          OTTERDOG_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Org selector, via env (never inline `${{ }}` in `run:`) to keep the
+          # zizmor template-injection surface closed. Empty inputs -> vig-os.
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
+          # Dummy web credentials. `plan --no-web-ui` resolves credentials with
+          # only_token=True (diff_operation.py:132), so these are not exercised;
+          # they are supplied to satisfy the env provider's declared keys
+          # robustly and are provably never used on the --no-web-ui path.
+          OTTERDOG_DUMMY_USERNAME: plan-dummy-unused
+          OTTERDOG_DUMMY_PASSWORD: plan-dummy-unused
+          OTTERDOG_DUMMY_TWOFA_SEED: plan-dummy-unused
+          # Deterministic, unwrapped rich output for a clean code block.
+          NO_COLOR: "1"
+          COLUMNS: "200"
+        run: |
+          # No errexit: otterdog's exit code is the SIGNAL we report on, not a
+          # reason to abort the harness. `plan` returns validation_status.errors
+          # (plan.py handle_finish), so a non-empty DIFF exits 0 — only invalid
+          # config / auth / harness failures are nonzero.
+          set -uo pipefail
+          OTTER=(uvx --with python-dotenv==1.1.0 --from "otterdog@${OTTERDOG_VERSION}" otterdog)
+          set +e
+          "${OTTER[@]}" plan --local --no-web-ui -c otterdog.json "${ORG_GITHUB_ID}" >plan.txt 2>&1
+          rc=$?
+          set -e
+          echo "rc=${rc}" >> "$GITHUB_OUTPUT"
+          echo "otterdog plan exited ${rc}"
+          cat plan.txt
+
+      - name: Build plan report (comment body + job summary)
+        if: always() && steps.plan.outcome != 'skipped'
+        env:
+          PLAN_RC: ${{ steps.plan.outputs.rc }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
+        run: |
+          set -euo pipefail
+          MARKER='<!-- otterdog-plan-report -->'
+          [ -f plan.txt ] || echo "(no plan output was produced — the plan step did not run to completion)" > plan.txt
+
+          if [ "${PLAN_RC:-1}" = "0" ]; then
+            status="Plan completed. A non-empty diff is drift for the PR author to decide on, **not** a failure."
+          else
+            status="Plan exited with code \`${PLAN_RC}\`. \`plan\` returns 0 on drift, so a nonzero code means invalid config, auth, or a harness error — not drift. See the run log."
+          fi
+
+          # vig-os-specific known artifact; downstream orgs get no footnote (#56).
+          footnote=""
+          if [ "${ORG_GITHUB_ID}" = "vig-os" ]; then
+            footnote=$(cat <<'FOOT'
+          > **Expected benign drift — do not chase:** `vs-dolt` › `code_scanning_default_languages`
+          > always reports as changed. GitHub's import splits `javascript-typescript` into
+          > `[javascript, typescript]`, a form otterdog's own validator rejects, so the committed
+          > config keeps the schema-valid `javascript-typescript`. The diff is cosmetic and expected
+          > on every run.
+          FOOT
+            )
+          fi
+
+          # --- Job summary (generous 1 MiB budget: full output) ---
+          {
+            echo "## Otterdog plan — \`${ORG_GITHUB_ID}\` (read-only)"
+            echo
+            echo "_\`plan --local --no-web-ui\` against the committed config — the exact tree L0 \`otterdog validate --local\` checks. Nothing is applied._"
+            echo
+            echo "${status}"
+            echo
+            echo '```text'
+            cat plan.txt
+            echo '```'
+            echo
+            echo "${footnote}"
+            echo
+            echo "[Run log](${RUN_URL})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # --- PR comment body (65536-char cap: truncate the plan text safely) ---
+          MAX_PLAN_BYTES=55000
+          plan_note=""
+          if [ "$(wc -c < plan.txt)" -gt "${MAX_PLAN_BYTES}" ]; then
+            head -c "${MAX_PLAN_BYTES}" plan.txt > plan.comment.txt
+            printf '\n... [output truncated — see the full plan in the [job summary](%s) / run log] ...\n' "${RUN_URL}" >> plan.comment.txt
+            plan_note="_Plan output truncated for the comment; the full plan is in the [job summary](${RUN_URL})._"
+          else
+            cp plan.txt plan.comment.txt
+          fi
+
+          {
+            echo "${MARKER}"
+            echo "## Otterdog plan — \`${ORG_GITHUB_ID}\` (read-only)"
+            echo
+            echo "_\`plan --local --no-web-ui\` against the committed config — the exact tree L0 \`otterdog validate --local\` checks. Nothing is applied._"
+            echo
+            echo "${status}"
+            [ -n "${plan_note}" ] && { echo; echo "${plan_note}"; }
+            echo
+            echo '<details><summary>Plan output</summary>'
+            echo
+            echo '```text'
+            cat plan.comment.txt
+            echo '```'
+            echo
+            echo '</details>'
+            echo
+            echo "${footnote}"
+            echo
+            echo "[Run log](${RUN_URL}) · triggered by \`${EVENT_NAME}\`"
+          } > comment-body.md
+
+      # Post / update the PR comment in place, keyed by the hidden marker so
+      # re-runs edit the same comment instead of stacking. Uses GITHUB_TOKEN
+      # (pull-requests: write) — the App token is reserved for the plan itself.
+      - name: Upsert plan comment on the PR
+        if: always() && github.event_name == 'pull_request' && steps.plan.outcome != 'skipped'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          MARKER='<!-- otterdog-plan-report -->'
+          jq -Rs '{body: .}' comment-body.md > comment-payload.json
+          comment_id="$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" | head -n1)"
+          if [ -n "${comment_id}" ]; then
+            echo "Updating existing plan comment ${comment_id}"
+            gh api --method PATCH "repos/${REPO}/issues/comments/${comment_id}" --input comment-payload.json >/dev/null
+          else
+            echo "Creating new plan comment"
+            gh api --method POST "repos/${REPO}/issues/${PR_NUMBER}/comments" --input comment-payload.json >/dev/null
+          fi
+
+      # Reflect otterdog's exit code as the job status AFTER the report is posted,
+      # so a validation/auth/harness failure reddens the check while the comment
+      # and summary still explain why. Drift (exit 0) never fails here.
+      - name: Fail on plan error
+        if: always() && steps.plan.outcome != 'skipped'
+        env:
+          PLAN_RC: ${{ steps.plan.outputs.rc }}
+        run: |
+          set -euo pipefail
+          if [ "${PLAN_RC:-1}" != "0" ]; then
+            echo "::error::otterdog plan failed (exit ${PLAN_RC}); this is not drift — check the config, auth, or harness."
+            exit 1
+          fi
+          echo "otterdog plan succeeded (exit 0); any diff shown is drift for the PR author to review."

@@ -1,0 +1,39 @@
+# Plan-on-PR caller (downstream org-config skeleton, ADR-0006).
+#
+# Thin ~5-line caller: it wires this org's triggers to vig-os/org-config's
+# reusable `plan` workflow, PINNED to an exact tag or SHA of that public repo.
+# The engine (otterdog invocation, App-token minting, PR comment) lives upstream;
+# only the config data + this caller live here.
+#
+# PIN (ADR-0006, BINDING): replace `@vX.Y.Z` with a released tag of
+# vig-os/org-config (e.g. `@v1.0.0`). For medtech orgs (exo-pet) pin the exact
+# commit SHA instead and keep the tag in a trailing comment, e.g.
+#   uses: vig-os/org-config/.github/workflows/plan.yml@<40-char-sha>  # v1.0.0
+# Renovate (see renovate.json) proposes bumps; never use a floating major tag.
+name: Plan
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - otterdog.json
+      - otterdog/**
+      - .github/workflows/plan.yml
+  workflow_dispatch:
+
+jobs:
+  plan:
+    permissions:
+      contents: read
+      pull-requests: write   # the reusable workflow posts the plan comment
+    uses: vig-os/org-config/.github/workflows/plan.yml@vX.Y.Z  # TODO(pin): exact tag or SHA
+    with:
+      org_github_id: YOUR_ORG      # TODO: this org's GitHub login (e.g. exo-pet)
+      config_repo: org-config      # TODO: this repo's name, if different
+      # Keep in lockstep with the engine's justfile.project otterdog pin (#56);
+      # Renovate can bump this alongside the engine SHA pin above.
+      otterdog_version: "1.3.4"
+    secrets:
+      ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+      ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
