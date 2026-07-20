@@ -1,0 +1,26 @@
+# .gitignore — downstream org-config repo.
+#
+# This repo holds org-admin-equivalent config and SOPS/age CIPHERTEXT. Only the
+# ciphertext under secrets/ is committed; the plaintext age PRIVATE key and any
+# local env must NEVER be committed (ADR-0003).
+
+# Environments / local secrets
+.env
+.env.*
+.envrc.local
+
+# age / SOPS PRIVATE keys — the private half lives ONLY in the SOPS_AGE_KEY
+# repo Actions secret, never on disk in the repo (ADR-0003). Its PUBLIC half in
+# .sops.yaml is fine to commit.
+*.age
+key.txt
+keys.txt
+age-key.txt
+*.agekey
+
+# Otterdog runtime cache: `otterdog validate`/`plan`/`import` write an async-HTTP
+# cache into ./.cache in the working dir. Machine-local, never committed.
+/.cache/
+
+# Editors / OS
+.DS_Store

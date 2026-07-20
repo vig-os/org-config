@@ -33,13 +33,29 @@ placeholders.
    repository**. Make the new repo **private** and create it **inside your org**.
 2. In the new repo, move the contents of `template/` to the repo **root** and
    delete everything else the template copied (the engine's `src/`,
-   `otterdog/vig-os/`, the engine workflows, ADRs, and so on). Your root should
-   end up with: `otterdog.json`, `otterdog/<org>/`, `.github/workflows/`,
-   `.github/CODEOWNERS`, `.sops.yaml`, `drift-allowlist.toml`, and
-   `renovate.json`.
+   `otterdog/vig-os/`, the engine workflows, ADRs, and so on). Two files need a
+   **rename**, not a plain copy:
+   - `README.repo.md` -> `README.md` — this becomes the repo's own README. **This
+     onboarding runbook (`template/README.md`) is not carried into the repo** —
+     discard it once onboarding is done, so the repo ends up with a real README
+     rather than the runbook (or none).
+   - `.github/workflows/import.yml` is a one-time bootstrap helper (Step 4); keep
+     it for the import, then delete it.
+
+   Your root should end up with: `README.md` (from `README.repo.md`), `LICENSE`,
+   `.gitignore`, `otterdog.json`, `otterdog/<org>/`, `.github/workflows/`,
+   `.github/CODEOWNERS`, `.sops.yaml`, `drift-allowlist.toml`, and `renovate.json`.
 3. Replace every placeholder: `YOUR_ORG` (this org's GitHub login), `YOUR_ORG_ADMIN`
-   (an owner user or team in CODEOWNERS), the `@vX.Y.Z` pins, and the `.sops.yaml`
-   age recipient.
+   (an owner user or team in CODEOWNERS), the `@vX.Y.Z` pins, the `.sops.yaml`
+   age recipient, and the year/org name in `LICENSE` (see [License](#license)).
+4. **Decide the engine pin style now** (ADR-0006): a released **tag** (`@vX.Y.Z`)
+   or an exact **commit SHA** (recommended for medtech orgs such as `exo-pet`).
+   For a SHA pin, write `uses: ...@<40-char-sha>  # vX.Y.Z` in each caller and keep
+   the trailing `# vX.Y.Z` comment so the human-readable version stays visible.
+   `renovate.json` bumps whichever form you choose; to have Renovate auto-convert
+   tag pins to digests fleet-wide, add `"helpers:pinGitHubActionDigests"` to its
+   `extends` (see the `_sha_pinning_note` key in `renovate.json`). **Never** use a
+   floating major tag.
 
 ## Step 2 — Install the GitHub App
 
@@ -71,10 +87,17 @@ secret and is never committed (ADR-0003).
 
 ## Step 4 — Import the org config
 
-1. Bootstrap `otterdog/<org>/<org>.jsonnet` from the live org (see
-   [`otterdog/README.md`](otterdog/README.md) for the layout and an
-   `otterdog import` starting point), then normalize away base-template defaults
-   so the first plan shows an empty diff.
+1. Bootstrap `otterdog/<org>/<org>.jsonnet` from the live org. Two options:
+   - **CI (recommended):** run the shipped **Import** workflow
+     (`.github/workflows/import.yml`) via **Actions -> Import -> Run workflow**,
+     passing this org's login. It runs `otterdog import` read-only against the org
+     and uploads the generated jsonnet as a build **artifact** — it never commits
+     or mutates the org. Download the artifact into `otterdog/<org>/`.
+   - **Local:** run `otterdog import <org>` yourself (see
+     [`otterdog/README.md`](otterdog/README.md) for the layout).
+
+   Either way, **normalize away base-template defaults** so the first plan shows an
+   empty diff, then commit. Delete `import.yml` once the import is done.
 2. Open a PR to `dev`. The **plan** caller runs a read-only
    `otterdog plan` against the live org and posts the diff as a PR comment —
    nothing is applied.
@@ -87,8 +110,10 @@ Per ADR-0006, a **Free-plan** org runs **plan-first / read-only**:
   reads, and gives useful review-time coverage.
 - **drift** is also read-only (it opens issues, never touches org state), but its
   reconciler currently needs the shared drift layer present in this repo; until
-  that layer ships as a vendored artifact (a `vig-os/org-config` follow-up), keep
-  drift disabled and rely on plan.
+  that layer is published/vendored as a versioned artifact (a `vig-os/org-config`
+  follow-up to #24 — the same caveat carried in
+  [`.github/workflows/drift.yml`](.github/workflows/drift.yml)), keep drift
+  disabled and rely on plan.
 - Do **not** wire **apply** yet. A Free private repo has no enforceable branch
   protection, so holding write credentials there is the worst-case blast radius.
 
@@ -110,3 +135,12 @@ to the `vig-os/org-config` reusable-workflow pin. Review each bump like any
 dependency update — a bump changes the engine that can rewrite this org's
 settings. For SHA pins, keep the `# vX.Y.Z` comment beside the digest so the
 human-readable version stays visible.
+
+## License
+
+The `vig-os/org-config` **engine** is Apache-2.0. This **downstream config repo is
+not** — it holds org-admin-equivalent configuration and (encrypted) secrets, so it
+carries its **own proprietary notice**. The shipped `LICENSE` is an
+all-rights-reserved placeholder: fill in the year and org name (Step 1.3), or drop
+in your org's standard proprietary license text. **Do not** copy the engine's
+Apache-2.0 `LICENSE` into this repo.
