@@ -46,7 +46,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
-          ref: dev
+          ref: main
           fetch-depth: 0
 
       - name: Validate and prepare variables
@@ -174,10 +174,10 @@ jobs:
           client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
           private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
 
-      - name: Checkout dev branch
+      - name: Checkout main branch
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
-          ref: dev
+          ref: main
           fetch-depth: 0
 
       - name: Set up devkit toolchain
@@ -186,14 +186,14 @@ jobs:
           mode: ${{ needs.validate.outputs.mode }}
           devkit-version: ${{ needs.validate.outputs.image-tag }}
 
-      - name: Capture pre-prepare dev SHA
+      - name: Capture pre-prepare main SHA
         id: pre_state
         env:
           GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
         run: |
           set -euo pipefail
           PREPARE_START_SHA=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
-            gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+            gh api "repos/${{ github.repository }}/git/ref/heads/main" --jq '.object.sha')
           echo "prepare_start_sha=$PREPARE_START_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Prepare CHANGELOG (freeze + reset)
@@ -225,12 +225,12 @@ jobs:
             echo "CHANGELOGEOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Commit prepared CHANGELOG to dev via API
+      - name: Commit prepared CHANGELOG to main via API
         uses: vig-os/commit-action@3a0588ec060d9647bf406e064cf9e6192a431864  # v0.3.1
         env:
           GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          TARGET_BRANCH: refs/heads/dev
+          TARGET_BRANCH: refs/heads/main
           MAX_ATTEMPTS: "3"
           COMMIT_MESSAGE: |-
             chore: freeze changelog for release ${{ needs.validate.outputs.version }}
@@ -239,7 +239,7 @@ jobs:
             and create fresh empty Unreleased section for continued development.
           FILE_PATHS: CHANGELOG.md
 
-      - name: Create release branch from dev
+      - name: Create release branch from main
         id: create_branch
         env:
           GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
@@ -247,8 +247,8 @@ jobs:
           PREPARE_START_SHA: ${{ steps.pre_state.outputs.prepare_start_sha }}
         run: |
           set -euo pipefail
-          # Wait for dev to advance past the pre-freeze SHA before branching (#617).
-          # The freeze commit-action updates dev's ref, but a REST ref read can
+          # Wait for main to advance past the pre-freeze SHA before branching (#617).
+          # The freeze commit-action updates main's ref, but a REST ref read can
           # briefly return the stale pre-freeze SHA (read-after-write lag); branching
           # then would create release/X.Y.Z without the freeze. `retry` only retries
           # on failure, so a stale-but-successful read slips through -- assert the SHA
@@ -256,15 +256,15 @@ jobs:
           DEV_SHA=""
           for attempt in $(seq 1 8); do
             DEV_SHA=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
-              gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+              gh api "repos/${{ github.repository }}/git/ref/heads/main" --jq '.object.sha')
             if [ "$DEV_SHA" != "$PREPARE_START_SHA" ]; then
               break
             fi
-            echo "dev still at pre-freeze SHA $DEV_SHA (attempt $attempt/8); waiting for freeze to propagate..."
+            echo "main still at pre-freeze SHA $DEV_SHA (attempt $attempt/8); waiting for freeze to propagate..."
             sleep 5
           done
           if [ "$DEV_SHA" = "$PREPARE_START_SHA" ]; then
-            echo "ERROR: dev did not advance past pre-freeze SHA $PREPARE_START_SHA; freeze commit not visible"
+            echo "ERROR: main did not advance past pre-freeze SHA $PREPARE_START_SHA; freeze commit not visible"
             exit 1
           fi
           retry --retries 3 --backoff 5 --max-backoff 60 -- \
@@ -291,9 +291,9 @@ jobs:
           echo "✓ Release branch ref verified as resolvable"
 
       # The release branch keeps the empty ## Unreleased section (no stripping).
-      # main therefore retains ## Unreleased above the dated release, matching
-      # dev, so the section is stable common context in the eventual main/dev
-      # sync merge and can never be silently dropped (#590). Keep a Changelog
+      # main therefore retains ## Unreleased above the dated release, so the
+      # section stays stable and can never be silently dropped (#590) even as
+      # releases land directly on main. Keep a Changelog
       # endorses an always-present Unreleased section.
 
   # Project-specific release-branch preparation (#1059), the mutating counterpart
@@ -402,7 +402,7 @@ jobs:
 
   # Single rollback job across the whole prepare phase (mirrors release.yml's
   # rollback job that watches release-extension). It deletes the partial release
-  # branch and restores CHANGELOG.md on dev — unchanged logic. Because every
+  # branch and restores CHANGELOG.md on main — unchanged logic. Because every
   # commit the extension pushes lives on release/X.Y.Z, deleting that branch
   # erases the extension's work too, so an extension failure needs no new
   # machinery beyond listing `extension` in `needs`.
@@ -477,7 +477,7 @@ jobs:
           fi
 
           CURRENT_DEV_SHA=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
-            gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+            gh api "repos/${{ github.repository }}/git/ref/heads/main" --jq '.object.sha')
           if [ "$CURRENT_DEV_SHA" != "$POST_FREEZE_DEV_SHA" ]; then
             echo "changelog_rollback_needed=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -493,16 +493,16 @@ jobs:
           fi
           echo "changelog_rollback_needed=$CHANGELOG_ROLLBACK_NEEDED" >> "$GITHUB_OUTPUT"
 
-      - name: Commit CHANGELOG rollback to dev via API
+      - name: Commit CHANGELOG rollback to main via API
         if: ${{ steps.rollback_prepare.outputs.changelog_rollback_needed == 'true' }}
         uses: vig-os/commit-action@3a0588ec060d9647bf406e064cf9e6192a431864  # v0.3.1
         env:
           GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          TARGET_BRANCH: refs/heads/dev
+          TARGET_BRANCH: refs/heads/main
           MAX_ATTEMPTS: "3"
           COMMIT_MESSAGE: |-
             chore: rollback failed prepare-release ${{ needs.validate.outputs.version }}
 
-            Restore CHANGELOG.md on dev to pre-prepare state after prepare-release failed.
+            Restore CHANGELOG.md on main to pre-prepare state after prepare-release failed.
           FILE_PATHS: CHANGELOG.md

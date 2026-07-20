@@ -30,8 +30,8 @@ When the user asks to create or start work on an issue (e.g. "create branch for 
 
 5. **Determine base branch**
    - Check if the issue has a parent: `gh api repos/{owner}/{repo}/issues/{issue_number}/parent --jq '.number'`
-   - If a parent exists, resolve its linked branch: `gh issue develop --list <parent_number>`. Use the parent's branch as `<base_branch>`. If the parent has no linked branch, fall back to `dev`.
-   - If no parent exists, use `dev` as `<base_branch>`.
+   - If a parent exists, resolve its linked branch: `gh issue develop --list <parent_number>`. Use the parent's branch as `<base_branch>`. If the parent has no linked branch, fall back to `main`.
+   - If no parent exists, use `main` as `<base_branch>`.
 
 6. **Create and link the branch via GitHub**
    - After user confirms: `gh issue develop <issue_number> --base <base_branch> --name <branch_name> --checkout`

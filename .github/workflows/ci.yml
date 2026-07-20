@@ -47,7 +47,6 @@ name: CI
 on:  # yamllint disable-line rule:truthy
   pull_request:
     branches:
-      - dev
       - 'release/**'
       - main
   workflow_dispatch:
@@ -229,7 +228,7 @@ jobs:
           # anything already reachable from origin/dev — a no-op on a dev PR
           # (its base IS dev) that only tightens the release-PR range (#1149).
           EXCLUDE=()
-          TRUNK="dev"
+          TRUNK="main"
           if [ "${BASE_REF}" != "${TRUNK}" ] && \
              git fetch --no-tags --quiet origin "${TRUNK}" 2>/dev/null; then
             EXCLUDE+=(--exclude-reachable "origin/${TRUNK}")
