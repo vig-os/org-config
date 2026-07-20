@@ -1,6 +1,6 @@
 # Apply-on-merge — mutating `otterdog apply` of the committed config against live
-# `vig-os`, run from trunk `dev` after a config change merges (issue #19,
-# ADR-0007 split cadence: "config applies from `dev` on merge").
+# `vig-os`, run from trunk `main` after a config change merges (issue #19, #63
+# trunk model: `main` is the single applied-state branch).
 #
 # This is a repo-OWNED workflow (not devkit-managed), so zizmor gates it in full:
 # it is deliberately absent from zizmor.yml, and the only accepted findings are
@@ -9,11 +9,11 @@
 #
 # HUMAN GATE ON MUTATIONS (ADR-0007 §Public-repo credential rules, BINDING):
 #   - The job runs in the `production` environment, which on this repo requires
-#     reviewer `c-vigo` and restricts deployments to the `dev` branch. Entering
+#     reviewer `c-vigo` and restricts deployments to the `main` branch. Entering
 #     that environment pauses the run until the reviewer approves — this wait IS
 #     the designed manual gate before any write token touches live `vig-os`. No
 #     `apply` mutates without a human first approving the deployment.
-#   - `apply` runs ONLY from trunk `dev`: `push` events fire on this repo, never
+#   - `apply` runs ONLY from trunk `main`: `push` events fire on this repo, never
 #     on a fork (a fork cannot push to the base repo), so org-admin credentials
 #     are never exposed to fork code (OWASP CICD-SEC-4, Poisoned Pipeline
 #     Execution). The `if:` below asserts the repo identity as belt-and-braces.
@@ -94,7 +94,7 @@
 # `template/` skeleton) can call it pinned to an exact tag/SHA. Inputs default to
 # `vig-os`/`org-config` and the App/age credentials fall through to this repo's
 # own bootstrap secrets on a non-`workflow_call` event, so this repo's own `push`
-# to `dev` keeps byte-identical semantics. NOTE (ADR-0006 sequencing): a Free
+# to `main` keeps byte-identical semantics. NOTE (ADR-0006 sequencing): a Free
 # downstream org onboards read-only (plan+drift) and only wires this apply caller
 # AFTER upgrading to Team — apply is the write path.
 name: Apply
@@ -102,6 +102,11 @@ name: Apply
 on:  # yamllint disable-line rule:truthy
   push:
     branches:
+      # Applied state is trunk `main` (#63). `dev` is retained only so the
+      # trunk-migration PR (#63) itself still fires this last dev-based apply
+      # (which flips the production branch policy to `main`); inert once `dev` is
+      # deleted.
+      - main
       - dev
     paths:
       - otterdog.json
@@ -172,7 +177,7 @@ jobs:
     if: github.repository == format('{0}/{1}', inputs.org_github_id || 'vig-os', inputs.config_repo || 'org-config')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # The production environment (required reviewer c-vigo, dev-only deployment
+    # The production environment (required reviewer c-vigo, main-only deployment
     # branch policy) is the human approval gate on mutations — the run pauses
     # here until the deployment is approved.
     environment: production

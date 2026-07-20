@@ -41,26 +41,24 @@
 #
 # DEFAULT-BRANCH REGISTRATION / ACTIVATION MODEL (devkit release model): GitHub
 # registers `schedule` and `workflow_dispatch` triggers ONLY from a repo's
-# DEFAULT branch — here `main`, which advances only via a release, never from
-# trunk `dev` where this file is developed. So until the first release (v1.0.0)
-# promotes this workflow onto `main`, it is UNREGISTERED: the weekly cron below
-# is INERT and `workflow_dispatch` cannot target it (M3 acceptance evidence is
-# provided BEFORE then by the disposable `e2e-verification-spike.yml`, which runs
-# this same harness on a draft PR). It ACTIVATES at that first release, and
-# dispatch likewise only works once the file is on `main`.
+# DEFAULT branch — here trunk `main` (#63 trunk model: `main` is the single
+# branch, where this file is both developed AND applied). So this harness is
+# REGISTERED once this file lands on `main`: from then the weekly cron below and
+# `workflow_dispatch` can fire (M3 acceptance evidence is provided independently
+# by the disposable `e2e-verification-spike.yml`, which runs this same harness on
+# a draft PR). (Pre-trunk, under gitflow, registration waited on the first
+# release promoting the file from `dev` onto `main`; the trunk switch collapses
+# that dev/main split, so there is no release gap left to bridge.)
 #
-# CHECKOUT REF IS PINNED TO `dev` (BINDING): once this file runs from `main`
-# post-release, the workflow FILE is main's (released, reviewed-at-release), but
-# the DATA and code it must operate on — the committed `otterdog/` config (the
-# jsonnet the description-sync guard greps), the `src/drift_layer/` Python, the
-# allow-list, and the `justfile.project` otterdog pin — all live on trunk `dev`
-# between releases. So the checkout step pins `ref: dev` explicitly; without it
-# `actions/checkout` takes the triggering ref (`main`) and the harness would run
-# STALE released config/code. INJECTION SURFACE (stated explicitly): a
-# main-pinned workflow then executes dev's Python (the reconciler) — trust-wise
-# IDENTICAL to today's dev-push `apply` (apply.yml runs dev's code on merge to
-# `dev`); BOTH are gated by the same PR-to-`dev` review, so pinning `ref: dev`
-# opens no injection surface the existing merge-apply path does not already carry.
+# CHECKOUT REF IS THE DEFAULT (`main`): under the trunk model `main` is both
+# where GitHub registers this workflow's triggers AND where the DATA and code it
+# must operate on live — the committed `otterdog/` config (the jsonnet the
+# description-sync guard greps), the `src/drift_layer/` Python, the allow-list,
+# and the `justfile.project` otterdog pin. So the default `actions/checkout` ref
+# (the triggering ref, `main`) is exactly the tree to run against; NO explicit
+# `ref:` pin is needed. (The old gitflow `ref: dev` pin bridged a released-`main`
+# workflow to dev-resident config between releases; that split is gone under
+# trunk, so the pin is removed.)
 
 name: Testbed E2E
 
@@ -114,14 +112,13 @@ jobs:
     permissions: {}
     steps:
       - name: Checkout repository
-        # Pin to trunk `dev`: post-release this workflow runs from `main` (the
-        # only branch GitHub registers its schedule/dispatch from), but the
-        # config, drift-layer code, allow-list, and otterdog pin all live on
-        # `dev` between releases — see the header. The default `main` triggering
-        # ref would run the harness against stale released config/code.
+        # Default checkout ref (the triggering ref, trunk `main`): under the
+        # trunk model `main` is both where GitHub registers this schedule/
+        # dispatch and where the config, drift-layer code, allow-list, and
+        # otterdog pin live, so the default ref is exactly the tree to run
+        # against — see the header. No `ref:` pin needed.
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
-          ref: dev
           persist-credentials: false
 
       - name: Set up uv
