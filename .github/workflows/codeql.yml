@@ -45,6 +45,7 @@ on:  # yamllint disable-line rule:truthy
     branches:
       - main
     paths:
+      - '**.py'
       - '.github/workflows/**'
   schedule:
     - cron: '15 2 * * 1'  # Monday at 02:15 UTC
@@ -67,11 +68,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['actions']
+        language: ['python', 'actions']
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a  # v4
