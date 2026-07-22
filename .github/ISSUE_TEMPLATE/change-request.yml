@@ -1,0 +1,92 @@
+---
+# Owned by vig-os/org-config — NOT devkit-managed.
+# Unlike the sibling forms in this directory, this file is repo-specific and is
+# NOT regenerated on a vigOS devkit upgrade; edit it here. It captures a request
+# to change a managed org/repo setting; a maintainer turns an accepted request
+# into an Otterdog config PR.
+
+name: Change Request
+description: Request a change to a managed vig-os org or repository setting
+title: '[CHANGE-REQUEST] '
+labels: ['change-request']
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to request a change to any setting managed by this repo
+        (org settings, repository settings, rulesets/branch protection, teams &
+        permissions, secrets/variables, webhooks).
+
+        **What happens next:** a maintainer turns an accepted request into an
+        Otterdog config pull request. The **plan** workflow posts the exact diff
+        on that PR; on merge, **apply** runs in a reviewer-gated environment so
+        every mutation pauses for human approval; scheduled **drift** detection
+        catches any out-of-band change afterward. You do not edit the jsonnet
+        yourself — describe the outcome you want below.
+  - type: input
+    id: target
+    attributes:
+      label: Target repo(s)
+      description: |
+        Which repository or repositories should change? Use `org-wide` for a
+        change to org-level settings that is not scoped to a single repo.
+      placeholder: 'e.g. vig-os/devcontainer, or: org-wide'
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Setting area
+      description: Which area of configuration does this affect?
+      options:
+        - Repository settings
+        - Ruleset / branch protection
+        - Org settings
+        - Teams & permissions
+        - Secrets / variables
+        - Webhooks
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: Current behavior
+      description: How is the setting configured today? (Leave blank if it does not exist yet.)
+      placeholder: Describe the current state...
+  - type: textarea
+    id: desired-change
+    attributes:
+      label: Desired change
+      description: What should the setting be after this request is applied?
+      placeholder: Describe the desired end state...
+    validations:
+      required: true
+  - type: textarea
+    id: justification
+    attributes:
+      label: Justification
+      description: Why is this change needed? What problem does it solve or unblock?
+      placeholder: Explain the motivation and any constraints...
+    validations:
+      required: true
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: Urgency
+      description: How time-sensitive is this change?
+      options:
+        - Low — whenever capacity allows
+        - Medium — this milestone
+        - High — needed soon, blocks planned work
+        - Critical — blocking or security-sensitive
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Links to related issues/PRs, prior discussion, or anything else that helps.
+      placeholder: 'Related to #123, see ADR-0006, etc.'

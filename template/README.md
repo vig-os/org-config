@@ -44,7 +44,8 @@ placeholders.
 
    Your root should end up with: `README.md` (from `README.repo.md`), `LICENSE`,
    `.gitignore`, `otterdog.json`, `otterdog/<org>/`, `.github/workflows/`,
-   `.github/CODEOWNERS`, `.sops.yaml`, `drift-allowlist.toml`, and `renovate.json`.
+   `.github/ISSUE_TEMPLATE/`, `.github/CODEOWNERS`, `.sops.yaml`,
+   `drift-allowlist.toml`, and `renovate.json`.
 3. Replace every placeholder: `YOUR_ORG` (this org's GitHub login), `YOUR_ORG_ADMIN`
    (an owner user or team in CODEOWNERS), the `@vX.Y.Z` pins, the `.sops.yaml`
    age recipient, and the year/org name in `LICENSE` (see [License](#license)).

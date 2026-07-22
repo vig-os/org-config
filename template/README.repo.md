@@ -27,9 +27,9 @@ contains:
 
 ## How changes flow
 
-1. Open a PR to `dev`. The **plan** caller runs a read-only `otterdog plan` against
+1. Open a PR to `main`. The **plan** caller runs a read-only `otterdog plan` against
    the live org and posts the diff as a PR comment — nothing is applied.
-2. On merge to `dev`, the **apply** caller (once enabled) runs `otterdog apply` in a
+2. On merge to `main`, the **apply** caller (once enabled) runs `otterdog apply` in a
    required-reviewer `production` environment, so every mutation pauses for human
    approval.
 3. The **drift** caller runs on a schedule, opening deduplicated issues for any
