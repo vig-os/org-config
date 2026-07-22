@@ -9,7 +9,7 @@
 # subprocess execution.
 #
 # Triggers:
-#   - Pull requests to dev, release/**, and main
+#   - Pull requests to release/** and main
 #   - Pushes to main (post-merge analysis)
 #   - Weekly schedule (catch newly disclosed patterns)
 #

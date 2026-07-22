@@ -5,7 +5,7 @@
 #
 # 1. validate: semver, draft GitHub Release for X.Y.Z, release PR approved and CI green
 # 2. promote: publish (undraft) GitHub Release
-# 3. merge: merge release/X.Y.Z PR to main (triggers sync-main-to-dev)
+# 3. merge: merge release/X.Y.Z PR to main
 # 4. cleanup (best-effort): delete RC draft pre-releases for X.Y.Z, then remote git RC tags
 #    matching X.Y.Z-rc* with no (remaining) GitHub Release
 #
@@ -470,7 +470,7 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         run: |
-          echo "✓ Release $VERSION promoted; PR #$PR_NUMBER merged to main (sync-main-to-dev may run next)"
+          echo "✓ Release $VERSION promoted; PR #$PR_NUMBER merged to main"
 
   cleanup:
     name: Cleanup git RC tags
