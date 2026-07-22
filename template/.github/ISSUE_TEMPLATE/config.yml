@@ -1,0 +1,4 @@
+# Downstream skeleton — copied into YOUR_ORG/org-config during onboarding.
+# Owned by the instantiated config repo, NOT devkit-managed.
+
+blank_issues_enabled: false

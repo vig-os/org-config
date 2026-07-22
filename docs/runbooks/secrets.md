@@ -52,7 +52,7 @@ authoring.
    },
    ```
 
-3. Open a PR. Review the **ciphertext** diff. Merge to `dev` → apply-on-merge
+3. Open a PR. Review the **ciphertext** diff. Merge to `main` → apply-on-merge
    pushes it live.
 
 > The pass path may contain `/` but **no `:`** — otterdog splits a secret value
