@@ -1,0 +1,20 @@
+# Repo-local label taxonomy extension (#1254) — not devkit-managed.
+[[labels]]
+name = "drift"
+description = "Drift detected between declared and live org state"
+color = "d93f0b"
+
+[[labels]]
+name = "critical"
+description = "Requires immediate attention"
+color = "b60205"
+
+[[labels]]
+name = "inventory"
+description = "Org inventory snapshot"
+color = "0e8a16"
+
+[[labels]]
+name = "change-request"
+description = "Structured change request via issue form"
+color = "1d76db"
