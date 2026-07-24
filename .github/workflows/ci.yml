@@ -38,7 +38,7 @@
 #   6. summary           — Aggregate results for branch protection
 #
 # Triggers:
-#   - Pull requests to dev, release/**, and main
+#   - Pull requests to release/** and main
 #   - Manual workflow_dispatch
 #
 
@@ -225,8 +225,8 @@ jobs:
           # A release PR (release/* -> main) spans pre-migration history that
           # predates the commit gate. Those commits were gated (or
           # grandfathered) on their way into the trunk branch, so exclude
-          # anything already reachable from origin/dev — a no-op on a dev PR
-          # (its base IS dev) that only tightens the release-PR range (#1149).
+          # anything already reachable from origin/main — a no-op on a main PR
+          # (its base IS main) that only tightens the release-PR range (#1149).
           EXCLUDE=()
           TRUNK="main"
           if [ "${BASE_REF}" != "${TRUNK}" ] && \

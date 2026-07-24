@@ -23,7 +23,7 @@ on:  # yamllint disable-line rule:truthy
         default: false
         type: boolean
       target-branch:
-        description: 'Target branch to commit changes to (e.g., dev, release/x.y.z).'
+        description: 'Target branch to commit changes to (e.g., main, release/x.y.z).'
         required: false
         default: 'main'
         type: string
