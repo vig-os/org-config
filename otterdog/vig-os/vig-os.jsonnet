@@ -48,6 +48,12 @@ orgs.newOrg('vig-os', 'vig-os') {
     orgs.newOrgSecret('COMMIT_APP_PRIVATE_KEY') {
       value: '********',
     },
+    orgs.newOrgSecret('DEVKIT_UPGRADE_APP_ID') {
+      value: '********',
+    },
+    orgs.newOrgSecret('DEVKIT_UPGRADE_APP_PRIVATE_KEY') {
+      value: '********',
+    },
     orgs.newOrgSecret('DOCKERHUB_TOKEN') {
       value: '********',
     },
