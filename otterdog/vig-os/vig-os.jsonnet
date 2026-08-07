@@ -236,6 +236,11 @@ orgs.newOrg('vig-os', 'vig-os') {
             'refs/heads/main',
           ],
           required_pull_request+: {
+            // An approval must cover the code being merged: without this, a
+            // review of one commit survives every later push to the branch.
+            // Main only — Dev and Release require 0 approvals, so they have
+            // nothing to dismiss (#118).
+            dismisses_stale_reviews: true,
             required_approving_review_count: 1,
             // Deliberately off: `.github/CODEOWNERS` names a single owner who
             // also authors the PRs, so the gate can never be satisfied and its
