@@ -2,7 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "timezone": "Etc/UTC",
-  "baseBranchPatterns": ["dev"],
+  "baseBranchPatterns": ["main"],
   "enabledManagers": ["github-actions"],
   "packageRules": [
     {

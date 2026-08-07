@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **House defaults overlay: a single source for the repository merge policy** ([#108](https://github.com/vig-os/org-config/issues/108)): new `otterdog/vig-os/house-defaults.libsonnet` re-exports the vendored Eclipse base template with the house merge policy (`allow_merge_commit: true`, rebase/squash off, `merge_commit_title: 'PR_TITLE'`, `merge_commit_message: 'PR_BODY'`) folded into `newRepo`, so every repo an org declares inherits it by construction instead of restating five fields. The policy previously had no single source: it was hand-copied onto individual repo blocks (`allow_merge_commit: true` appeared 12 times, the full five-field policy five times) while the vendored base declared the exact opposite, so any newly declared repo silently started on the upstream Eclipse defaults. The overlay resolves `vendor/…` relative to itself and names no org, so it is a single file dropped beside a downstream org's own vendored tree — `template/otterdog/YOUR_ORG/house-defaults.libsonnet` now ships it, and the skeleton's layout note plus the onboarding runbook document the one-line import change (`local orgs = import 'house-defaults.libsonnet';`) and how to normalize an `otterdog import` against it. It also exports `houseMergePolicy`, `upstreamMergePolicy`, and `legacyMergePolicy` mixins so a repo that deliberately sits on another policy names it rather than restating fields. `otterdog/vig-os/vig-os.jsonnet` is deduplicated against the overlay as a **pure refactor** — the evaluated config is byte-identical before and after (verified with `jsonnet`), so `scitadel` and `tessera` keep their documented deviations and the repos that predate the policy carry an explicit `+ orgs.legacyMergePolicy` (narrowing them to the house policy is a live settings change, deliberately out of scope here).
+
 ### Changed
 
 ### Deprecated
@@ -16,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+- **`template/` retargeted from the retired `dev` branch to trunk `main`** ([#106](https://github.com/vig-os/org-config/issues/106)): the downstream skeleton shipped in `v1.0.0` still described the pre-trunk `dev` model that #63 retired, so an org copying it verbatim got a `plan` caller that never fires (nothing opens PRs against `dev`), an `apply` caller that never fires (nothing pushes to `dev`), a Renovate base-branch pattern matching no branch, and a runbook pointing at a branch that does not exist — silent no-ops rather than errors, the worst failure mode for a write-path workflow. All eight references are now `main`: `plan.yml`'s `on.pull_request.branches`, `apply.yml`'s `on.push.branches` and its `production` deployment-branch-policy note, `import.yml`'s commit-back instruction, `renovate.json`'s `baseBranchPatterns`, and the three `README.md` onboarding steps (open the PR, the `production` environment policy, and where `apply` runs from). The example engine pins in `plan.yml` are bumped to `v1.0.1`, the first release carrying a skeleton that matches the engine it calls. `exo-pet/org-config` had already hand-adapted each of these twice (exo-pet/org-config#6, exo-pet/org-config#10).
 
 ### Security
 

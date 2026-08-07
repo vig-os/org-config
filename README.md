@@ -18,8 +18,11 @@ The design and roadmap are tracked in issue
 Reconciliation is [Otterdog](https://github.com/eclipse-csi/otterdog)
 (ADR-0001), pinned to an exact version in `justfile.project` (ADR-0005). The
 desired state is the committed jsonnet under `otterdog/vig-os/`, evaluated
-against the vendored Eclipse base template in `otterdog/vig-os/vendor/`. Three
-repo-owned workflows drive it:
+against the vendored Eclipse base template in `otterdog/vig-os/vendor/` through
+`otterdog/vig-os/house-defaults.libsonnet` — an org-neutral overlay that folds
+the house repository merge policy (merge commits only, `PR_TITLE` / `PR_BODY`)
+into `newRepo`, so it is declared once here and shipped to every downstream org
+in `template/`. Three repo-owned workflows drive it:
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |

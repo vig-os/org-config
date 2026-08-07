@@ -7,7 +7,7 @@
 #
 # The reusable workflow runs in the `production` environment (a required-reviewer
 # human gate on every mutation). Create a `production` environment in this repo's
-# Settings with a required reviewer and a `dev`-only deployment-branch policy
+# Settings with a required reviewer and a `main`-only deployment-branch policy
 # before the first apply.
 #
 # PIN (ADR-0006, BINDING): replace `@vX.Y.Z` with a released tag of
@@ -17,7 +17,7 @@ name: Apply
 on:  # yamllint disable-line rule:truthy
   push:
     branches:
-      - dev
+      - main
     paths:
       - otterdog.json
       - otterdog/**

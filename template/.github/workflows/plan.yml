@@ -6,16 +6,16 @@
 # only the config data + this caller live here.
 #
 # PIN (ADR-0006, BINDING): replace `@vX.Y.Z` with a released tag of
-# vig-os/org-config (e.g. `@v1.0.0`). For medtech orgs (exo-pet) pin the exact
+# vig-os/org-config (e.g. `@v1.0.1`). For medtech orgs (exo-pet) pin the exact
 # commit SHA instead and keep the tag in a trailing comment, e.g.
-#   uses: vig-os/org-config/.github/workflows/plan.yml@<40-char-sha>  # v1.0.0
+#   uses: vig-os/org-config/.github/workflows/plan.yml@<40-char-sha>  # v1.0.1
 # Renovate (see renovate.json) proposes bumps; never use a floating major tag.
 name: Plan
 
 on:  # yamllint disable-line rule:truthy
   pull_request:
     branches:
-      - dev
+      - main
     paths:
       - otterdog.json
       - otterdog/**

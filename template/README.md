@@ -46,9 +46,18 @@ placeholders.
    `.gitignore`, `otterdog.json`, `otterdog/<org>/`, `.github/workflows/`,
    `.github/ISSUE_TEMPLATE/`, `.github/CODEOWNERS`, `.sops.yaml`,
    `drift-allowlist.toml`, and `renovate.json`.
-3. Replace every placeholder: `YOUR_ORG` (this org's GitHub login), `YOUR_ORG_ADMIN`
-   (an owner user or team in CODEOWNERS), the `@vX.Y.Z` pins, the `.sops.yaml`
-   age recipient, and the year/org name in `LICENSE` (see [License](#license)).
+3. Replace every placeholder: `YOUR_ORG` (this org's GitHub login — **including
+   the `otterdog/YOUR_ORG/` directory name**), `YOUR_ORG_ADMIN` (an owner user or
+   team in CODEOWNERS), the `@vX.Y.Z` pins, the `.sops.yaml` age recipient, and
+   the year/org name in `LICENSE` (see [License](#license)).
+
+   `otterdog/YOUR_ORG/` ships one file, `house-defaults.libsonnet` — the **house
+   defaults overlay**. Copy it verbatim and never edit it: it re-exports the
+   vendored Otterdog base template with the house repository merge policy folded
+   into `newRepo`, so every repo this org declares inherits that policy instead of
+   the upstream Eclipse defaults. Your `<org>.jsonnet` imports it with the single
+   line `local orgs = import 'house-defaults.libsonnet';` (see
+   [`otterdog/README.md`](otterdog/README.md)).
 4. **Decide the engine pin style now** (ADR-0006): a released **tag** (`@vX.Y.Z`)
    or an exact **commit SHA** (recommended for medtech orgs such as `exo-pet`).
    For a SHA pin, write `uses: ...@<40-char-sha>  # vX.Y.Z` in each caller and keep
@@ -97,9 +106,16 @@ secret and is never committed (ADR-0003).
    - **Local:** run `otterdog import <org>` yourself (see
      [`otterdog/README.md`](otterdog/README.md) for the layout).
 
-   Either way, **normalize away base-template defaults** so the first plan shows an
-   empty diff, then commit. Delete `import.yml` once the import is done.
-2. Open a PR to `dev`. The **plan** caller runs a read-only
+   Either way, repoint the generated import line at the house defaults overlay
+   (`local orgs = import 'house-defaults.libsonnet';`, replacing the
+   `vendor/otterdog-defaults/otterdog-defaults.libsonnet` import `otterdog import`
+   writes) and **normalize away base-template defaults** so the first plan shows
+   an empty diff, then commit. Repos already on the house merge policy can drop
+   their five merge fields; repos that are not need an explicit
+   `+ orgs.legacyMergePolicy` (or `+ orgs.upstreamMergePolicy`) to keep the plan
+   empty — see [`otterdog/README.md`](otterdog/README.md). Delete `import.yml`
+   once the import is done.
+2. Open a PR to `main`. The **plan** caller runs a read-only
    `otterdog plan` against the live org and posts the diff as a PR comment —
    nothing is applied.
 
@@ -123,11 +139,11 @@ Per ADR-0006, a **Free-plan** org runs **plan-first / read-only**:
 Once the org is on **GitHub Team** and the App install is granted write:
 
 1. Create a `production` **environment** in this repo's settings with a
-   **required reviewer** and a deployment-branch policy limited to `dev`. The
+   **required reviewer** and a deployment-branch policy limited to `main`. The
    reusable apply workflow runs in that environment, so every mutation pauses for
    human approval.
 2. Add the **apply** caller (`.github/workflows/apply.yml`). It runs
-   `otterdog apply` from `dev` on merge, serialized so mutations never race.
+   `otterdog apply` from `main` on merge, serialized so mutations never race.
 
 ## Keeping the pins current
 
