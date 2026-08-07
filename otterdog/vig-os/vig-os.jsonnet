@@ -358,39 +358,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       secret_scanning: 'disabled',
       secret_scanning_push_protection: 'disabled',
     },
-    orgs.newRepo('meta') {
-      allow_merge_commit: true,
-      allow_update_branch: false,
-      code_scanning_default_setup_enabled: true,
-      default_branch: 'dev',
-      delete_branch_on_merge: false,
-      description: 'vigOS coordination: discussions, guidelines, architecture, roadmap, and general tasks.',
-      private_vulnerability_reporting_enabled: true,
-      rulesets: [
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          required_status_checks: null,
-          requires_commit_signatures: true,
-          required_pull_request+: {
-            required_approving_review_count: 0,
-          },
-        },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
-      ],
-    },
     orgs.newRepo('nvd-mirror') {
       allow_merge_commit: true,
       allow_update_branch: false,
@@ -497,76 +464,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       // `TESTBED_DESCRIPTION` (its consistency-guard step greps for it here), so
       // the harness reverts induced drift back to this declared value.
       description: 'SACRIFICIAL testbed for the L3 mutation E2E harness (issue #23) - its live settings are deliberately churned and reverted by .github/workflows/testbed-e2e.yml on every run; do not rely on any state here.',
-    },
-    orgs.newRepo('os-config') {
-      allow_merge_commit: true,
-      allow_update_branch: false,
-      code_scanning_default_languages+: [
-        'python',
-      ],
-      code_scanning_default_setup_enabled: true,
-      custom_properties+: {
-        type: ['tools'],
-      },
-      delete_branch_on_merge: false,
-      description: 'Reproducible OS configuration with for medtech-compliant deployments. Security hardening, audit logging, and ISO generation for air-gapped environments.',
-      private_vulnerability_reporting_enabled: true,
-    },
-    orgs.newRepo('part-registry') {
-      allow_auto_merge: true,
-      allow_merge_commit: true,
-      allow_rebase_merge: false,
-      allow_squash_merge: false,
-      allow_update_branch: false,
-      custom_properties+: {
-        type: ['tools'],
-      },
-      description: 'Registry of components, parts, assemblies',
-      is_template: true,
-      merge_commit_message: 'PR_BODY',
-      merge_commit_title: 'PR_TITLE',
-      secret_scanning: 'disabled',
-      secret_scanning_push_protection: 'disabled',
-      rulesets: [
-        orgs.newRepoRuleset('Dev protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/dev',
-          ],
-          required_status_checks: null,
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_code_owner_review: true,
-            requires_review_thread_resolution: true,
-          },
-        },
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          required_status_checks: null,
-          required_pull_request+: {
-            required_approving_review_count: 1,
-            requires_code_owner_review: true,
-            requires_review_thread_resolution: true,
-          },
-        },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
-      ],
     },
     orgs.newRepo('qms') {
       allow_forking: false,
