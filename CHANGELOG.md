@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Orphaned `APP_SYNC_ISSUES_ID` / `APP_SYNC_ISSUES_PRIVATE_KEY` org secrets** ([#111](https://github.com/vig-os/org-config/issues/111)): the two `vig-os` **organization** secrets are dropped from `otterdog/vig-os/vig-os.jsonnet`. A 2026-08-07 sweep of every `sync-issues.yml` in the org found zero consumers at org scope: the only workflows naming them are `tessera`'s, and `tessera` carries its **own repo-level secrets of the same names** belonging to a different App (the repo-scoped `tessera-sync-issues-bot`, `app_id` 4483218) — a repo-level secret always shadows an org-level one, so nothing ever resolved to the org pair. Every other repo's `sync-issues.yml` authenticates with `COMMIT_APP_*`. `tessera`'s `orgs.newRepoSecret('APP_SYNC_ISSUES_*')` declarations are deliberately **untouched** (the comment beside them already warns against "deduplicating" them into org secrets). Because `otterdog apply` never deletes secrets, the live org secrets are deleted out-of-band after merge; until then they surface as two pending deletions in the plan. Phase 1 of the App-secret consolidation program tracked in [#112](https://github.com/vig-os/org-config/issues/112).
+
 ### Fixed
 
 ### Security
