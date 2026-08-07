@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`DEVKIT_UPGRADE_APP_CLIENT_ID` org secret declared** ([#112](https://github.com/vig-os/org-config/issues/112)): the `vig-os` **organization** secret holding the devkit-upgrade App's client ID is now declared in `otterdog/vig-os/vig-os.jsonnet`, alphabetically beside the existing `DEVKIT_UPGRADE_APP_ID` and matching the `COMMIT_APP_CLIENT_ID` / `RELEASE_APP_CLIENT_ID` shape (dummy `'********'` value, no `visibility` field — `vig-os` org secrets are visibility `all` by convention). The secret was created live on 2026-08-07; this is the config-side half of the pair, so the declaration matches the org rather than drifting from it. Pre-work for phase 4 of the App-secret consolidation program tracked in [#112](https://github.com/vig-os/org-config/issues/112): the devkit release that renames `DEVKIT_UPGRADE_APP_ID` -> `DEVKIT_UPGRADE_APP_CLIENT_ID` in the `devkit-upgrade.yml` scaffold is [vig-os/devkit#1365](https://github.com/vig-os/devkit/issues/1365). Both secrets coexist until every consumer is re-scaffolded; the numeric `DEVKIT_UPGRADE_APP_ID` is retired in a later phase.
+
 ### Changed
 
 ### Deprecated
