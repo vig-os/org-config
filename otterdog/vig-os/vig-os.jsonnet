@@ -781,7 +781,27 @@ orgs.newOrg('vig-os', 'vig-os') {
       merge_commit_message: 'PR_BODY',
       merge_commit_title: 'PR_TITLE',
       private_vulnerability_reporting_enabled: true,
+      // Credentials of the repo-scoped `tessera-sync-issues-bot` GitHub App
+      // (app_id 4483218), NOT the org-wide sync-issues App — same secret names,
+      // different App identity, so do not "deduplicate" these into org secrets.
+      secrets: [
+        orgs.newRepoSecret('APP_SYNC_ISSUES_ID') {
+          value: '********',
+        },
+        orgs.newRepoSecret('APP_SYNC_ISSUES_PRIVATE_KEY') {
+          value: '********',
+        },
+      ],
       branch_protection_rules: [
+        orgs.newBranchProtectionRule('dev') {
+          required_approving_review_count: null,
+          // Deliberately un-prefixed: the live check is app-bound (app_id
+          // 15368), which otterdog serializes without the `any:` prefix.
+          required_status_checks: [
+            'nix flake check',
+          ],
+          requires_pull_request: false,
+        },
         orgs.newBranchProtectionRule('main') {
           required_approving_review_count: null,
           required_status_checks: [
