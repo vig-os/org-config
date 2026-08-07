@@ -36,12 +36,6 @@ orgs.newOrg('vig-os', 'vig-os') {
   },
   teams: [],
   secrets+: [
-    orgs.newOrgSecret('APP_SYNC_ISSUES_ID') {
-      value: '********',
-    },
-    orgs.newOrgSecret('APP_SYNC_ISSUES_PRIVATE_KEY') {
-      value: '********',
-    },
     orgs.newOrgSecret('COMMIT_APP_CLIENT_ID') {
       value: '********',
     },
