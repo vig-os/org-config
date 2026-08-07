@@ -237,11 +237,19 @@ orgs.newOrg('vig-os', 'vig-os') {
           ],
           required_pull_request+: {
             required_approving_review_count: 1,
-            requires_code_owner_review: true,
+            // Deliberately off: `.github/CODEOWNERS` names a single owner who
+            // also authors the PRs, so the gate can never be satisfied and its
+            // only outcome is an #OrganizationAdmin bypass (#115).
+            requires_code_owner_review: false,
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
             status_checks: [
+              // Two contexts, not one: `codeql.yml`'s analyze job is a
+              // `language: ['python', 'actions']` matrix, so each leg reports
+              // under its own matrix-suffixed name (#115).
+              '15368:CodeQL Analysis (actions)',
+              '15368:CodeQL Analysis (python)',
               '15368:Test Summary',
             ],
             strict: true,
@@ -259,7 +267,8 @@ orgs.newOrg('vig-os', 'vig-os') {
           ],
           required_pull_request+: {
             required_approving_review_count: 0,
-            requires_code_owner_review: true,
+            // Deliberately off, same rationale as Main protection (#115).
+            requires_code_owner_review: false,
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
@@ -278,6 +287,23 @@ orgs.newOrg('vig-os', 'vig-os') {
           required_pull_request: null,
           required_status_checks: null,
           requires_commit_signatures: true,
+        },
+        // Tag protection mirrors commit-action's: devkit publishes the release
+        // tags every consumer pins, and `release.yml` is the only tag writer —
+        // it pushes (and `promote-release.yml` prunes RC tags) with a
+        // vig-os-release-app token, so one always-bypass actor is enough.
+        orgs.newRepoRuleset('Tag protection') {
+          allows_force_pushes: true,
+          allows_updates: false,
+          bypass_actors+: [
+            'vig-os-release-app',
+          ],
+          include_refs+: [
+            '~ALL',
+          ],
+          required_pull_request: null,
+          required_status_checks: null,
+          target: 'tag',
         },
       ],
       environments: [
