@@ -9,8 +9,16 @@ orgs.newOrg('vig-os', 'vig-os') {
     default_repository_permission: 'read',
     description: 'Versatile Instrumentation and Governance Operating Stack',
     location: 'Switzerland',
-    members_can_create_private_repositories: true,
-    members_can_create_public_repositories: true,
+    // Repository creation is config-first: a repo is declared here and created
+    // by `otterdog apply`. A UI-created repo bypasses every default this config
+    // exists to enforce and is never cleaned up automatically — apply creates
+    // what the config declares but deliberately does not delete what it omits
+    // (apply.yml:72-73), so an undeclared repo surfaces only as an inventory
+    // drift issue (#21) and is removed by hand. Owners can always create
+    // regardless of these flags; for them this stays discipline plus the drift
+    // sweep (#121).
+    members_can_create_private_repositories: false,
+    members_can_create_public_repositories: false,
     name: 'vigOS',
     plan: 'free',
     // Override (not `+:`) the base template's Eclipse-specific injections so
@@ -33,6 +41,16 @@ orgs.newOrg('vig-os', 'vig-os') {
         value_type: 'multi_select',
       },
     ],
+    // Org-level workflow settings (distinct from the repo-level `workflows+:`
+    // block that hangs off `newRepo`).
+    workflows+: {
+      // An approving review from a workflow satisfies `required_approving_review_count`
+      // without a human, so this is the one permission that can defeat every
+      // review gate in the fleet — including from a workflow added by the PR it
+      // would approve. `devkit` already set this at repo level; this closes it
+      // org-wide (#121).
+      actions_can_approve_pull_request_reviews: false,
+    },
   },
   teams: [],
   secrets+: [
