@@ -9,7 +9,7 @@
 # the generated config into the workspace. This workflow does NOT commit or push
 # and does NOT mutate org state — it uploads the generated jsonnet as a build
 # ARTIFACT for you to download, review, normalize (strip base-template defaults so
-# the first `plan` shows an empty diff), and commit via a normal PR to `dev`.
+# the first `plan` shows an empty diff), and commit via a normal PR to `main`.
 #
 # After onboarding you may delete this file — it is only needed for the initial
 # import (re-runnable if you ever re-bootstrap).

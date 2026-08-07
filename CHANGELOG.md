@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`template/` retargeted from the retired `dev` branch to trunk `main`** ([#106](https://github.com/vig-os/org-config/issues/106)): the downstream skeleton shipped in `v1.0.0` still described the pre-trunk `dev` model that #63 retired, so an org copying it verbatim got a `plan` caller that never fires (nothing opens PRs against `dev`), an `apply` caller that never fires (nothing pushes to `dev`), a Renovate base-branch pattern matching no branch, and a runbook pointing at a branch that does not exist — silent no-ops rather than errors, the worst failure mode for a write-path workflow. All eight references are now `main`: `plan.yml`'s `on.pull_request.branches`, `apply.yml`'s `on.push.branches` and its `production` deployment-branch-policy note, `import.yml`'s commit-back instruction, `renovate.json`'s `baseBranchPatterns`, and the three `README.md` onboarding steps (open the PR, the `production` environment policy, and where `apply` runs from). The example engine pins in `plan.yml` are bumped to `v1.0.1`, the first release carrying a skeleton that matches the engine it calls. `exo-pet/org-config` had already hand-adapted each of these twice (exo-pet/org-config#6, exo-pet/org-config#10).
+
 ### Security
 
 ## [v1.0.0](https://github.com/vig-os/org-config/releases/tag/v1.0.0) - 2026-08-07
