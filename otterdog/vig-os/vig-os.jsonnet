@@ -1,4 +1,7 @@
-local orgs = import 'vendor/otterdog-defaults/otterdog-defaults.libsonnet';
+// House defaults overlay: the vendored Eclipse base template re-exported with
+// the house repository merge policy folded into `newRepo`, so every repo
+// declared below inherits it without restating it (see house-defaults.libsonnet).
+local orgs = import 'house-defaults.libsonnet';
 
 orgs.newOrg('vig-os', 'vig-os') {
   settings+: {
@@ -78,17 +81,12 @@ orgs.newOrg('vig-os', 'vig-os') {
   _repositories:: [
     orgs.newRepo('commit-action') {
       allow_auto_merge: true,
-      allow_merge_commit: true,
-      allow_rebase_merge: false,
-      allow_squash_merge: false,
       custom_properties+: {
         type: ['tools'],
       },
       description: 'GitHub Action that commits changes via GitHub API or GitHub Token, creating automatically signed commits. Modular TypeScript design - use as a standalone action or import as a library.',
       has_projects: false,
       has_wiki: false,
-      merge_commit_message: 'PR_BODY',
-      merge_commit_title: 'PR_TITLE',
       private_vulnerability_reporting_enabled: true,
       workflows+: {
         actions_can_approve_pull_request_reviews: false,
@@ -181,9 +179,6 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('devkit') {
       allow_auto_merge: true,
-      allow_merge_commit: true,
-      allow_rebase_merge: false,
-      allow_squash_merge: false,
       custom_properties+: {
         type: ['internal', 'tools'],
       },
@@ -193,8 +188,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       has_projects: false,
       has_wiki: false,
       homepage: '',
-      merge_commit_message: 'PR_BODY',
-      merge_commit_title: 'PR_TITLE',
       private_vulnerability_reporting_enabled: true,
       topics+: [
         'devcontainer',
@@ -296,12 +289,7 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('devkit-smoke-test') {
       allow_auto_merge: true,
-      allow_merge_commit: true,
-      allow_rebase_merge: false,
-      allow_squash_merge: false,
       description: 'Repository to test deployment workflows of vigOS devcontainer',
-      merge_commit_message: 'PR_BODY',
-      merge_commit_title: 'PR_TITLE',
       private_vulnerability_reporting_enabled: true,
       rulesets: [
         orgs.newRepoRuleset('Dev protection') {
@@ -351,15 +339,13 @@ orgs.newOrg('vig-os', 'vig-os') {
       ],
     },
     orgs.newRepo('h5v') {
-      allow_merge_commit: true,
       allow_update_branch: false,
       delete_branch_on_merge: false,
       description: 'A terminal viewer for HDF5 files with chart, image, string, matrix, and attributes support',
       secret_scanning: 'disabled',
       secret_scanning_push_protection: 'disabled',
-    },
+    } + orgs.legacyMergePolicy,
     orgs.newRepo('nvd-mirror') {
-      allow_merge_commit: true,
       allow_update_branch: false,
       delete_branch_on_merge: false,
       description: 'Public mirror of the NVD JSON 2.0 feeds for vulnix (see vig-os/devcontainer#870)',
@@ -377,12 +363,9 @@ orgs.newOrg('vig-os', 'vig-os') {
           deployment_branch_policy: 'selected',
         },
       ],
-    },
+    } + orgs.legacyMergePolicy,
     orgs.newRepo('org-config') {
       allow_auto_merge: true,
-      allow_merge_commit: true,
-      allow_rebase_merge: false,
-      allow_squash_merge: false,
       custom_properties+: {
         type: ['tools'],
       },
@@ -392,8 +375,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       // Template repo: downstream orgs' private org-config repos are created
       // from this one (ADR-0006; marked live via one-time gh API action, #52).
       is_template: true,
-      merge_commit_message: 'PR_BODY',
-      merge_commit_title: 'PR_TITLE',
       secret_scanning: 'disabled',
       secret_scanning_push_protection: 'disabled',
       secrets: [
@@ -460,14 +441,15 @@ orgs.newOrg('vig-os', 'vig-os') {
       // variables/environments/rulesets/branch_protection_rules) are empty — so
       // there is nothing seeded to re-inject and the evaluated config is
       // drift-free-by-construction (the next plan shows exactly one `+ repo`).
+      // `orgs.upstreamMergePolicy` below restores the vendored merge fields that
+      // the house overlay would otherwise impose, keeping that property exact.
       // The description string is duplicated verbatim into testbed-e2e.yml's
       // `TESTBED_DESCRIPTION` (its consistency-guard step greps for it here), so
       // the harness reverts induced drift back to this declared value.
       description: 'SACRIFICIAL testbed for the L3 mutation E2E harness (issue #23) - its live settings are deliberately churned and reverted by .github/workflows/testbed-e2e.yml on every run; do not rely on any state here.',
-    },
+    } + orgs.upstreamMergePolicy,
     orgs.newRepo('qms') {
       allow_forking: false,
-      allow_merge_commit: true,
       allow_update_branch: false,
       custom_properties+: {
         type: ['tools'],
@@ -477,9 +459,8 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'Quality Management System',
       has_wiki: false,
       private: true,
-    },
+    } + orgs.legacyMergePolicy,
     orgs.newRepo('qx') {
-      allow_merge_commit: true,
       allow_update_branch: false,
       delete_branch_on_merge: false,
       description: 'Per-instance physical part identification: nano-id IDs, QR labels, mint-then-bind workflow',
@@ -500,14 +481,16 @@ orgs.newOrg('vig-os', 'vig-os') {
           deployment_branch_policy: 'selected',
         },
       ],
-    },
+    } + orgs.legacyMergePolicy,
     orgs.newRepo('scitadel') {
       allow_auto_merge: true,
-      allow_rebase_merge: false,
+      // Deliberate deviation from the house merge policy (house-defaults.libsonnet):
+      // scitadel merges by squash, keeping the house PR_TITLE/PR_BODY wording on
+      // the squash commit instead of the merge commit.
+      allow_merge_commit: false,
+      allow_squash_merge: true,
       allow_update_branch: false,
       description: 'Scitadel: programmable, reproducible scientific literature retrieval',
-      merge_commit_message: 'PR_BODY',
-      merge_commit_title: 'PR_TITLE',
       secret_scanning: 'disabled',
       secret_scanning_push_protection: 'disabled',
       squash_merge_commit_message: 'PR_BODY',
@@ -571,16 +554,11 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('sync-issues-action') {
       allow_auto_merge: true,
-      allow_merge_commit: true,
-      allow_rebase_merge: false,
-      allow_squash_merge: false,
       allow_update_branch: false,
       custom_properties+: {
         type: ['tools'],
       },
       description: 'GitHub Action that syncs issues and pull requests to markdown files with full comments, review threads, and diff snippets. Useful for documentation, backups, and offline access. Supports incremental syncing with state caching and GitHub App authentication.',
-      merge_commit_message: 'PR_BODY',
-      merge_commit_title: 'PR_TITLE',
       private_vulnerability_reporting_enabled: true,
       rulesets: [
         orgs.newRepoRuleset('Dev protection') {
@@ -670,13 +648,14 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('tessera') {
       allow_auto_merge: true,
-      allow_merge_commit: true,
+      // Deliberate deviation from the house merge policy (house-defaults.libsonnet):
+      // rebase and squash stay available alongside merge commits.
+      allow_rebase_merge: true,
+      allow_squash_merge: true,
       allow_update_branch: false,
       code_scanning_default_setup_enabled: true,
       delete_branch_on_merge: false,
       description: 'FAIR Data on HDF5 — self-describing, FAIR-principled data format for scientific data products',
-      merge_commit_message: 'PR_BODY',
-      merge_commit_title: 'PR_TITLE',
       private_vulnerability_reporting_enabled: true,
       // Credentials of the repo-scoped `tessera-sync-issues-bot` GitHub App
       // (app_id 4483218), NOT the org-wide sync-issues App — same secret names,
@@ -710,7 +689,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       ],
     },
     orgs.newRepo('vigos-mvp') {
-      allow_merge_commit: true,
       allow_update_branch: false,
       code_scanning_default_languages+: [
         'python',
@@ -719,9 +697,8 @@ orgs.newOrg('vig-os', 'vig-os') {
       delete_branch_on_merge: false,
       description: 'MVP with basic functions',
       private_vulnerability_reporting_enabled: true,
-    },
+    } + orgs.legacyMergePolicy,
     orgs.newRepo('vs-dolt') {
-      allow_merge_commit: true,
       allow_update_branch: false,
       code_scanning_default_languages+: [
         'javascript-typescript',
@@ -732,6 +709,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       has_issues: false,
       homepage: 'https://hub.docker.com/r/dolthub/dolt-workbench',
       private_vulnerability_reporting_enabled: true,
-    },
+    } + orgs.legacyMergePolicy,
   ],
 }
