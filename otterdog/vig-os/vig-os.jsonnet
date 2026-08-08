@@ -363,7 +363,11 @@ orgs.newOrg('vig-os', 'vig-os') {
             'refs/heads/main',
           ],
           required_pull_request+: {
-            required_approving_review_count: 0,
+            // A human must approve the smoke release PR: workflow-token
+            // approvals are blocked org-wide, and the dispatch listener's
+            // final-release gate polls `reviewDecision`, which GitHub only
+            // computes when reviews are required (vig-os/devkit#1391).
+            required_approving_review_count: 1,
           },
           required_status_checks+: {
             status_checks: [
