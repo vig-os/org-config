@@ -121,7 +121,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:CI Summary',
+              'github-actions:CI Summary',
             ],
           },
         },
@@ -140,8 +140,8 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
+              'github-actions:CI Summary',
+              'github-actions:Dist Check',
             ],
             strict: true,
           },
@@ -161,8 +161,8 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
+              'github-actions:CI Summary',
+              'github-actions:Dist Check',
             ],
           },
         },
@@ -241,7 +241,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:Test Summary',
+              'github-actions:Test Summary',
             ],
           },
         },
@@ -271,9 +271,9 @@ orgs.newOrg('vig-os', 'vig-os') {
               // Two contexts, not one: `codeql.yml`'s analyze job is a
               // `language: ['python', 'actions']` matrix, so each leg reports
               // under its own matrix-suffixed name (#115).
-              '15368:CodeQL Analysis (actions)',
-              '15368:CodeQL Analysis (python)',
-              '15368:Test Summary',
+              'github-actions:CodeQL Analysis (actions)',
+              'github-actions:CodeQL Analysis (python)',
+              'github-actions:Test Summary',
             ],
             strict: true,
           },
@@ -296,7 +296,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:Test Summary',
+              'github-actions:Test Summary',
             ],
           },
         },
@@ -353,7 +353,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:CI Summary',
+              'github-actions:CI Summary',
             ],
           },
         },
@@ -371,7 +371,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:CI Summary',
+              'github-actions:CI Summary',
             ],
           },
         },
@@ -465,7 +465,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:CI Summary',
+              'github-actions:CI Summary',
             ],
           },
         },
@@ -626,7 +626,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:CI Summary',
+              'github-actions:CI Summary',
             ],
           },
         },
@@ -642,8 +642,8 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
+              'github-actions:CI Summary',
+              'github-actions:Dist Check',
             ],
           },
         },
@@ -662,8 +662,8 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
+              'github-actions:CI Summary',
+              'github-actions:Dist Check',
             ],
           },
         },
