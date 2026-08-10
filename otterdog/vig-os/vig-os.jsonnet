@@ -238,7 +238,17 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:CI Summary',
+              // Canonical status-check prefix form is PER-APP, throughout this
+              // file (#69): checks bound to FIRST-PARTY apps that are never org
+              // installations (github-actions, app_id 15368) MUST use the
+              // numeric `15368:` form — otterdog's id->slug resolution covers
+              // only `/orgs/{org}/installations`, so live always reads back
+              // numeric and a committed slug is a permanent phantom plan diff
+              // (#130-#141). Checks from org-installed apps DO resolve to slugs
+              // and use slug form (cf. tessera's `any:` note). Writing the
+              // numeric form needs otterdog >= 1.4.0 (upstream #695/#700); the
+              // pin lives in justfile.project.
+              '15368:CI Summary',
             ],
           },
         },
@@ -257,8 +267,8 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:CI Summary',
-              'github-actions:Dist Check',
+              '15368:CI Summary',
+              '15368:Dist Check',
             ],
             strict: true,
           },
@@ -278,8 +288,8 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:CI Summary',
-              'github-actions:Dist Check',
+              '15368:CI Summary',
+              '15368:Dist Check',
             ],
           },
         },
@@ -358,7 +368,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:Test Summary',
+              '15368:Test Summary',
             ],
           },
         },
@@ -388,9 +398,9 @@ orgs.newOrg('vig-os', 'vig-os') {
               // Two contexts, not one: `codeql.yml`'s analyze job is a
               // `language: ['python', 'actions']` matrix, so each leg reports
               // under its own matrix-suffixed name (#115).
-              'github-actions:CodeQL Analysis (actions)',
-              'github-actions:CodeQL Analysis (python)',
-              'github-actions:Test Summary',
+              '15368:CodeQL Analysis (actions)',
+              '15368:CodeQL Analysis (python)',
+              '15368:Test Summary',
             ],
             strict: true,
           },
@@ -413,7 +423,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:Test Summary',
+              '15368:Test Summary',
             ],
           },
         },
@@ -470,7 +480,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:CI Summary',
+              '15368:CI Summary',
             ],
           },
         },
@@ -488,7 +498,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:CI Summary',
+              '15368:CI Summary',
             ],
           },
         },
@@ -582,7 +592,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:CI Summary',
+              '15368:CI Summary',
             ],
           },
         },
@@ -743,7 +753,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:CI Summary',
+              '15368:CI Summary',
             ],
           },
         },
@@ -759,8 +769,8 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:CI Summary',
-              'github-actions:Dist Check',
+              '15368:CI Summary',
+              '15368:Dist Check',
             ],
           },
         },
@@ -779,8 +789,8 @@ orgs.newOrg('vig-os', 'vig-os') {
           },
           required_status_checks+: {
             status_checks: [
-              'github-actions:CI Summary',
-              'github-actions:Dist Check',
+              '15368:CI Summary',
+              '15368:Dist Check',
             ],
           },
         },
