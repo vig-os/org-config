@@ -17,10 +17,18 @@ class FakeClient:
     """In-memory GitHubClient stand-in recording every call (injected edge)."""
 
     def __init__(
-        self, issues: list[Issue] | None = None, org_repos: list[str] | None = None
+        self,
+        issues: list[Issue] | None = None,
+        org_repos: list[str] | None = None,
+        documents: dict[str, object] | None = None,
+        org_secrets: list[dict] | None = None,
+        secret_repositories: dict[str, list[str]] | None = None,
     ) -> None:
         self.issues = issues or []
         self.org_repos = org_repos or []
+        self.documents = documents or {}
+        self.org_secrets = org_secrets or []
+        self.secret_repositories = secret_repositories or {}
         self.created: list[tuple[str, str, tuple[str, ...]]] = []
         self.updated: list[tuple[int, str, str]] = []
         self.comments: list[tuple[int, str]] = []
@@ -32,6 +40,15 @@ class FakeClient:
 
     def list_org_repos(self, org: str) -> list[str]:
         return self.org_repos
+
+    def get_json(self, path: str) -> object:
+        return self.documents.get(path, {})
+
+    def list_org_secrets(self, org: str) -> list[dict]:
+        return self.org_secrets
+
+    def list_org_secret_repositories(self, org: str, name: str) -> list[str]:
+        return self.secret_repositories.get(name, [])
 
     def create_issue(self, title: str, body: str, labels: tuple[str, ...]) -> int:
         self.created.append((title, body, labels))
