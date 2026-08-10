@@ -143,20 +143,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       value: '********',
       visibility: 'selected',
     },
-    // ORPHANED: zero references across all 14 org repos. vs-dolt's Docker Hub
-    // workflows use its own repo-level DOCKER_HUB_ACCESS_TOKEN /
-    // DOCKER_HUB_USERNAME — different names, different scope. Narrowed to an
-    // empty selected-list so it reaches nothing while its value is preserved;
-    // outright retirement is #125, mirroring the #111 precedent.
-    orgs.newOrgSecret('DOCKERHUB_TOKEN') {
-      value: '********',
-      visibility: 'selected',
-    },
-    // Orphaned, same as DOCKERHUB_TOKEN above (#125).
-    orgs.newOrgSecret('DOCKERHUB_USERNAME') {
-      value: '********',
-      visibility: 'selected',
-    },
     // Pilot for the org-wide visibility migration (#123). No workflow anywhere
     // in the org reads this secret — it is written by `otterdog apply` from the
     // committed SOPS ciphertext and exists only to prove that pipeline — so
