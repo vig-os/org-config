@@ -16,7 +16,7 @@ project := "org_config"
 # template repos run otterdog via `uvx` at this exact version without this
 # repo's Nix flake; the pin also anchors the L1 plan-fixture format (ADR-0007).
 # Bumped by Renovate; a bump implies re-checking the dev-shell path.
-otterdog_version := "1.3.4"
+otterdog_version := "1.4.0"
 # ===============================================================================
 # INFO
 # ===============================================================================

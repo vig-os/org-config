@@ -29,7 +29,7 @@ jobs:
       config_repo: org-config      # TODO: this repo's name, if different
       # Keep in lockstep with the engine's justfile.project otterdog pin (#56);
       # Renovate can bump this alongside the engine SHA pin above.
-      otterdog_version: "1.3.4"
+      otterdog_version: "1.4.0"
     secrets:
       ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
       ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
