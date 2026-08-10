@@ -472,6 +472,12 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
         orgs.newRepoRuleset('Main protection') {
           allows_creations: true,
+          // Parity with devkit's Main protection: a sanctioned always-mode
+          // admin override instead of out-of-band ruleset PUTs that the next
+          // apply reverts (#147).
+          bypass_actors+: [
+            '#OrganizationAdmin',
+          ],
           include_refs+: [
             'refs/heads/main',
           ],
