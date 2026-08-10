@@ -23,11 +23,22 @@ DRIFT_LABELS: tuple[str, ...] = ("drift", "critical")
 INVENTORY_LABEL = "inventory"
 INVENTORY_LABELS: tuple[str, ...] = (*DRIFT_LABELS, INVENTORY_LABEL)
 
+# Unmanaged-control findings (issue #116) are the third population: controls
+# otterdog has no schema field for, asserted directly against the live API. The
+# extra label partitions them like the sweep's, and additionally lets the CLI
+# withhold individual rows that could not be read (per-row degradation).
+UNMANAGED_LABEL = "unmanaged-control"
+UNMANAGED_LABELS: tuple[str, ...] = (*DRIFT_LABELS, UNMANAGED_LABEL)
+
 _MARKER_RE = re.compile(r"<!-- drift-fingerprint: (?P<fp>[0-9a-f]+) -->")
 
 # Inventory records use a namespaced resource (see inventory.py); their evidence
 # is a sweep finding, not a plan diff.
 _INVENTORY_RESOURCE_PREFIX = "repository-inventory"
+
+# Unmanaged-control records use their own namespace (see controls.py); their
+# evidence is a live API reading, and there is no plan diff at all.
+_UNMANAGED_RESOURCE_PREFIX = "unmanaged-control"
 
 
 def extract_fingerprint(body: str) -> str | None:
@@ -36,14 +47,36 @@ def extract_fingerprint(body: str) -> str | None:
     return match.group("fp") if match else None
 
 
+_ISSUE_ONLY = (
+    "This is **issue-only** (ADR-0002): nothing is auto-reverted — a human "
+    "decides whether to revert the change or adopt it into config, then "
+    "closes this issue (it also closes automatically once the divergence "
+    "is resolved)."
+)
+
+_CONFIG_INTRO = f"The live GitHub state diverges from the committed Otterdog config. {_ISSUE_ONLY}"
+
+# Deliberately NOT the wording above: an unmanaged control has no jsonnet field
+# to diverge from, so claiming a config divergence would send the triager
+# hunting for a setting that does not exist. The asserted value in
+# unmanaged-controls.toml is the only record of what was intended.
+_ASSERTION_INTRO = (
+    "The live GitHub control diverges from the value asserted for it in "
+    "`unmanaged-controls.toml`. Otterdog has no schema field for this control, "
+    f"so it appears in no plan diff — the assertion table is its only "
+    f"declaration. {_ISSUE_ONLY}"
+)
+
+
 def render_body(record: DriftRecord, *, now: str) -> str:
     """Render the issue body for a divergence (carries the hidden fingerprint)."""
     marker = FINGERPRINT_MARKER.format(fingerprint=record.fingerprint)
-    evidence_label = (
-        "Inventory finding"
-        if record.resource.startswith(_INVENTORY_RESOURCE_PREFIX)
-        else "Plan diff"
-    )
+    if record.resource.startswith(_UNMANAGED_RESOURCE_PREFIX):
+        evidence_label, intro = "Live API assertion", _ASSERTION_INTRO
+    elif record.resource.startswith(_INVENTORY_RESOURCE_PREFIX):
+        evidence_label, intro = "Inventory finding", _CONFIG_INTRO
+    else:
+        evidence_label, intro = "Plan diff", _CONFIG_INTRO
     return "\n".join(
         [
             marker,
@@ -53,11 +86,7 @@ def render_body(record: DriftRecord, *, now: str) -> str:
             f"- **Change type:** `{record.change_type}`",
             f"- **Last observed:** {now}",
             "",
-            "The live GitHub state diverges from the committed Otterdog config. "
-            "This is **issue-only** (ADR-0002): nothing is auto-reverted — a human "
-            "decides whether to revert the change or adopt it into config, then "
-            "closes this issue (it also closes automatically once the divergence "
-            "is resolved).",
+            intro,
             "",
             f"<details><summary>{evidence_label}</summary>",
             "",
@@ -74,11 +103,18 @@ def _recurrence_comment(now: str) -> str:
     return f"Drift still present as of {now}. Refreshed the report above."
 
 
-def _resolution_comment(now: str) -> str:
-    return (
-        f"Drift resolved as of {now}: the divergence no longer appears in the "
-        f"plan (config and live state reconciled). Closing automatically."
-    )
+def _resolution_comment(now: str, issue: Issue) -> str:
+    """Audit-trail close comment, naming the signal that actually cleared.
+
+    An unmanaged-control issue closes because the live API now returns the
+    asserted value, not because a plan diff disappeared; the label identifies
+    the population, so the wording stays honest without changing reconcile().
+    """
+    if UNMANAGED_LABEL in issue.labels:
+        source = "the live API assertion now matches the declared value"
+    else:
+        source = "the divergence no longer appears in the plan (config and live state reconciled)"
+    return f"Drift resolved as of {now}: {source}. Closing automatically."
 
 
 def reconcile(
@@ -145,7 +181,7 @@ def reconcile(
                     kind="close",
                     fingerprint=fp,
                     number=issue.number,
-                    comment=_resolution_comment(now),
+                    comment=_resolution_comment(now, issue),
                 )
             )
 
