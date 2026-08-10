@@ -78,8 +78,19 @@ orgs.newOrg('vig-os', 'vig-os') {
     orgs.newOrgSecret('DOCKERHUB_USERNAME') {
       value: '********',
     },
+    // Pilot for the org-wide visibility migration (#123). No workflow anywhere
+    // in the org reads this secret — it is written by `otterdog apply` from the
+    // committed SOPS ciphertext and exists only to prove that pipeline — so
+    // `org-config` is the whole audience. Unlike the other eleven org secrets,
+    // its value is a real credential-provider reference rather than a
+    // `'********'` dummy, so `include_for_live_patch` is true and apply can set
+    // visibility declaratively (secret.py:88).
     orgs.newOrgSecret('ORG_CONFIG_CANARY') {
+      selected_repositories+: [
+        'org-config',
+      ],
       value: 'pass:org-config/ORG_CONFIG_CANARY',
+      visibility: 'selected',
     },
     orgs.newOrgSecret('RELEASE_APP_CLIENT_ID') {
       value: '********',
