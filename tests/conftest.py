@@ -74,6 +74,12 @@ def allowlist_path() -> Path:
 
 
 @pytest.fixture
+def controls_path() -> Path:
+    """Unmanaged-controls table: plain, tolerated, repo-scoped, unassertable."""
+    return FIXTURES / "unmanaged-controls.toml"
+
+
+@pytest.fixture
 def declared_jsonnet() -> str:
     """The real committed otterdog config — the declared-set extraction source."""
     return (REPO_ROOT / "otterdog" / "vig-os" / "vig-os.jsonnet").read_text()
