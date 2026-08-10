@@ -51,10 +51,28 @@ auto-close once the divergence is gone. The inventory sweep feeds
 undeclared/absent repositories into the same lifecycle under an `inventory`
 label.
 
+A third leg asserts the controls Otterdog **cannot model** — Actions SHA-pinning,
+the fork-PR approval policy, the new-repository security defaults, org-secret
+visibility and reader lists. These have no field in its schema, so they appear
+in no plan diff: without an assertion they can be flipped in the UI and nothing
+notices. [`unmanaged-controls.toml`](unmanaged-controls.toml) declares each one
+as an endpoint, a field path and the expected value; findings join the same
+lifecycle under an `unmanaged-control` label. The leg degrades **per row** — a
+control that cannot be read leaves its own issue untouched rather than being
+reported as drift or silently resolved. Check any row against live state without
+writing an issue:
+
+```bash
+DRIFT_REPOS_TOKEN=... uv run drift-layer --controls-report --org vig-os
+```
+
 [`drift-allowlist.toml`](drift-allowlist.toml) holds the two governance
 exceptions — `[[expected]]` (known-benign settings divergence) and
 `[[unmanaged]]` (repos intentionally outside declarative scope). Both are edited
 through the normal PR flow, so "what is tolerated" stays reviewed and versioned.
+A control whose live value is knowingly wrong is *not* allow-listed: its row
+gets a `tolerated` value instead, so the table keeps recording the desired value
+and the row goes green by itself once reality catches up.
 
 ### Secrets
 

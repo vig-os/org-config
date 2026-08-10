@@ -122,3 +122,42 @@ def test_pr41_against_empty_issues_opens_all_non_expected(plan_pr41: str, allowl
     assert all(a.kind == "open" for a in actions)
     fingerprints = {a.fingerprint for a in actions}
     assert len(fingerprints) == 16  # all distinct, one per resource
+
+
+def test_render_body_on_an_unmanaged_control_names_the_live_assertion() -> None:
+    # The evidence is a live API reading, not a plan diff: claiming the live
+    # state "diverges from the committed Otterdog config" would send the
+    # triager looking for a jsonnet field that does not exist.
+    record = DriftRecord(
+        org="vig-os",
+        resource="unmanaged-control:org:sha-pinning",
+        change_type="assert-failed",
+        detail="expected:  True\nactual:    False",
+        title_override="Unmanaged control drift: SHA-pinned actions required org-wide",
+    )
+    body = render_body(record, now=NOW)
+    assert "Live API assertion" in body
+    assert "Plan diff" not in body
+    assert "Inventory finding" not in body
+    assert "unmanaged-controls.toml" in body
+    assert "committed Otterdog config" not in body
+    assert extract_fingerprint(body) == record.fingerprint
+
+
+def test_resolution_comment_on_a_control_issue_cites_the_assertion() -> None:
+    record = DriftRecord(
+        org="vig-os",
+        resource="unmanaged-control:org:sha-pinning",
+        change_type="assert-failed",
+        detail="",
+    )
+    issue = Issue(
+        number=8,
+        title=record.title,
+        body=render_body(record, now="old"),
+        labels=("drift", "critical", "unmanaged-control"),
+    )
+    (action,) = reconcile([], [issue], now=NOW)
+    assert action.kind == "close"
+    assert "live API assertion" in action.comment
+    assert "plan" not in action.comment

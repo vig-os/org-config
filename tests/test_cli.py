@@ -5,10 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from drift_layer.cli import build_actions, build_inventory_records, reconcile_populations, run
-from drift_layer.github_client import execute
-from drift_layer.models import Issue
+from drift_layer.controls import Control, ControlsConfig, ControlsResult, control_fingerprint
+from drift_layer.github_client import ApiError, execute
+from drift_layer.models import DriftRecord, Issue
 from drift_layer.parser import parse_plan
-from drift_layer.reconcile import DRIFT_LABELS, INVENTORY_LABELS, render_body
+from drift_layer.reconcile import (
+    DRIFT_LABELS,
+    INVENTORY_LABELS,
+    UNMANAGED_LABELS,
+    render_body,
+)
 
 NOW = "2026-07-17 03:00 UTC"
 
@@ -17,10 +23,18 @@ class FakeClient:
     """In-memory GitHubClient stand-in recording every call (injected edge)."""
 
     def __init__(
-        self, issues: list[Issue] | None = None, org_repos: list[str] | None = None
+        self,
+        issues: list[Issue] | None = None,
+        org_repos: list[str] | None = None,
+        documents: dict[str, object] | None = None,
+        org_secrets: list[dict] | None = None,
+        secret_repositories: dict[str, list[str]] | None = None,
     ) -> None:
         self.issues = issues or []
         self.org_repos = org_repos or []
+        self.documents = documents or {}
+        self.org_secrets = org_secrets or []
+        self.secret_repositories = secret_repositories or {}
         self.created: list[tuple[str, str, tuple[str, ...]]] = []
         self.updated: list[tuple[int, str, str]] = []
         self.comments: list[tuple[int, str]] = []
@@ -32,6 +46,15 @@ class FakeClient:
 
     def list_org_repos(self, org: str) -> list[str]:
         return self.org_repos
+
+    def get_json(self, path: str) -> object:
+        return self.documents.get(path, {})
+
+    def list_org_secrets(self, org: str) -> list[dict]:
+        return self.org_secrets
+
+    def list_org_secret_repositories(self, org: str, name: str) -> list[str]:
+        return self.secret_repositories.get(name, [])
 
     def create_issue(self, title: str, body: str, labels: tuple[str, ...]) -> int:
         self.created.append((title, body, labels))
@@ -148,7 +171,9 @@ def test_reconcile_populations_keeps_plan_and_inventory_independent() -> None:
         DECLARE_TWO, ["alpha", "beta", "rogue"], org="vig-os", allowlist_path=None
     )
     plan_records = parse_plan(PLAN_ONE_DRIFT).records
-    plan_actions, inv_actions = reconcile_populations(plan_records, inv_records, [], now=NOW)
+    plan_actions, inv_actions, _controls = reconcile_populations(
+        plan_records, inv_records, None, [], now=NOW
+    )
     assert [a.kind for a in plan_actions] == ["open"]
     assert [a.kind for a in inv_actions] == ["open"]
     assert plan_actions[0].title == 'Drift: repository[name="alpha"]'
@@ -165,20 +190,23 @@ def test_reconcile_populations_degrades_leaving_inventory_issues_untouched() -> 
         labels=("drift", "critical", "inventory"),
     )
     plan_records = parse_plan(PLAN_ONE_DRIFT).records
-    plan_actions, inv_actions = reconcile_populations(plan_records, None, [inv_issue], now=NOW)
+    plan_actions, inv_actions, _controls = reconcile_populations(
+        plan_records, None, None, [inv_issue], now=NOW
+    )
     assert [a.kind for a in plan_actions] == ["open"]
     assert inv_actions == []  # inventory issue left exactly as-is
 
 
 def test_run_opens_plan_and_inventory_issues_with_correct_labels() -> None:
     client = FakeClient(org_repos=["alpha", "beta", "rogue"])
-    plan_actions, inv_actions = run(
+    plan_actions, inv_actions, _controls = run(
         PLAN_ONE_DRIFT,
         issues_client=client,
         repos_client=client,
         org="vig-os",
         config_jsonnet_text=DECLARE_TWO,
         allowlist_path=None,
+        controls_config=None,
         now=NOW,
     )
     labels_used = {labels for _, _, labels in client.created}
@@ -189,13 +217,14 @@ def test_run_opens_plan_and_inventory_issues_with_correct_labels() -> None:
 
 def test_run_degrades_on_sweep_failure_but_reconciles_plan_drift() -> None:
     client = ExplodingReposClient(org_repos=["alpha", "beta", "rogue"])
-    plan_actions, inv_actions = run(
+    plan_actions, inv_actions, _controls = run(
         PLAN_ONE_DRIFT,
         issues_client=client,
         repos_client=client,
         org="vig-os",
         config_jsonnet_text=DECLARE_TWO,
         allowlist_path=None,
+        controls_config=None,
         now=NOW,
     )
     # Plan drift still opened; no inventory issue created (sweep degraded).
@@ -208,14 +237,178 @@ def test_run_degrades_on_sweep_failure_but_reconciles_plan_drift() -> None:
 
 def test_run_without_repos_client_is_plan_only() -> None:
     client = FakeClient()
-    plan_actions, inv_actions = run(
+    plan_actions, inv_actions, _controls = run(
         PLAN_ONE_DRIFT,
         issues_client=client,
         repos_client=None,
         org="vig-os",
         config_jsonnet_text=None,
         allowlist_path=None,
+        controls_config=None,
         now=NOW,
     )
     assert len(client.created) == 1
     assert inv_actions == []
+
+
+# --- unmanaged-control assertions (issue #116) ---------------------------------
+
+SHA_PINNING = Control(
+    key="sha-pinning",
+    scope="org",
+    title="SHA-pinned actions required org-wide",
+    endpoint="/orgs/{org}/actions/permissions",
+    path="sha_pinning_required",
+    expect=True,
+    reason="actions could otherwise be moved under a mutable tag",
+)
+CONTROLS = ControlsConfig(controls=[SHA_PINNING])
+CONTROL_FINGERPRINT = control_fingerprint(SHA_PINNING, org="vig-os")
+PERMISSIONS = "/orgs/vig-os/actions/permissions"
+
+
+class ExplodingControlsClient(FakeClient):
+    """Control read raises — models an unreachable API for the whole leg."""
+
+    def get_json(self, path: str) -> object:
+        msg = "boom: controls unreadable"
+        raise RuntimeError(msg)
+
+
+def _control_issue(number: int = 8) -> Issue:
+    return Issue(
+        number=number,
+        title="Unmanaged control drift: SHA-pinned actions required org-wide",
+        body=f"<!-- drift-fingerprint: {CONTROL_FINGERPRINT} -->",
+        labels=("drift", "critical", "unmanaged-control"),
+    )
+
+
+def test_reconcile_populations_partitions_all_three_lifecycles() -> None:
+    inv_records = build_inventory_records(
+        DECLARE_TWO, ["alpha", "beta", "rogue"], org="vig-os", allowlist_path=None
+    )
+    plan_records = parse_plan(PLAN_ONE_DRIFT).records
+    controls = ControlsResult(
+        records=[
+            DriftRecord(
+                org="vig-os",
+                resource="unmanaged-control:org:sha-pinning",
+                change_type="assert-failed",
+                detail="expected True, actual False",
+            )
+        ]
+    )
+    issues = [
+        Issue(number=1, title="plan", body="<!-- drift-fingerprint: aaaa -->"),
+        Issue(
+            number=2,
+            title="inv",
+            body="<!-- drift-fingerprint: bbbb -->",
+            labels=("drift", "critical", "inventory"),
+        ),
+        _control_issue(),
+    ]
+    plan_actions, inv_actions, control_actions = reconcile_populations(
+        plan_records, inv_records, controls, issues, now=NOW
+    )
+    # Each leg may only ever close an issue from its own population.
+    assert [a.number for a in plan_actions if a.kind == "close"] == [1]
+    assert [a.number for a in inv_actions if a.kind == "close"] == [2]
+    # The control row still diverges, so its own issue is refreshed in place —
+    # and neither of the other two legs went anywhere near it.
+    assert [(a.kind, a.number) for a in control_actions] == [("update", 8)]
+
+
+def test_run_opens_a_control_issue_with_the_unmanaged_label() -> None:
+    client = FakeClient(documents={PERMISSIONS: {"sha_pinning_required": False}})
+    _plan, _inv, control_actions = run(
+        PLAN_ONE_DRIFT,
+        issues_client=client,
+        repos_client=client,
+        org="vig-os",
+        config_jsonnet_text=None,
+        allowlist_path=None,
+        controls_config=CONTROLS,
+        now=NOW,
+    )
+    assert [a.kind for a in control_actions] == ["open"]
+    labels_used = {labels for _, _, labels in client.created}
+    assert UNMANAGED_LABELS in labels_used
+    assert UNMANAGED_LABELS == ("drift", "critical", "unmanaged-control")
+
+
+def test_run_leaves_an_unreadable_rows_issue_completely_alone() -> None:
+    # The phantom-resolution guard. A 403 on one row must not update the issue
+    # (nothing new was learned) and must NEVER close it (the control may well
+    # still be wrong) — the row is simply withheld from reconciliation.
+    class Forbidden(FakeClient):
+        def get_json(self, path: str) -> object:
+            raise ApiError(403, "Forbidden")
+
+    client = Forbidden(issues=[_control_issue()])
+    _plan, _inv, control_actions = run(
+        PLAN_ONE_DRIFT,
+        issues_client=client,
+        repos_client=client,
+        org="vig-os",
+        config_jsonnet_text=None,
+        allowlist_path=None,
+        controls_config=CONTROLS,
+        now=NOW,
+    )
+    assert control_actions == []
+    assert client.closed == []
+    assert client.updated == []
+
+
+def test_run_without_a_controls_table_leaves_control_issues_untouched() -> None:
+    client = FakeClient(issues=[_control_issue()])
+    plan_actions, _inv, control_actions = run(
+        PLAN_ONE_DRIFT,
+        issues_client=client,
+        repos_client=client,
+        org="vig-os",
+        config_jsonnet_text=None,
+        allowlist_path=None,
+        controls_config=None,
+        now=NOW,
+    )
+    assert [a.kind for a in plan_actions] == ["open"]
+    assert control_actions == []
+    assert client.closed == []
+
+
+def test_run_degrades_on_a_controls_leg_failure_but_reconciles_plan_drift() -> None:
+    client = ExplodingControlsClient(issues=[_control_issue()])
+    plan_actions, _inv, control_actions = run(
+        PLAN_ONE_DRIFT,
+        issues_client=client,
+        repos_client=client,
+        org="vig-os",
+        config_jsonnet_text=None,
+        allowlist_path=None,
+        controls_config=CONTROLS,
+        now=NOW,
+    )
+    assert [a.kind for a in plan_actions] == ["open"]
+    assert control_actions == []
+    assert client.closed == []
+
+
+def test_a_clean_control_row_closes_its_open_issue() -> None:
+    client = FakeClient(
+        issues=[_control_issue()], documents={PERMISSIONS: {"sha_pinning_required": True}}
+    )
+    _plan, _inv, control_actions = run(
+        PLAN_ONE_DRIFT,
+        issues_client=client,
+        repos_client=client,
+        org="vig-os",
+        config_jsonnet_text=None,
+        allowlist_path=None,
+        controls_config=CONTROLS,
+        now=NOW,
+    )
+    assert [(a.kind, a.number) for a in control_actions] == [("close", 8)]
+    assert client.closed == [8]

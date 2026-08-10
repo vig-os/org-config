@@ -1,0 +1,49 @@
+# Test unmanaged-controls table (mirrors the real unmanaged-controls.toml
+# format). One plain row, one tolerated row, one repo-scoped nested-path row, one
+# unassertable row, plus the generated org-secret family.
+
+[[control]]
+key = "fork-pr-approval"
+scope = "org"
+title = "Fork-PR approval policy"
+endpoint = "/orgs/{org}/actions/permissions/fork-pr-contributor-approval"
+path = "approval_policy"
+expect = "first_time_contributors"
+reason = "plain row: the live value must equal the asserted one"
+
+[[control]]
+key = "sha-pinning"
+scope = "org"
+title = "SHA-pinned actions required org-wide"
+endpoint = "/orgs/{org}/actions/permissions"
+path = "sha_pinning_required"
+expect = true
+tolerated = false
+reason = "tolerated row: desired true, known divergence false tracked elsewhere"
+refs = ["#120"]
+
+[[control]]
+key = "secret-scanning-validity-checks"
+scope = "repo"
+repository = "devkit"
+title = "Secret-scanning validity checks on devkit"
+endpoint = "/repos/{org}/{repo}"
+path = "security_and_analysis.secret_scanning_validity_checks.status"
+expect = "enabled"
+tolerated = "disabled"
+reason = "repo-scoped row reaching a nested field through a dotted path"
+
+[[control]]
+key = "two-factor-requirement"
+scope = "org"
+kind = "unassertable"
+title = "Two-factor enforcement for every org member"
+reason = "unassertable row: no readable endpoint, so it is never evaluated"
+recheck = "quarterly"
+
+[org_secrets]
+enabled = true
+assert_visibility = true
+assert_selected_repositories = true
+assert_no_undeclared = true
+reason = "generated family: expected values are read from the committed config"

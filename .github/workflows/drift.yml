@@ -3,7 +3,11 @@
 # layer, which reconciles the plan into deduplicated `drift`+`critical` issues
 # (issue #20, ADR-0002 issue-only drift semantics, ADR-0007 L1 core). The same
 # run also sweeps the live org repo inventory against the declared set and flags
-# undeclared / absent repos into the SAME lifecycle (issue #21).
+# undeclared / absent repos into the SAME lifecycle (issue #21), and asserts the
+# controls otterdog CANNOT model — Actions SHA-pinning, the fork-PR approval
+# policy, the new-repository security defaults, org-secret metadata — directly
+# against the live REST API from `unmanaged-controls.toml` (issue #116). All
+# three populations share one dedup'd issue lifecycle, partitioned by label.
 #
 # This is a repo-OWNED workflow (not devkit-managed), so zizmor gates it in full:
 # it is deliberately absent from zizmor.yml, and the only accepted findings are
@@ -30,7 +34,14 @@
 #         Read-only-ness is enforced by BEHAVIOR: `plan` only issues GETs. The
 #         inventory sweep's org-repo read (`GET /orgs/vig-os/repos`, #21) reuses
 #         this same full token (a narrowed token cannot list org repos) and is
-#         likewise read-only by behavior.
+#         likewise read-only by behavior. So is the unmanaged-control assertion
+#         leg (#116): every one of its endpoints — `GET /orgs/{org}`,
+#         `/orgs/{org}/actions/permissions[/fork-pr-contributor-approval]`,
+#         `/orgs/{org}/actions/secrets[/{name}/repositories]`,
+#         `/repos/{org}/{repo}[/actions/permissions...]` — is a GET, and the
+#         permissions they need (Org Administration read, Org Secrets read, Repo
+#         Administration read) are already inside this grant, so the leg adds NO
+#         token, permission or App-grant change (docs/runbooks/github-app.md).
 #       * issue-ops token — a SECOND token narrowed to `issues: write` on this
 #         repo only. ALL issue writes (plan-drift AND inventory) run on this
 #         smallest grant, never the org-admin token.
@@ -248,22 +259,31 @@ jobs:
           repositories: ${{ inputs.config_repo || 'org-config' }}
           permission-issues: write
 
-      # Plan-drift + inventory-sweep reconciliation in one invocation. The sweep
-      # leg (issue #21) lists live org repos and compares them against the
-      # declared set in the committed config, feeding undeclared/absent repos
-      # into the SAME dedup'd drift+critical lifecycle (an `inventory`-labelled
-      # population). Two tokens, each for exactly what it may do:
-      #   - GITHUB_TOKEN     = the issues:write-narrowed token (all issue writes)
-      #   - DRIFT_REPOS_TOKEN = the full plan token, ONLY for the org-repo read
-      #     (`GET /orgs/vig-os/repos`; a narrowed token cannot list org repos).
-      # EXPLICIT DEGRADATION (issue #21 BINDING): a sweep failure (e.g. the live
-      # repo read 403s) must NOT skip reconciliation of plan-drift records. The
-      # CLI catches the live-read failure IN-TOOL, reconciles plan drift anyway,
-      # leaves inventory issues untouched (never phantom-closes them), and exits
-      # 0 — so this step stays green on a degraded sweep WITHOUT a blanket
-      # `continue-on-error` that would also mask a genuine plan-reconcile failure
-      # (an issue-write error still, correctly, reddens the run).
-      - name: Reconcile plan drift + inventory sweep into drift+critical issues
+      # THREE populations reconciled in one invocation, each with its own label
+      # and its own degradation contract:
+      #   1. plan drift          — `drift`+`critical`
+      #   2. inventory sweep     — + `inventory` (issue #21): live org repos vs
+      #      the declared set in the committed config.
+      #   3. unmanaged controls  — + `unmanaged-control` (issue #116): live
+      #      settings otterdog has NO schema field for, so they appear in no plan
+      #      diff at all, asserted straight from the REST API against
+      #      `unmanaged-controls.toml`.
+      # Two tokens, each for exactly what it may do:
+      #   - GITHUB_TOKEN      = the issues:write-narrowed token (all issue writes)
+      #   - DRIFT_REPOS_TOKEN = the full plan token, ONLY for the org/repo READ
+      #     legs (a narrowed token cannot list org repos or read org settings).
+      # EXPLICIT DEGRADATION (issues #21/#116 BINDING): a live-read failure must
+      # NOT skip reconciliation of the other populations. The CLI catches the
+      # failure IN-TOOL, reconciles what it can, leaves the failed leg's issues
+      # untouched (never phantom-closes them), and exits 0 — so this step stays
+      # green on a degraded leg WITHOUT a blanket `continue-on-error` that would
+      # also mask a genuine reconcile failure (an issue-write error still,
+      # correctly, reddens the run). The controls leg degrades PER ROW: a row
+      # whose endpoint 403s or whose field moved has its own issue withheld from
+      # reconciliation, so one unreadable control can neither be reported as
+      # drift nor silently resolve a real finding, while every other row still
+      # reports. Those rows surface as `::warning::` annotations, not failures.
+      - name: Reconcile plan drift, inventory sweep and live control assertions
         env:
           GITHUB_TOKEN: ${{ steps.issues-token.outputs.token }}
           DRIFT_REPOS_TOKEN: ${{ steps.plan-token.outputs.token }}
@@ -272,12 +292,17 @@ jobs:
           ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
         run: |
           set -euo pipefail
+          # Tee (stdout+stderr) so the run summary can fence the reconciler's own
+          # output — the actions taken plus the per-row control annotations —
+          # without teaching the CLI anything about GitHub Actions. `pipefail`
+          # keeps the tool's exit code authoritative through the pipe.
           uv run drift-layer \
             --plan-file plan.txt \
             --repo "${{ github.repository }}" \
             --org "${ORG_GITHUB_ID}" \
             --allowlist drift-allowlist.toml \
-            --config-jsonnet "otterdog/${ORG_GITHUB_ID}/${ORG_GITHUB_ID}.jsonnet"
+            --config-jsonnet "otterdog/${ORG_GITHUB_ID}/${ORG_GITHUB_ID}.jsonnet" \
+            --unmanaged-controls unmanaged-controls.toml 2>&1 | tee drift-layer.txt
 
       - name: Drift run summary
         if: always()
@@ -288,10 +313,18 @@ jobs:
           {
             echo "## Drift reconciliation — \`vig-os\`"
             echo
-            echo "_Read-only \`otterdog plan --local --no-web-ui\` + live repo inventory sweep, reconciled into deduplicated \`drift\`+\`critical\` issues (ADR-0002, #21). Nothing was applied to org state._"
+            echo "_Read-only \`otterdog plan --local --no-web-ui\` + live repo inventory sweep + live unmanaged-control assertions, reconciled into deduplicated \`drift\`+\`critical\` issues (ADR-0002, #21, #116). Nothing was applied to org state._"
             echo
             echo '```text'
             [ -f plan.txt ] && cat plan.txt || echo "(no plan output produced)"
+            echo '```'
+            echo
+            echo "### Reconciler output"
+            echo
+            echo "_Actions taken across all three populations, plus any per-row control annotations (tolerated divergences and rows that could not be read)._"
+            echo
+            echo '```text'
+            [ -f drift-layer.txt ] && cat drift-layer.txt || echo "(no reconciler output produced)"
             echo '```'
             echo
             echo "[Run log](${RUN_URL})"

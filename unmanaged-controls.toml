@@ -1,0 +1,240 @@
+# Unmanaged-controls assertion table (issue #116) — governance state, like
+# drift-allowlist.toml: adding, changing or tolerating a row is a normal
+# reviewable PR, so "what we assert about the live org" stays versioned.
+#
+# These are controls OTTERDOG CANNOT MODEL: they have no field in its schema, so
+# they appear in no plan diff and in no inventory sweep. Until this table
+# existed they could be flipped in the UI and nothing would notice. The drift
+# run reads each one straight from the REST API and compares it against the
+# value asserted here; a mismatch opens one deduplicated
+# `drift`+`critical`+`unmanaged-control` issue, and the issue closes itself once
+# the live value matches again.
+#
+# Row shape:
+#   key         stable identity; part of the issue fingerprint — renaming a key
+#               abandons its open issue and opens a fresh one
+#   scope       "org", or "repo" plus a `repository`
+#   endpoint    `{org}` / `{repo}` are templated at run time
+#   path        dotted key path into the decoded JSON response (not jq)
+#   expect      the DESIRED value, always — never today's value if they differ
+#   tolerated   optional second accepted value for a known, tracked divergence:
+#               live == expect is clean, live == tolerated is clean-but-noted
+#               (summary only, no issue), any THIRD value is real drift
+#   kind        optional "unassertable" — documents a control with no readable
+#               endpoint; never evaluated, summary line only (example at the
+#               bottom of this file)
+#
+# Every `expect` below was verified against the live `vig-os` organization on
+# 2026-08-10, so the table seeds green: it is a detector, not a posture change.
+
+# --- Actions: SHA pinning ------------------------------------------------------
+
+[[control]]
+key = "sha-pinning"
+scope = "repo"
+repository = "devkit"
+title = "SHA-pinned actions required on devkit"
+endpoint = "/repos/{org}/{repo}/actions/permissions"
+path = "sha_pinning_required"
+expect = true
+reason = """
+devkit is the fleet's supply-chain root: every other repo consumes its composite
+actions and its scaffolded workflows. With SHA pinning off, a tag on any action
+devkit calls can be moved under it and the change reaches all 14 repos on the
+next run. Otterdog has no field for this Actions-policy setting, so nothing but
+this assertion notices if it is switched off in the UI.
+"""
+
+[[control]]
+key = "sha-pinning"
+scope = "org"
+title = "SHA-pinned actions required org-wide"
+endpoint = "/orgs/{org}/actions/permissions"
+path = "sha_pinning_required"
+expect = true
+tolerated = false
+reason = """
+Desired org-wide, currently off: enabling it is tracked in #120, which has to
+land the pin sweep across every repo first. Recording the desired value here
+(rather than asserting today's `false`) means the row goes green by itself when
+#120 lands, with no edit to this file — and until then a third value, or the
+setting being toggled the other way at repo scope, is still real drift.
+"""
+refs = ["#120"]
+
+# --- Actions: fork-PR approval -------------------------------------------------
+
+[[control]]
+key = "fork-pr-approval"
+scope = "org"
+title = "Fork-PR workflow approval required org-wide"
+endpoint = "/orgs/{org}/actions/permissions/fork-pr-contributor-approval"
+path = "approval_policy"
+expect = "first_time_contributors"
+reason = """
+Fork-PR workflow runs execute attacker-supplied code against this org's runners
+(OWASP CICD-SEC-4). `first_time_contributors` is the live policy and what this
+row locks in — a silent widening to `never` would let any fork run workflows
+unreviewed. Hardening further to `all_external_contributors` is a separate
+posture decision, deliberately not conflated with standing up the detector.
+"""
+
+[[control]]
+key = "fork-pr-approval"
+scope = "repo"
+repository = "devkit"
+title = "Fork-PR workflow approval required on devkit"
+endpoint = "/repos/{org}/{repo}/actions/permissions/fork-pr-contributor-approval"
+path = "approval_policy"
+expect = "first_time_contributors"
+reason = """
+The repo-level policy overrides the org one, so the org row alone is not
+sufficient: devkit is public and the fleet's supply-chain root, which makes it
+the repo where an unreviewed fork run costs the most.
+"""
+
+# --- Secret scanning extras (known stuck) --------------------------------------
+
+[[control]]
+key = "secret-scanning-non-provider-patterns"
+scope = "repo"
+repository = "devkit"
+title = "Secret-scanning non-provider patterns enabled on devkit"
+endpoint = "/repos/{org}/{repo}"
+path = "security_and_analysis.secret_scanning_non_provider_patterns.status"
+expect = "enabled"
+tolerated = "disabled"
+reason = """
+Wanted enabled; permanently stuck disabled. devkit is attached to the ENFORCED
+org code-security configuration 237480, which declares both secret-scanning
+extras enabled, but the features need a GHAS Secret Protection entitlement the
+plan does not carry — a repo-level PATCH returns 200 OK and changes nothing.
+Tolerating it HERE rather than in drift-allowlist.toml keeps the desired value
+on record: if the entitlement ever lands, the row goes green on its own. An
+allow-list entry would instead silence the control unconditionally, hide a third
+value, split one control's truth across two files, and be cleared by
+apply_allowlist's with_expected() — control records deliberately never pass
+through the allow-list.
+"""
+
+[[control]]
+key = "secret-scanning-validity-checks"
+scope = "repo"
+repository = "devkit"
+title = "Secret-scanning validity checks enabled on devkit"
+endpoint = "/repos/{org}/{repo}"
+path = "security_and_analysis.secret_scanning_validity_checks.status"
+expect = "enabled"
+tolerated = "disabled"
+reason = """
+Same entitlement gap as the non-provider patterns row above: declared enabled by
+the enforced org code-security configuration, reads disabled live, and no
+repo-level write moves it. Asserting the stuck state instead would record a lie.
+"""
+
+# --- New-repository security defaults ------------------------------------------
+#
+# These decide what a repo created TOMORROW starts with. Otterdog models the
+# per-repo settings but not the org-level defaults, so a repo created after a
+# silent flip would come up unprotected and only the repo-level drift would
+# eventually show it — one repo at a time, after the fact.
+
+[[control]]
+key = "new-repo-dependency-graph"
+scope = "org"
+title = "Dependency graph on by default for new repositories"
+endpoint = "/orgs/{org}"
+path = "dependency_graph_enabled_for_new_repositories"
+expect = true
+reason = "The dependency graph is the input Dependabot alerts are computed from; without it the two rows below are inert."
+
+[[control]]
+key = "new-repo-dependabot-alerts"
+scope = "org"
+title = "Dependabot alerts on by default for new repositories"
+endpoint = "/orgs/{org}"
+path = "dependabot_alerts_enabled_for_new_repositories"
+expect = true
+reason = "A new repo must start reporting known-vulnerable dependencies, not wait for someone to remember to switch it on."
+
+[[control]]
+key = "new-repo-dependabot-security-updates"
+scope = "org"
+title = "Dependabot security updates on by default for new repositories"
+endpoint = "/orgs/{org}"
+path = "dependabot_security_updates_enabled_for_new_repositories"
+expect = true
+reason = "Alerts without automated fix PRs put the whole remediation burden on a one-engineer team; the default must include the fixes."
+
+[[control]]
+key = "new-repo-secret-scanning"
+scope = "org"
+title = "Secret scanning on by default for new repositories"
+endpoint = "/orgs/{org}"
+path = "secret_scanning_enabled_for_new_repositories"
+expect = true
+reason = "A committed credential is unrecoverable once pushed; detection has to be on from the repository's first commit."
+
+[[control]]
+key = "new-repo-secret-scanning-push-protection"
+scope = "org"
+title = "Secret-scanning push protection on by default for new repositories"
+endpoint = "/orgs/{org}"
+path = "secret_scanning_push_protection_enabled_for_new_repositories"
+expect = true
+reason = "Push protection is the only one of these that PREVENTS the leak rather than reporting it afterwards, so it matters most on a new repo."
+
+[[control]]
+key = "new-repo-advanced-security"
+scope = "org"
+title = "GitHub Advanced Security off by default for new repositories"
+endpoint = "/orgs/{org}"
+path = "advanced_security_enabled_for_new_repositories"
+expect = false
+reason = """
+Deliberately asserted OFF, and not an oversight: the org has no GHAS
+entitlement, so a default-on would attach every new repository to a feature set
+that cannot function (the same entitlement gap that leaves the two
+secret-scanning extras above stuck). Flipping it on silently would produce
+repos that look protected and are not. Revisit together with the entitlement,
+not on its own.
+"""
+
+# --- Generated families: org secrets -------------------------------------------
+#
+# Expected values are NOT literals here — they are read from
+# `otterdog/vig-os/vig-os.jsonnet` at run time, so the committed config stays the
+# single source of truth for who may read which secret and this file never has to
+# be edited when a consumer list changes.
+
+[org_secrets]
+enabled = true
+assert_visibility = true
+assert_selected_repositories = true
+assert_no_undeclared = true
+reason = """
+Otterdog structurally cannot police org-secret metadata: nine of the ten
+committed org secrets carry a `'********'` dummy value, so `include_for_live_patch`
+is false and its plan skips them entirely. A visibility widened in the UI, or a
+reader list hand-edited through `PUT /orgs/{org}/actions/secrets/{name}/repositories`
+(which needs no secret value), therefore produces no diff at all — the exact
+operations #123 used to narrow all ten secrets to `selected` are the ones that
+can silently undo it. Each family opens at most ONE issue listing every
+offender. `assert_no_undeclared` is on because a live org secret with no
+committed declaration is an unreviewed credential: nothing records who created
+it, what reads it, or when it should be rotated.
+"""
+
+# --- Unassertable controls -----------------------------------------------------
+#
+# A control with no readable endpoint is still recorded here — the row IS the
+# durable record — but is never evaluated and never opens an issue; it appears
+# only in the run summary. None at present. Shape:
+#
+#   [[control]]
+#   key = "some-ui-only-control"
+#   scope = "org"
+#   kind = "unassertable"
+#   title = "Some control GitHub exposes only in the UI"
+#   recheck = "quarterly"
+#   reason = "why it matters and why no API can read it today"

@@ -39,6 +39,92 @@ DECLARED_REPOS: frozenset[str] = frozenset(
 )
 
 
+# The real declared ORG SECRET set committed in otterdog/vig-os/vig-os.jsonnet:
+# name -> (otterdog visibility, sorted selected_repositories). The generated
+# org-secret assertion families (#116) compare live metadata against exactly
+# this, so it is kept here as the L1 ground truth beside DECLARED_REPOS. All ten
+# are `selected` since the #123/#125 visibility narrowing.
+DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "COMMIT_APP_CLIENT_ID": (
+        "selected",
+        (
+            "commit-action",
+            "devkit",
+            "devkit-smoke-test",
+            "h5v",
+            "org-config",
+            "scitadel",
+            "sync-issues-action",
+        ),
+    ),
+    "COMMIT_APP_ID": ("selected", ("commit-action", "h5v", "scitadel", "sync-issues-action")),
+    "COMMIT_APP_PRIVATE_KEY": (
+        "selected",
+        (
+            "commit-action",
+            "devkit",
+            "devkit-smoke-test",
+            "h5v",
+            "org-config",
+            "scitadel",
+            "sync-issues-action",
+        ),
+    ),
+    "DEVKIT_UPGRADE_APP_CLIENT_ID": (
+        "selected",
+        (
+            "commit-action",
+            "devkit-smoke-test",
+            "h5v",
+            "org-config",
+            "scitadel",
+            "sync-issues-action",
+        ),
+    ),
+    "DEVKIT_UPGRADE_APP_ID": (
+        "selected",
+        ("commit-action", "devkit-smoke-test", "org-config", "sync-issues-action"),
+    ),
+    "DEVKIT_UPGRADE_APP_PRIVATE_KEY": (
+        "selected",
+        (
+            "commit-action",
+            "devkit-smoke-test",
+            "h5v",
+            "org-config",
+            "scitadel",
+            "sync-issues-action",
+        ),
+    ),
+    "ORG_CONFIG_CANARY": ("selected", ("org-config",)),
+    "RELEASE_APP_CLIENT_ID": (
+        "selected",
+        (
+            "commit-action",
+            "devkit",
+            "devkit-smoke-test",
+            "h5v",
+            "org-config",
+            "scitadel",
+            "sync-issues-action",
+        ),
+    ),
+    "RELEASE_APP_ID": ("selected", ("h5v", "scitadel")),
+    "RELEASE_APP_PRIVATE_KEY": (
+        "selected",
+        (
+            "commit-action",
+            "devkit",
+            "devkit-smoke-test",
+            "h5v",
+            "org-config",
+            "scitadel",
+            "sync-issues-action",
+        ),
+    ),
+}
+
+
 def _read(name: str) -> str:
     return (FIXTURES / name).read_text()
 
@@ -74,6 +160,18 @@ def allowlist_path() -> Path:
 
 
 @pytest.fixture
+def controls_path() -> Path:
+    """Unmanaged-controls table: plain, tolerated, repo-scoped, unassertable."""
+    return FIXTURES / "unmanaged-controls.toml"
+
+
+@pytest.fixture
+def shipped_controls_path() -> Path:
+    """The real committed unmanaged-controls.toml (the shipped seed table)."""
+    return REPO_ROOT / "unmanaged-controls.toml"
+
+
+@pytest.fixture
 def declared_jsonnet() -> str:
     """The real committed otterdog config — the declared-set extraction source."""
     return (REPO_ROOT / "otterdog" / "vig-os" / "vig-os.jsonnet").read_text()
@@ -83,3 +181,9 @@ def declared_jsonnet() -> str:
 def declared_repos() -> frozenset[str]:
     """The known committed declared repo set (ground truth)."""
     return DECLARED_REPOS
+
+
+@pytest.fixture
+def declared_org_secrets() -> dict[str, tuple[str, tuple[str, ...]]]:
+    """The known committed org-secret declarations (ground truth)."""
+    return DECLARED_ORG_SECRETS
