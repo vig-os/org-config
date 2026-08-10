@@ -3,7 +3,8 @@
 The table declares live org/repo controls otterdog cannot model, so they are
 invisible to both the plan and the inventory sweep. Loading, endpoint
 templating, dotted-path selection and fingerprint namespacing are pure and
-offline; nothing here touches the network.
+offline; the evaluation runs against an injected fake client, so nothing here
+touches the network.
 """
 
 from __future__ import annotations
@@ -11,22 +12,68 @@ from __future__ import annotations
 from pathlib import Path
 
 from drift_layer.controls import (
+    DRIFT,
     MISSING,
+    OK,
     RESOURCE_PREFIX,
+    SKIPPED,
+    TOLERATED,
+    UNRESOLVED,
     UNSET,
+    Control,
+    ControlsConfig,
     control_resource,
+    evaluate_controls,
     load_controls,
     resolve_endpoint,
     select_path,
 )
+from drift_layer.github_client import ApiError
 from drift_layer.models import DriftRecord
 
 ORG = "vig-os"
 
 
+class FakeApiClient:
+    """Maps a resolved endpoint to a canned document or a raised ApiError."""
+
+    def __init__(self, responses: dict[str, object]) -> None:
+        self.responses = responses
+        self.requested: list[str] = []
+
+    def get_json(self, path: str) -> object:
+        self.requested.append(path)
+        response = self.responses[path]
+        if isinstance(response, ApiError):
+            raise response
+        return response
+
+
 def _by_key(config, key: str, scope: str = "org"):
     (control,) = [c for c in config.controls if c.key == key and c.scope == scope]
     return control
+
+
+def _control(**overrides: object) -> Control:
+    fields: dict[str, object] = {
+        "key": "sha-pinning",
+        "scope": "org",
+        "title": "SHA-pinned actions required org-wide",
+        "endpoint": "/orgs/{org}/actions/permissions",
+        "path": "sha_pinning_required",
+        "expect": True,
+        "reason": "actions can otherwise be moved under a mutable tag",
+    }
+    fields.update(overrides)
+    return Control(**fields)  # type: ignore[arg-type]
+
+
+def _evaluate(control: Control, responses: dict[str, object]):
+    client = FakeApiClient(responses)
+    return evaluate_controls(ControlsConfig(controls=[control]), client, org=ORG), client
+
+
+PERMISSIONS = "/orgs/vig-os/actions/permissions"
 
 
 # --- load_controls -------------------------------------------------------------
@@ -207,3 +254,174 @@ def test_control_fingerprints_are_distinct_from_the_other_populations() -> None:
     assert len(fingerprints) == 4
     # Stable across evaluations: identity is the TOML key, not the live value.
     assert org_scoped.fingerprint == record(f"{RESOURCE_PREFIX}:org:sha-pinning").fingerprint
+
+
+# --- evaluation outcomes -------------------------------------------------------
+
+
+def test_live_value_matching_the_expectation_is_clean() -> None:
+    control = _control()
+    result, _ = _evaluate(control, {PERMISSIONS: {"sha_pinning_required": True}})
+    assert result.records == []
+    assert result.clean_fingerprints == {_fingerprint(control)}
+    assert result.unresolved_fingerprints == set()
+    assert [o.status for o in result.outcomes] == [OK]
+
+
+def test_live_value_diverging_opens_one_record_with_the_evidence() -> None:
+    control = _control()
+    result, _ = _evaluate(control, {PERMISSIONS: {"sha_pinning_required": False}})
+    (record,) = result.records
+    assert record.org == ORG
+    assert record.resource == f"{RESOURCE_PREFIX}:org:sha-pinning"
+    assert record.change_type == "assert-failed"
+    assert record.title == "Unmanaged control drift: SHA-pinned actions required org-wide"
+    # The evidence block must carry enough to triage without re-reading the API.
+    assert PERMISSIONS in record.detail
+    assert "sha_pinning_required" in record.detail
+    assert "expected" in record.detail.lower()
+    assert "True" in record.detail
+    assert "False" in record.detail
+    assert control.reason in record.detail
+    # A failed row is neither clean nor unresolved: it is drift.
+    assert result.clean_fingerprints == set()
+    assert result.unresolved_fingerprints == set()
+    assert [o.status for o in result.outcomes] == [DRIFT]
+
+
+def test_tolerated_value_is_clean_but_noted() -> None:
+    control = _control(tolerated=False, refs=("#120",))
+    result, _ = _evaluate(control, {PERMISSIONS: {"sha_pinning_required": False}})
+    assert result.records == []
+    assert result.clean_fingerprints == {_fingerprint(control)}
+    assert [o.status for o in result.outcomes] == [TOLERATED]
+    assert any("sha-pinning" in note for note in result.notes)
+
+
+def test_a_third_value_is_drift_even_with_a_tolerated_escape() -> None:
+    control = _control(
+        key="secret-scanning-non-provider-patterns",
+        path="status",
+        endpoint="/repos/{org}/{repo}",
+        scope="repo",
+        repository="devkit",
+        expect="enabled",
+        tolerated="disabled",
+    )
+    result, _ = _evaluate(control, {"/repos/vig-os/devkit": {"status": "suspended"}})
+    (record,) = result.records
+    assert "suspended" in record.detail
+    assert "disabled" in record.detail  # the tolerated value is part of the evidence
+    assert result.clean_fingerprints == set()
+
+
+def test_expectation_comparison_does_not_conflate_booleans_with_integers() -> None:
+    # `1` is not `true`: a retyped field is drift, not a silent pass.
+    result, _ = _evaluate(_control(), {PERMISSIONS: {"sha_pinning_required": 1}})
+    assert len(result.records) == 1
+
+
+# --- per-row degradation -------------------------------------------------------
+
+
+def _degrades(response: object, expected_note: str) -> None:
+    control = _control()
+    result, _ = _evaluate(control, {PERMISSIONS: response})
+    assert result.records == []
+    assert result.clean_fingerprints == set()
+    assert result.unresolved_fingerprints == {_fingerprint(control)}
+    assert [o.status for o in result.outcomes] == [UNRESOLVED]
+    assert any(expected_note in note for note in result.notes)
+
+
+def test_missing_endpoint_degrades_the_row() -> None:
+    _degrades(ApiError(404, "GET /orgs/vig-os/actions/permissions: Not Found"), "unassertable")
+
+
+def test_forbidden_endpoint_degrades_the_row() -> None:
+    _degrades(ApiError(403, "GET /orgs/vig-os/actions/permissions: Forbidden"), "token")
+
+
+def test_network_failure_degrades_the_row() -> None:
+    _degrades(ApiError(0, "connection refused"), "unreadable")
+
+
+def test_absent_field_degrades_rather_than_fabricating_drift() -> None:
+    # A 200 whose schema no longer carries the path means GitHub moved the
+    # field; reporting that as drift would invent a security finding.
+    _degrades({"something_else": True}, "absent")
+
+
+def test_unresolved_rows_are_withheld_from_both_populations() -> None:
+    # The load-bearing contract: an unreadable row must never land in
+    # clean_fingerprints, or reconcile() would close its open issue.
+    clean = _control()
+    broken = _control(
+        key="fork-pr-approval",
+        endpoint="/orgs/{org}/actions/permissions/fork-pr-contributor-approval",
+        path="approval_policy",
+        expect="first_time_contributors",
+    )
+    client = FakeApiClient(
+        {
+            PERMISSIONS: {"sha_pinning_required": True},
+            f"{PERMISSIONS}/fork-pr-contributor-approval": ApiError(403, "Forbidden"),
+        }
+    )
+    result = evaluate_controls(ControlsConfig(controls=[clean, broken]), client, org=ORG)
+    assert result.clean_fingerprints == {_fingerprint(clean)}
+    assert result.unresolved_fingerprints == {_fingerprint(broken)}
+    assert result.records == []
+
+
+# --- memoization and unassertable rows -----------------------------------------
+
+
+def test_rows_sharing_an_endpoint_are_read_once() -> None:
+    keys = ("dependency-graph", "dependabot-alerts", "secret-scanning")
+    controls = [
+        _control(key=key, endpoint="/orgs/{org}", path=f"{key.replace('-', '_')}_enabled")
+        for key in keys
+    ]
+    client = FakeApiClient({"/orgs/vig-os": {f"{k.replace('-', '_')}_enabled": True for k in keys}})
+    result = evaluate_controls(ControlsConfig(controls=controls), client, org=ORG)
+    assert client.requested == ["/orgs/vig-os"]
+    assert len(result.clean_fingerprints) == 3
+
+
+def test_a_failed_read_is_memoized_too() -> None:
+    controls = [_control(key="a", path="x"), _control(key="b", path="y")]
+    client = FakeApiClient({PERMISSIONS: ApiError(403, "Forbidden")})
+    result = evaluate_controls(ControlsConfig(controls=controls), client, org=ORG)
+    assert client.requested == [PERMISSIONS]
+    assert len(result.unresolved_fingerprints) == 2
+
+
+def test_unassertable_rows_are_never_evaluated(controls_path: Path) -> None:
+    config = load_controls(controls_path)
+    unassertable = _by_key(config, "two-factor-requirement")
+    client = FakeApiClient({})
+    result = evaluate_controls(ControlsConfig(controls=[unassertable]), client, org=ORG)
+    assert client.requested == []
+    assert result.records == []
+    assert result.clean_fingerprints == set()
+    assert result.unresolved_fingerprints == set()
+    assert [o.status for o in result.outcomes] == [SKIPPED]
+    assert any("two-factor-requirement" in note for note in result.notes)
+
+
+def test_outcomes_report_the_scope_expected_and_actual_values() -> None:
+    control = _control(scope="repo", repository="devkit", endpoint="/repos/{org}/{repo}")
+    result, _ = _evaluate(control, {"/repos/vig-os/devkit": {"sha_pinning_required": False}})
+    (outcome,) = result.outcomes
+    assert outcome.key == "sha-pinning"
+    assert outcome.scope == "devkit"
+    assert outcome.status == DRIFT
+    assert outcome.expected == "True"
+    assert outcome.actual == "False"
+
+
+def _fingerprint(control: Control) -> str:
+    return DriftRecord(
+        org=ORG, resource=control_resource(control), change_type="assert-failed", detail=""
+    ).fingerprint
