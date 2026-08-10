@@ -584,3 +584,44 @@ def test_org_secret_families_need_the_committed_config_text() -> None:
     result = evaluate_controls(config, client, org=ORG, config_jsonnet_text=None)
     assert result.outcomes == []
     assert client.requested == []
+
+
+# --- guard against the real shipped table --------------------------------------
+
+
+def test_shipped_controls_table_is_well_formed(
+    shipped_controls_path: Path, declared_repos: frozenset[str]
+) -> None:
+    # The shipped table is the durable record of every control otterdog cannot
+    # model, so it is asserted here rather than only exercised through fixtures.
+    config = load_controls(shipped_controls_path)
+    assert len(config.controls) >= 12
+    assert config.org_secrets is not None
+    assert config.org_secrets.enabled is True
+
+    identities = [(c.scope, c.repository, c.key) for c in config.controls]
+    assert len(identities) == len(set(identities))  # one issue per identity
+
+    for control in config.controls:
+        assert control.reason.strip(), f"{control.key} documents no rationale"
+        assert control.title.strip()
+        if control.scope == "repo":
+            assert control.repository in declared_repos, control.key
+        if control.assertable:
+            assert "{org}" in control.endpoint
+            assert control.path
+            assert control.expect is not UNSET
+
+
+def test_shipped_controls_table_records_the_desired_value_not_the_stuck_one(
+    shipped_controls_path: Path,
+) -> None:
+    # The known-stuck and pending-fix rows must assert what SHOULD be true and
+    # tolerate today's value, so they turn green on their own once fixed.
+    config = load_controls(shipped_controls_path)
+    tolerated = {c.key: c for c in config.controls if c.has_tolerated}
+    assert tolerated["sha-pinning"].expect is True
+    assert tolerated["sha-pinning"].tolerated is False
+    for key in ("secret-scanning-non-provider-patterns", "secret-scanning-validity-checks"):
+        assert tolerated[key].expect == "enabled"
+        assert tolerated[key].tolerated == "disabled"

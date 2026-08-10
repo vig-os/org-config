@@ -15,6 +15,11 @@ description = "Org inventory snapshot"
 color = "0e8a16"
 
 [[labels]]
+name = "unmanaged-control"
+description = "Live control otterdog cannot model, asserted directly"
+color = "5319e7"
+
+[[labels]]
 name = "change-request"
 description = "Structured change request via issue form"
 color = "1d76db"

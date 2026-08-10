@@ -1,0 +1,57 @@
+# Unmanaged-controls assertion table — downstream org-config starter.
+#
+# Governance state, like drift-allowlist.toml: adding, changing or tolerating a
+# row is a normal reviewable PR, so "what we assert about the live org" stays
+# versioned. Start EMPTY and add a row only for a control you have actually
+# decided to hold.
+#
+# These are controls OTTERDOG CANNOT MODEL: they have no field in its schema, so
+# they appear in no plan diff and in no inventory sweep — without a row here they
+# can be flipped in the UI and nothing notices. The drift run reads each one
+# straight from the REST API and compares it against the value asserted here; a
+# mismatch opens one deduplicated `drift`+`critical`+`unmanaged-control` issue,
+# which closes itself once the live value matches again.
+#
+# Row shape:
+#   [[control]]
+#   key         = "sha-pinning"      # stable identity; part of the fingerprint,
+#                                    # so renaming it abandons any open issue
+#   scope       = "repo"             # "org" | "repo"
+#   repository  = "some-repo"        # required iff scope = "repo"
+#   title       = "SHA-pinned actions required on some-repo"
+#   endpoint    = "/repos/{org}/{repo}/actions/permissions"  # {org}/{repo} templated
+#   path        = "sha_pinning_required"   # dotted key path into the JSON (not jq)
+#   expect      = true                     # the DESIRED value, always
+#   tolerated   = false                    # optional: a known, tracked divergence
+#   refs        = ["#1"]
+#   reason      = """why this matters and why otterdog cannot model it"""
+#
+# ALWAYS assert the desired value. If reality currently differs for a known,
+# tracked reason, add `tolerated` instead of weakening `expect`: live == expect
+# is clean, live == tolerated is clean-but-noted (summary only, no issue), and
+# any THIRD value is real drift. The row then goes green by itself once the
+# divergence is fixed, with no edit to this file.
+#
+# A control with no readable endpoint is recorded with `kind = "unassertable"`:
+# never evaluated, never opens an issue, summary line only — the row itself is
+# the durable record.
+#
+# Verify every row before relying on it, with no issue writes:
+#   DRIFT_REPOS_TOKEN=... uv run drift-layer --controls-report --org <your-org>
+# A seeded row should read OK or TOLERATED there BEFORE a scheduled run turns it
+# into a critical issue.
+
+# No [[control]] rows yet.
+
+# Generated org-secret families. Otterdog cannot diff a dummy-valued secret, so
+# a widened visibility or a hand-edited reader list produces no plan diff at all.
+# Expected values are read from the committed config at run time, not written
+# here. Disabled by default — turn it on once your org secrets are declared.
+[org_secrets]
+enabled = false
+assert_visibility = true
+assert_selected_repositories = true
+assert_no_undeclared = true
+reason = """
+Why this org asserts its secret metadata directly (fill in when enabling).
+"""

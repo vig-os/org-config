@@ -166,6 +166,12 @@ def controls_path() -> Path:
 
 
 @pytest.fixture
+def shipped_controls_path() -> Path:
+    """The real committed unmanaged-controls.toml (the shipped seed table)."""
+    return REPO_ROOT / "unmanaged-controls.toml"
+
+
+@pytest.fixture
 def declared_jsonnet() -> str:
     """The real committed otterdog config — the declared-set extraction source."""
     return (REPO_ROOT / "otterdog" / "vig-os" / "vig-os.jsonnet").read_text()
