@@ -54,29 +54,108 @@ orgs.newOrg('vig-os', 'vig-os') {
   },
   teams: [],
   secrets+: [
+    // The five repos on DEVKIT_VERSION=1.6.0, whose workflows authenticate with
+    // the client-ID form. h5v and scitadel are still on the legacy scaffold and
+    // use COMMIT_APP_ID instead (#112, #123).
     orgs.newOrgSecret('COMMIT_APP_CLIENT_ID') {
+      selected_repositories+: [
+        'commit-action',
+        'devkit',
+        'devkit-smoke-test',
+        'org-config',
+        'sync-issues-action',
+      ],
       value: '********',
+      visibility: 'selected',
     },
+    // Broader than the client-ID list: h5v (DEVCONTAINER_VERSION=0.3.1) and
+    // scitadel (0.3.3) still authenticate with the numeric App ID. Retire those
+    // two entries, not the whole secret, when they are re-scaffolded (#112).
     orgs.newOrgSecret('COMMIT_APP_ID') {
+      selected_repositories+: [
+        'commit-action',
+        'devkit',
+        'devkit-smoke-test',
+        'h5v',
+        'org-config',
+        'scitadel',
+        'sync-issues-action',
+      ],
       value: '********',
+      visibility: 'selected',
     },
+    // Union of the client-ID and numeric-ID consumer lists — every repo that
+    // mints a commit-app token needs the key regardless of which ID form it
+    // uses (#123).
     orgs.newOrgSecret('COMMIT_APP_PRIVATE_KEY') {
+      selected_repositories+: [
+        'commit-action',
+        'devkit',
+        'devkit-smoke-test',
+        'h5v',
+        'org-config',
+        'scitadel',
+        'sync-issues-action',
+      ],
       value: '********',
+      visibility: 'selected',
     },
+    // No consumer yet: declared ahead of vig-os/devkit#1365, which renames
+    // DEVKIT_UPGRADE_APP_ID -> _CLIENT_ID in the scaffolded devkit-upgrade.yml.
+    // Pre-seeded with the same four repos so the rename lands without a
+    // visibility change (#112, #123).
     orgs.newOrgSecret('DEVKIT_UPGRADE_APP_CLIENT_ID') {
+      selected_repositories+: [
+        'commit-action',
+        'devkit-smoke-test',
+        'org-config',
+        'sync-issues-action',
+      ],
       value: '********',
+      visibility: 'selected',
     },
+    // MAINTENANCE COUPLING: exactly the repos carrying a scaffolded
+    // `.github/workflows/devkit-upgrade.yml` today. devkit itself is the source
+    // and does not upgrade itself; h5v and scitadel predate the workflow. Any
+    // repo (re-)scaffolded to devkit >= 1.6 MUST be added here or its upgrade
+    // workflow fails with an empty credential and no error. Once visibility is
+    // `selected`, the list is editable without the secret value via
+    // `PUT /orgs/vig-os/actions/secrets/<NAME>/repositories` (#123).
     orgs.newOrgSecret('DEVKIT_UPGRADE_APP_ID') {
+      selected_repositories+: [
+        'commit-action',
+        'devkit-smoke-test',
+        'org-config',
+        'sync-issues-action',
+      ],
       value: '********',
+      visibility: 'selected',
     },
+    // Same four repos and the same maintenance coupling as
+    // DEVKIT_UPGRADE_APP_ID above (#123).
     orgs.newOrgSecret('DEVKIT_UPGRADE_APP_PRIVATE_KEY') {
+      selected_repositories+: [
+        'commit-action',
+        'devkit-smoke-test',
+        'org-config',
+        'sync-issues-action',
+      ],
       value: '********',
+      visibility: 'selected',
     },
+    // ORPHANED: zero references across all 14 org repos. vs-dolt's Docker Hub
+    // workflows use its own repo-level DOCKER_HUB_ACCESS_TOKEN /
+    // DOCKER_HUB_USERNAME — different names, different scope. Narrowed to an
+    // empty selected-list so it reaches nothing while its value is preserved;
+    // outright retirement is #125, mirroring the #111 precedent.
     orgs.newOrgSecret('DOCKERHUB_TOKEN') {
       value: '********',
+      visibility: 'selected',
     },
+    // Orphaned, same as DOCKERHUB_TOKEN above (#125).
     orgs.newOrgSecret('DOCKERHUB_USERNAME') {
       value: '********',
+      visibility: 'selected',
     },
     // Pilot for the org-wide visibility migration (#123). No workflow anywhere
     // in the org reads this secret — it is written by `otterdog apply` from the
@@ -92,14 +171,41 @@ orgs.newOrg('vig-os', 'vig-os') {
       value: 'pass:org-config/ORG_CONFIG_CANARY',
       visibility: 'selected',
     },
+    // The five 1.6.0 repos; h5v and scitadel use RELEASE_APP_ID (#112, #123).
     orgs.newOrgSecret('RELEASE_APP_CLIENT_ID') {
+      selected_repositories+: [
+        'commit-action',
+        'devkit',
+        'devkit-smoke-test',
+        'org-config',
+        'sync-issues-action',
+      ],
       value: '********',
+      visibility: 'selected',
     },
+    // Only the two legacy-scaffold repos still using the numeric App ID form.
+    // This secret retires entirely once both are re-scaffolded (#112).
     orgs.newOrgSecret('RELEASE_APP_ID') {
+      selected_repositories+: [
+        'h5v',
+        'scitadel',
+      ],
       value: '********',
+      visibility: 'selected',
     },
+    // Union of the client-ID and numeric-ID release consumers (#123).
     orgs.newOrgSecret('RELEASE_APP_PRIVATE_KEY') {
+      selected_repositories+: [
+        'commit-action',
+        'devkit',
+        'devkit-smoke-test',
+        'h5v',
+        'org-config',
+        'scitadel',
+        'sync-issues-action',
+      ],
       value: '********',
+      visibility: 'selected',
     },
   ],
   // Override (not `+::`) the base template's default `_repositories` list so its
