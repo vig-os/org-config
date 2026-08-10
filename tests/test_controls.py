@@ -22,6 +22,7 @@ from drift_layer.controls import (
     UNSET,
     Control,
     ControlsConfig,
+    OrgSecretsPolicy,
     control_resource,
     evaluate_controls,
     load_controls,
@@ -37,16 +38,34 @@ ORG = "vig-os"
 class FakeApiClient:
     """Maps a resolved endpoint to a canned document or a raised ApiError."""
 
-    def __init__(self, responses: dict[str, object]) -> None:
-        self.responses = responses
+    def __init__(
+        self,
+        responses: dict[str, object] | None = None,
+        org_secrets: object = None,
+        secret_repositories: dict[str, object] | None = None,
+    ) -> None:
+        self.responses = responses or {}
+        self.org_secrets = org_secrets if org_secrets is not None else []
+        self.secret_repositories = secret_repositories or {}
         self.requested: list[str] = []
 
     def get_json(self, path: str) -> object:
         self.requested.append(path)
-        response = self.responses[path]
-        if isinstance(response, ApiError):
-            raise response
-        return response
+        return _unwrap(self.responses[path])
+
+    def list_org_secrets(self, org: str) -> list[dict]:
+        self.requested.append(f"/orgs/{org}/actions/secrets")
+        return _unwrap(self.org_secrets)
+
+    def list_org_secret_repositories(self, org: str, name: str) -> list[str]:
+        self.requested.append(f"/orgs/{org}/actions/secrets/{name}/repositories")
+        return _unwrap(self.secret_repositories[name])
+
+
+def _unwrap(response: object) -> object:
+    if isinstance(response, ApiError):
+        raise response
+    return response
 
 
 def _by_key(config, key: str, scope: str = "org"):
@@ -425,3 +444,143 @@ def _fingerprint(control: Control) -> str:
     return DriftRecord(
         org=ORG, resource=control_resource(control), change_type="assert-failed", detail=""
     ).fingerprint
+
+
+# --- generated org-secret families ---------------------------------------------
+
+DECLARED_SECRETS = """
+orgs.newOrgSecret('ALPHA') {
+  selected_repositories+: [
+    'devkit',
+    'org-config',
+  ],
+  value: '********',
+  visibility: 'selected',
+},
+orgs.newOrgSecret('BETA') {
+  selected_repositories+: [
+    'org-config',
+  ],
+  value: '********',
+  visibility: 'selected',
+},
+"""
+
+LIVE_MATCHING = [
+    {"name": "ALPHA", "visibility": "selected"},
+    {"name": "BETA", "visibility": "selected"},
+]
+REPOS_MATCHING: dict[str, object] = {
+    "ALPHA": ["org-config", "devkit"],
+    "BETA": ["org-config"],
+}
+
+
+def _evaluate_secrets(
+    live: object = None,
+    repositories: dict[str, object] | None = None,
+    **policy: object,
+):
+    settings: dict[str, object] = {
+        "enabled": True,
+        "assert_visibility": True,
+        "assert_selected_repositories": True,
+        "assert_no_undeclared": True,
+        "reason": "otterdog cannot diff a dummy-valued secret",
+    }
+    settings.update(policy)
+    config = ControlsConfig(
+        controls=[],
+        org_secrets=OrgSecretsPolicy(**settings),  # type: ignore[arg-type]
+    )
+    client = FakeApiClient(
+        org_secrets=LIVE_MATCHING if live is None else live,
+        secret_repositories=REPOS_MATCHING if repositories is None else repositories,
+    )
+    result = evaluate_controls(config, client, org=ORG, config_jsonnet_text=DECLARED_SECRETS)
+    return result, client
+
+
+def test_live_org_secrets_matching_the_config_are_clean() -> None:
+    result, _ = _evaluate_secrets()
+    assert result.records == []
+    assert len(result.clean_fingerprints) == 3  # one per enabled family
+    assert {o.status for o in result.outcomes} == {OK}
+
+
+def test_widened_visibility_yields_one_aggregate_record() -> None:
+    live = [{"name": "ALPHA", "visibility": "all"}, {"name": "BETA", "visibility": "selected"}]
+    result, _ = _evaluate_secrets(live=live, repositories={"BETA": ["org-config"]})
+    (record,) = result.records
+    assert record.resource == f"{RESOURCE_PREFIX}:org:org-secret-visibility"
+    assert "ALPHA" in record.detail
+    assert "BETA" not in record.detail
+    assert "selected" in record.detail
+    assert "all" in record.detail
+
+
+def test_selected_repository_gain_and_loss_are_reported_in_both_directions() -> None:
+    repositories = {"ALPHA": ["org-config", "rogue"], "BETA": ["org-config"]}
+    result, _ = _evaluate_secrets(repositories=repositories)
+    (record,) = result.records
+    assert record.resource == f"{RESOURCE_PREFIX}:org:org-secret-repositories"
+    assert "rogue" in record.detail  # live-only: an unreviewed reader
+    assert "devkit" in record.detail  # config-only: a consumer that lost access
+
+
+def test_undeclared_live_secret_is_its_own_family() -> None:
+    live = [*LIVE_MATCHING, {"name": "GHOST", "visibility": "all"}]
+    result, _ = _evaluate_secrets(live=live)
+    (record,) = result.records
+    assert record.resource == f"{RESOURCE_PREFIX}:org:org-secret-undeclared"
+    assert "GHOST" in record.detail
+
+
+def test_two_independent_breakages_stay_two_records() -> None:
+    live = [{"name": "ALPHA", "visibility": "all"}, {"name": "BETA", "visibility": "selected"}]
+    result, _ = _evaluate_secrets(live=live, repositories={"BETA": ["rogue"]})
+    assert len(result.records) == 2
+    assert {r.resource for r in result.records} == {
+        f"{RESOURCE_PREFIX}:org:org-secret-visibility",
+        f"{RESOURCE_PREFIX}:org:org-secret-repositories",
+    }
+
+
+def test_disabled_families_are_not_evaluated_at_all() -> None:
+    live = [*LIVE_MATCHING, {"name": "GHOST", "visibility": "all"}]
+    result, _ = _evaluate_secrets(live=live, assert_no_undeclared=False)
+    assert result.records == []
+    assert len(result.clean_fingerprints) == 2
+    assert all("undeclared" not in o.key for o in result.outcomes)
+
+
+def test_a_disabled_policy_skips_the_whole_leg() -> None:
+    result, client = _evaluate_secrets(enabled=False)
+    assert result.outcomes == []
+    assert client.requested == []
+
+
+def test_an_unreadable_secret_list_degrades_every_family() -> None:
+    result, _ = _evaluate_secrets(live=ApiError(403, "Forbidden"))
+    assert result.records == []
+    assert result.clean_fingerprints == set()
+    assert len(result.unresolved_fingerprints) == 3
+    assert {o.status for o in result.outcomes} == {UNRESOLVED}
+
+
+def test_an_unreadable_repository_list_degrades_only_its_family() -> None:
+    repositories = {"ALPHA": ApiError(403, "Forbidden"), "BETA": ["org-config"]}
+    result, _ = _evaluate_secrets(repositories=repositories)
+    assert result.records == []
+    statuses = {o.key: o.status for o in result.outcomes}
+    assert statuses["org-secret-repositories"] == UNRESOLVED
+    assert statuses["org-secret-visibility"] == OK
+    assert statuses["org-secret-undeclared"] == OK
+
+
+def test_org_secret_families_need_the_committed_config_text() -> None:
+    config = ControlsConfig(controls=[], org_secrets=OrgSecretsPolicy(enabled=True))
+    client = FakeApiClient(org_secrets=LIVE_MATCHING, secret_repositories=REPOS_MATCHING)
+    result = evaluate_controls(config, client, org=ORG, config_jsonnet_text=None)
+    assert result.outcomes == []
+    assert client.requested == []

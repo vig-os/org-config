@@ -33,10 +33,12 @@ row's fingerprint is derivable from the table without reading the API at all.
 from __future__ import annotations
 
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .github_client import ApiError, GitHubClient
+from .inventory import extract_declared_org_secrets
 from .models import DriftRecord
 
 # Namespaced fingerprint prefix — a sibling of the plan's block headers and the
@@ -238,11 +240,23 @@ def select_path(document: object, path: str) -> object:
     return current
 
 
+@dataclass(frozen=True)
+class _SecretFamily:
+    """One generated org-secret assertion: its switch, identity and comparison."""
+
+    switch: str
+    subject: str
+    intro: str
+    control: Control
+    compare: Callable[[dict, dict, GitHubClient, str], list[str]]
+
+
 def evaluate_controls(
     config: ControlsConfig,
     client: GitHubClient,
     *,
     org: str,
+    config_jsonnet_text: str | None = None,
 ) -> ControlsResult:
     """Assert every row of the table against live state through ``client``.
 
@@ -252,6 +266,11 @@ def evaluate_controls(
     (a drift record), or unreadable (unresolved plus a note — never a record and
     never clean; see the module docstring). ``unassertable`` rows are documented
     in the notes and never touch the client.
+
+    The generated org-secret families run last and only when the policy is
+    enabled AND the committed config text is available: their expectations come
+    from the jsonnet, not from literals in the table, so the config stays the
+    single source of truth for who may read which secret.
     """
     result = ControlsResult()
     cache: dict[str, object | ApiError] = {}
@@ -266,6 +285,12 @@ def evaluate_controls(
             )
             continue
         _evaluate_control(control, client, org=org, cache=cache, result=result)
+
+    policy = config.org_secrets
+    if policy is not None and policy.enabled and config_jsonnet_text is not None:
+        _evaluate_org_secrets(
+            policy, client, org=org, jsonnet_text=config_jsonnet_text, result=result
+        )
 
     return result
 
@@ -350,6 +375,191 @@ def _evaluate_control(
             key=control.key, scope=scope, status=DRIFT, expected=expected, actual=rendered
         )
     )
+
+
+def _evaluate_org_secrets(
+    policy: OrgSecretsPolicy,
+    client: GitHubClient,
+    *,
+    org: str,
+    jsonnet_text: str,
+    result: ControlsResult,
+) -> None:
+    """Assert live org-secret metadata against the committed declarations.
+
+    Otterdog cannot police these: nine of the ten committed secrets carry a
+    ``'********'`` dummy value, so its plan skips them for live patching and a
+    widened visibility or a hand-edited reader list never shows up as a diff.
+    Each family yields at most ONE aggregate record whose body lists every
+    offender — stable identity, volatile body, exactly what the reconciler's
+    update-in-place lifecycle is built for.
+    """
+    declared = extract_declared_org_secrets(jsonnet_text)
+    families = [f for f in _ORG_SECRET_FAMILIES if getattr(policy, f.switch)]
+    if not families:
+        return
+
+    try:
+        live_secrets = client.list_org_secrets(org)
+    except ApiError as exc:
+        for family in families:
+            _degrade_family(
+                family, org=org, note=f"org-secret list unreadable ({exc})", result=result
+            )
+        return
+
+    live = {raw["name"]: raw for raw in live_secrets if isinstance(raw, dict) and raw.get("name")}
+    for family in families:
+        try:
+            offenders = family.compare(declared, live, client, org)
+        except ApiError as exc:
+            _degrade_family(
+                family, org=org, note=f"{family.subject} unreadable ({exc})", result=result
+            )
+            continue
+        _report_family(family, offenders, org=org, reason=policy.reason, result=result)
+
+
+def _degrade_family(family: _SecretFamily, *, org: str, note: str, result: ControlsResult) -> None:
+    result.unresolved_fingerprints.add(control_fingerprint(family.control, org=org))
+    result.notes.append(f"{family.control.key}: {note}")
+    result.outcomes.append(
+        ControlOutcome(
+            key=family.control.key,
+            scope=_ORG_SCOPE,
+            status=UNRESOLVED,
+            expected="as declared",
+            actual="unreadable",
+        )
+    )
+
+
+def _report_family(
+    family: _SecretFamily,
+    offenders: list[str],
+    *,
+    org: str,
+    reason: str,
+    result: ControlsResult,
+) -> None:
+    control = family.control
+    if not offenders:
+        result.clean_fingerprints.add(control_fingerprint(control, org=org))
+        result.outcomes.append(
+            ControlOutcome(
+                key=control.key,
+                scope=_ORG_SCOPE,
+                status=OK,
+                expected="as declared",
+                actual="as declared",
+            )
+        )
+        return
+
+    detail = "\n".join([family.intro, "", *offenders] + (["", reason.strip()] if reason else []))
+    result.records.append(
+        DriftRecord(
+            org=org,
+            resource=control_resource(control),
+            change_type=CHANGE_TYPE,
+            detail=detail,
+            title_override=f"Unmanaged control drift: {control.title}",
+        )
+    )
+    result.outcomes.append(
+        ControlOutcome(
+            key=control.key,
+            scope=_ORG_SCOPE,
+            status=DRIFT,
+            expected="as declared",
+            actual=f"{len(offenders)} divergence(s)",
+        )
+    )
+
+
+def _compare_visibility(
+    declared: dict[str, object], live: dict[str, dict], client: GitHubClient, org: str
+) -> list[str]:
+    offenders = []
+    for name, secret in sorted(declared.items()):
+        if name not in live:
+            continue  # a missing secret is otterdog's own add/delete diff
+        actual = live[name].get("visibility")
+        if actual != secret.live_visibility:
+            offenders.append(f"- {name}: declared `{secret.live_visibility}`, live `{actual}`")
+    return offenders
+
+
+def _compare_selected_repositories(
+    declared: dict[str, object], live: dict[str, dict], client: GitHubClient, org: str
+) -> list[str]:
+    offenders = []
+    for name, secret in sorted(declared.items()):
+        if name not in live or live[name].get("visibility") != "selected":
+            continue  # only a `selected` secret HAS a reader list to compare
+        actual = set(client.list_org_secret_repositories(org, name))
+        wanted = set(secret.selected_repositories)
+        extra = sorted(actual - wanted)
+        absent = sorted(wanted - actual)
+        if extra or absent:
+            offenders.append(f"- {name}: live-only {extra or '[]'}, config-only {absent or '[]'}")
+    return offenders
+
+
+def _compare_undeclared(
+    declared: dict[str, object], live: dict[str, dict], client: GitHubClient, org: str
+) -> list[str]:
+    return [f"- {name}" for name in sorted(set(live) - set(declared))]
+
+
+def _family_control(key: str, title: str) -> Control:
+    """A synthetic row so a generated family shares the table's identity rules."""
+    return Control(key=key, scope=_ORG_SCOPE, title=title)
+
+
+_ORG_SECRET_FAMILIES: tuple[_SecretFamily, ...] = (
+    _SecretFamily(
+        switch="assert_visibility",
+        subject="org-secret visibility",
+        intro=(
+            "Live org-secret visibility diverges from the committed declaration. "
+            "A widened visibility hands the credential to repositories nobody "
+            "reviewed for it."
+        ),
+        control=_family_control(
+            "org-secret-visibility", "org-secret visibility diverges from the committed config"
+        ),
+        compare=_compare_visibility,
+    ),
+    _SecretFamily(
+        switch="assert_selected_repositories",
+        subject="org-secret reader lists",
+        intro=(
+            "The repositories a `selected` org secret is shared with diverge from "
+            "the committed list. A live-only entry is an unreviewed reader; a "
+            "config-only entry is a consumer whose workflows now resolve the "
+            "secret to an empty string, with no error."
+        ),
+        control=_family_control(
+            "org-secret-repositories",
+            "org-secret reader lists diverge from the committed config",
+        ),
+        compare=_compare_selected_repositories,
+    ),
+    _SecretFamily(
+        switch="assert_no_undeclared",
+        subject="org-secret inventory",
+        intro=(
+            "Live org secrets with no committed declaration. Each is an "
+            "unreviewed credential: nothing records who created it, what reads "
+            "it, or when it should be rotated."
+        ),
+        control=_family_control(
+            "org-secret-undeclared", "undeclared org secrets exist in the live organization"
+        ),
+        compare=_compare_undeclared,
+    ),
+)
 
 
 def _record(control: Control, *, org: str, endpoint: str, actual: object) -> DriftRecord:

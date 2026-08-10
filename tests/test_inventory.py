@@ -10,6 +10,7 @@ committed jsonnet, verified here against the known committed set.
 from __future__ import annotations
 
 from drift_layer.inventory import (
+    extract_declared_org_secrets,
     extract_declared_repos,
     missing_resource,
     sweep_inventory,
@@ -137,3 +138,66 @@ def test_sweep_reports_both_kinds_together_sorted() -> None:
     assert undeclared_resource("rogue") in resources
     assert missing_resource("ghost") in resources
     assert len(records) == 2
+
+
+# --- declared org secrets (issue #116) -----------------------------------------
+
+
+def test_extract_declared_org_secrets_matches_committed_set(
+    declared_jsonnet: str, declared_org_secrets: dict[str, tuple[str, tuple[str, ...]]]
+) -> None:
+    declared = extract_declared_org_secrets(declared_jsonnet)
+    assert set(declared) == set(declared_org_secrets)
+    for name, (visibility, repositories) in declared_org_secrets.items():
+        assert declared[name].visibility == visibility
+        assert tuple(sorted(declared[name].selected_repositories)) == repositories
+
+
+def test_declared_org_secret_maps_otterdog_public_onto_the_api_value() -> None:
+    # otterdog's schema says `public` where the REST API says `all`; comparing
+    # the raw strings would report every org-wide secret as drift.
+    text = "orgs.newOrgSecret('WIDE') {\n  value: '********',\n}\n"
+    (secret,) = extract_declared_org_secrets(text).values()
+    assert secret.visibility == "public"  # the vendored newOrgSecret default
+    assert secret.live_visibility == "all"
+
+
+def test_extract_declared_org_secrets_reads_visibility_and_repositories() -> None:
+    text = """
+    orgs.newOrgSecret('SCOPED') {
+      selected_repositories+: [
+        'beta',
+        'alpha',
+      ],
+      value: '********',
+      visibility: 'selected',
+    },
+    """
+    (secret,) = extract_declared_org_secrets(text).values()
+    assert secret.name == "SCOPED"
+    assert secret.visibility == "selected"
+    assert secret.live_visibility == "selected"
+    assert secret.selected_repositories == ("beta", "alpha")
+
+
+def test_extract_declared_org_secrets_ignores_repo_secrets_and_comments() -> None:
+    # newRepoSecret( shares no constructor with newOrgSecret( but sits inside
+    # repository blocks that the org-secret sweep must never absorb.
+    text = """
+    orgs.newOrgSecret('REAL') {
+      value: '********',
+      visibility: 'selected',
+      selected_repositories+: ['one'],
+    },
+    // orgs.newOrgSecret('COMMENTED_OUT') {},
+    orgs.newRepo('tessera') {
+      secrets: [
+        orgs.newRepoSecret('APP_SYNC_ISSUES_ID') {
+          value: '********',
+        },
+      ],
+    },
+    """
+    declared = extract_declared_org_secrets(text)
+    assert set(declared) == {"REAL"}
+    assert declared["REAL"].selected_repositories == ("one",)

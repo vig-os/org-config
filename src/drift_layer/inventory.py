@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from .allowlist import load_unmanaged
 from .models import DriftRecord
@@ -35,12 +36,28 @@ from .models import DriftRecord
 # `newRepoSecret(` / `newRepoVariable(`, which share the `newRepo` prefix.
 _NEW_REPO_RE = re.compile(r"\bnewRepo\(\s*'(?P<name>[^']+)'\s*\)")
 
+# `orgs.newOrgSecret('<NAME>')` — the ORG secret constructor, deliberately not
+# `newRepoSecret(`: repo-scoped secrets live inside repository blocks and belong
+# to a different scope entirely (ten of them are committed today).
+_NEW_ORG_SECRET_RE = re.compile(r"\bnewOrgSecret\(\s*'(?P<name>[^']+)'\s*\)")
+_VISIBILITY_RE = re.compile(r"\bvisibility:\s*'(?P<value>[^']*)'")
+_SELECTED_REPOS_RE = re.compile(r"\bselected_repositories\+?:\s*\[")
+_QUOTED_RE = re.compile(r"'(?P<value>[^']*)'")
+
 # Strip `//` line comments before matching so a commented-out example
 # declaration can never inject a phantom declared repo.
 _LINE_COMMENT_RE = re.compile(r"//.*$")
 
 _UNDECLARED_PREFIX = "repository-inventory"
 _MISSING_PREFIX = "repository-inventory-missing"
+
+# The vendored `newOrgSecret` default (otterdog-defaults.libsonnet), so a
+# declaration that omits `visibility` is read exactly as otterdog evaluates it.
+_DEFAULT_VISIBILITY = "public"
+
+# otterdog's schema says `public` where the REST API says `all`; the model does
+# the same translation on both read and write (organization_secret.py).
+_VISIBILITY_TO_LIVE = {"public": "all"}
 
 
 def undeclared_resource(name: str) -> str:
@@ -65,6 +82,82 @@ def extract_declared_repos(jsonnet_text: str) -> set[str]:
         line = _LINE_COMMENT_RE.sub("", raw_line)
         names.update(m.group("name") for m in _NEW_REPO_RE.finditer(line))
     return names
+
+
+@dataclass(frozen=True)
+class DeclaredOrgSecret:
+    """One committed ``orgs.newOrgSecret(...)`` declaration's live-visible half.
+
+    Secret *values* are never comparable (the API does not return them and nine
+    of the ten committed declarations carry a `'********'` dummy), so the
+    declaration's assertable content is exactly who may read it.
+    """
+
+    name: str
+    visibility: str = _DEFAULT_VISIBILITY
+    selected_repositories: tuple[str, ...] = ()
+
+    @property
+    def live_visibility(self) -> str:
+        """The declared visibility in the REST API's own vocabulary."""
+        return _VISIBILITY_TO_LIVE.get(self.visibility, self.visibility)
+
+
+def extract_declared_org_secrets(jsonnet_text: str) -> dict[str, DeclaredOrgSecret]:
+    """Extract the declared org secrets from committed otterdog config text.
+
+    Same strict-literal doctrine as :func:`extract_declared_repos` (see the
+    module docstring), extended from ``newRepo`` to ``newOrgSecret``: comments
+    are stripped first, each block is read from its constructor to its matching
+    closing brace, and only literal ``visibility`` / ``selected_repositories``
+    entries are taken. Faithful because the vendored ``newOrgSecret`` supplies
+    plain literal defaults and nothing in the committed file computes either
+    field, so the text IS the evaluated value — and ``jsonnetfmt --test`` is an
+    L0 gate, so the block shape cannot drift underneath the reader.
+    """
+    secrets: dict[str, DeclaredOrgSecret] = {}
+    name: str | None = None
+    depth = 0
+    visibility = _DEFAULT_VISIBILITY
+    selected: list[str] = []
+    in_list = False
+
+    for raw_line in jsonnet_text.splitlines():
+        line = _LINE_COMMENT_RE.sub("", raw_line)
+        if name is None:
+            match = _NEW_ORG_SECRET_RE.search(line)
+            if match is None:
+                continue
+            name = match.group("name")
+            visibility, selected, in_list = _DEFAULT_VISIBILITY, [], False
+            depth = line.count("{") - line.count("}")
+            if depth <= 0:  # `newOrgSecret('X') {}` on one line
+                secrets[name] = DeclaredOrgSecret(name=name)
+                name = None
+            continue
+
+        if in_list:
+            selected.extend(m.group("value") for m in _QUOTED_RE.finditer(line))
+            in_list = "]" not in line
+        else:
+            list_match = _SELECTED_REPOS_RE.search(line)
+            if list_match is not None:
+                tail = line[list_match.end() :]
+                selected.extend(m.group("value") for m in _QUOTED_RE.finditer(tail))
+                in_list = "]" not in tail
+            else:
+                visibility_match = _VISIBILITY_RE.search(line)
+                if visibility_match is not None:
+                    visibility = visibility_match.group("value")
+
+        depth += line.count("{") - line.count("}")
+        if depth <= 0:
+            secrets[name] = DeclaredOrgSecret(
+                name=name, visibility=visibility, selected_repositories=tuple(selected)
+            )
+            name = None
+
+    return secrets
 
 
 def sweep_inventory(
