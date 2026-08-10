@@ -95,7 +95,25 @@ permanent noise, degrading the whole channel.
 
 ## Corrections
 
-<!-- None yet. Preserve superseded assumptions here with date + source when caught. -->
+<!-- Preserve superseded assumptions here with date + source when caught. -->
+
+- **2026-08-10 — "the Otterdog plan is the sole drift signal" is superseded (issue
+  [#116](https://github.com/vig-os/org-config/issues/116)).** The Context above frames the drift layer as a wrapper around
+  *the engine's diff*, which silently assumed every governed control is expressible in Otterdog's schema. It is not.
+  Actions SHA-pinning, the fork-PR approval policy, the six org-level new-repository security defaults, and org-secret
+  metadata have no field in that schema, so they appear in no plan diff at all — and org-secret metadata is worse than
+  absent: nine of the ten committed secrets carry a `'********'` dummy value, so `include_for_live_patch` is false and
+  Otterdog skips them even though it *does* model the fields. Until #116 these controls could be changed in the UI and
+  nothing in the pipeline would notice. The drift layer therefore gained a second, non-plan **evidence source**: a
+  declarative assertion table (`unmanaged-controls.toml`) read straight from the live REST API, alongside the inventory
+  sweep added for #21.
+  **What this does NOT change:** the decisions above stand in full. Findings are still issue-only, still exactly one
+  deduplicated `drift`+`critical` issue per divergence (under an added `unmanaged-control` label), still updated on
+  recurrence and closed on resolution, and the run still needs only read plus issue-write credentials — every endpoint
+  the new leg touches is a `GET` inside the existing grant. The `managed: false` philosophy is extended rather than
+  bypassed: a knowingly-wrong control declares a `tolerated` value in its own row, keeping the *desired* value on
+  record, instead of being silenced in `drift-allowlist.toml`. Because only the evidence source is new and the response
+  policy is untouched, this is recorded as a correction here rather than as a new ADR.
 
 ## Open questions / supersession triggers
 
