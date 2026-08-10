@@ -28,6 +28,21 @@
 # group so apply-vs-drift is serialized too — a reconciler racing itself (or a
 # concurrent apply) manufactures phantom drift.
 #
+# SUPERSESSION GUARD (#105): the environment approval gates the RUN, not the
+# TREE. Applies queue behind the approval wait, so a later merge to the applied
+# branch can supersede a still-waiting run — approving that older run would
+# mutate live toward a config that is no longer on trunk (incident #99: an
+# approved stale tree recreated three intentionally deleted repos as stubs).
+# Two defenses:
+#   - the ungated, read-only `preview` job below runs the EXACT tree's plan
+#     into this run's job summary, so the approver can inspect the pending
+#     mutation before approving (this repo's own events only);
+#   - the gated job's FIRST step re-checks that `github.sha` is still the tip
+#     of the applied branch and neutral-skips the entire apply otherwise — the
+#     newer queued run carries the superseded delta. Consequence: re-running an
+#     old run can never apply an old tree; to re-apply the CURRENT state, use
+#     `workflow_dispatch` for a fresh run.
+#
 # Trigger scope: only `otterdog.json` / `otterdog/**` and the SOPS secret sources
 # (`secrets/**`, `.sops.yaml`) change apply anything — rotating a secret value
 # (#22, ADR-0003) is a normal PR that must re-apply. Engine or workflow edits
@@ -166,6 +181,32 @@ concurrency:
 permissions: {}
 
 jobs:
+  # Pre-approval plan preview (#105): read-only plan of the EXACT tree this run
+  # would apply, written into this run's job summary so the deployment approver
+  # sees the pending mutation one click from the approve button. Reuses
+  # plan.yml via a local `workflow_call` (single source of the plan harness);
+  # ungated (no environment) because the read path carries the same trust level
+  # as plan.yml on PRs and drift.yml on schedule. THIS REPO'S OWN EVENTS ONLY:
+  # the empty-inputs test below distinguishes an own push/dispatch (inputs
+  # context empty) from a downstream `workflow_call` (inputs default to
+  # 'vig-os'), so downstream callers are unaffected and nested `./` workflow
+  # resolution is never relied on (#56) — a downstream org wires its own
+  # preview beside its apply caller if it wants one. Deliberately NOT a `needs:`
+  # of `apply`: a preview harness failure must never block a legitimate apply,
+  # and the apply pauses on human approval regardless.
+  preview:
+    name: Preview plan for approval
+    if: inputs.org_github_id == ''
+    permissions:
+      contents: read          # checkout of the committed config for the plan
+      # Declared by plan.yml's job and therefore required here by the caller
+      # permission cap; inert on push — the comment step is PR-event-gated.
+      pull-requests: write
+    uses: ./.github/workflows/plan.yml
+    secrets:
+      ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+      ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+
   apply:
     name: Apply committed config to live ${{ inputs.org_github_id || 'vig-os' }}
     # ADR-0007 BINDING: apply runs only from the config repo's own trunk; a fork
@@ -184,12 +225,54 @@ jobs:
     permissions:
       contents: read          # read the committed otterdog config
     steps:
+      # SUPERSESSION GUARD (#105) — must be the FIRST step, because it runs
+      # AFTER the environment approval and that is the only moment the check is
+      # meaningful: any merge that lands while the run waits for approval makes
+      # this tree stale. Compares the run's commit against the LIVE tip of the
+      # applied branch via the API (never the checkout, which is pinned to the
+      # stale sha by definition). On supersession every subsequent step skips
+      # (the report/fail steps already self-skip when the apply step is
+      # skipped), the job stays green, and the summary + notice explain that
+      # the newer queued apply carries the delta. GITHUB_TOKEN with
+      # `contents: read` is sufficient, including for a private downstream
+      # caller repo.
+      - name: Skip if superseded (newer commit on the applied branch)
+        id: supersession
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          tip="$(gh api "repos/${REPO}/commits/${REF_NAME}" --jq .sha)"
+          if [ "${tip}" = "${RUN_SHA}" ]; then
+            echo "superseded=false" >> "$GITHUB_OUTPUT"
+            echo "tree ${RUN_SHA} is the tip of ${REF_NAME} — proceeding with apply"
+          else
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::apply skipped: ${RUN_SHA} is no longer the tip of ${REF_NAME} (now ${tip}); the newer queued apply carries this delta (#105)."
+            {
+              echo "## Apply skipped — superseded tree (#105)"
+              echo
+              echo "This run's tree \`${RUN_SHA}\` is no longer the tip of \`${REF_NAME}\` (now \`${tip}\`)."
+              echo "Applying it would mutate live state toward a config that is no longer on trunk,"
+              echo "so the apply was skipped entirely; the queued apply for the newer commit carries"
+              echo "this delta. Nothing was applied. To re-apply the current state, dispatch a fresh run."
+              echo
+              echo "[Run log](${RUN_URL})"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Checkout repository
+        if: steps.supersession.outputs.superseded != 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
 
       - name: Set up uv
+        if: steps.supersession.outputs.superseded != 'true'
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
 
       # Otterdog version pin: on this repo's own events, justfile.project
@@ -197,6 +280,7 @@ jobs:
       # callers check out THEIR repo (no justfile.project — template/ ships none,
       # issue #56), so they pass the pin as the `otterdog_version` input instead.
       - name: Resolve otterdog version pin
+        if: steps.supersession.outputs.superseded != 'true'
         env:
           OTTERDOG_VERSION_INPUT: ${{ inputs.otterdog_version || '' }}
         run: |
@@ -222,6 +306,7 @@ jobs:
       # private identity from `SOPS_AGE_KEY` (a bootstrap env secret), so no
       # separate `age` binary or key file is needed.
       - name: Install sops (pinned, checksum-verified)
+        if: steps.supersession.outputs.superseded != 'true'
         env:
           SOPS_VERSION: v3.13.1
           SOPS_SHA256: 620a9d7e3352ababeca6908cea24a6e8b14ce89a448ddbd3f94f1ef3398f470a
@@ -241,7 +326,7 @@ jobs:
       # ciphertext is present; a no-op otherwise. NO `set -x` — values are piped,
       # never printed, and masked defensively.
       - name: Decrypt SOPS secrets into apply-time pass store
-        if: hashFiles('secrets/*.yaml') != ''
+        if: steps.supersession.outputs.superseded != 'true' && hashFiles('secrets/*.yaml') != ''
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
         run: |
@@ -306,6 +391,7 @@ jobs:
       # zizmor.yml, which would silently exempt future edits of this file).
       - name: Mint full App installation token (unnarrowed, org-wide)
         id: app-token
+        if: steps.supersession.outputs.superseded != 'true'
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3 # zizmor: ignore[github-app]
         with:
           client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
@@ -314,6 +400,7 @@ jobs:
 
       - name: Run otterdog apply (mutating, committed config)
         id: apply
+        if: steps.supersession.outputs.superseded != 'true'
         env:
           # The `env` credential provider reads the token from this variable.
           OTTERDOG_TOKEN: ${{ steps.app-token.outputs.token }}
