@@ -20,16 +20,6 @@ on:  # yamllint disable-line rule:truthy
         required: false
         default: false
         type: boolean
-      git_user_name:
-        description: "Git user name for release commits"
-        required: false
-        default: "github-actions[bot]"
-        type: string
-      git_user_email:
-        description: "Git user email for release commits"
-        required: false
-        default: "41898282+github-actions[bot]@users.noreply.github.com"
-        type: string
       rc_number:
         description: "Candidate RC index (e.g. 21 for X.Y.Z-rc21). Omit to auto-increment from existing tags."
         required: false
@@ -96,6 +86,15 @@ on:  # yamllint disable-line rule:truthy
       finalize_sha:
         description: "Release branch SHA after finalization"
         value: ${{ jobs.finalize.outputs.finalize_sha }}
+      finalize_result:
+        # jobs.finalize.result would be the natural source, but actionlint's
+        # jobs-context type for workflow_call outputs only carries `outputs`,
+        # so the ran/skipped signal is derived from a first-step marker.
+        description: "'ran' when the finalize job started, 'skipped' when it never ran (#1462)"
+        value: ${{ jobs.finalize.outputs.finalize_ran == 'true' && 'ran' || 'skipped' }}
+      finalize_commit_sha:
+        description: "Exact commit SHA the finalize job pushed (empty when none) (#1462)"
+        value: ${{ jobs.finalize.outputs.finalize_commit_sha }}
       tag_already_exists:
         description: "Remote publish tag already exists at finalize SHA (retry path)"
         value: ${{ jobs.finalize.outputs.tag_already_exists }}
@@ -378,6 +377,7 @@ jobs:
       actions: read
       contents: read
       packages: read
+      pull-requests: read    # bot-PR metadata for changelog synthesis (#1423)
     container:
       image: ${{ inputs.toolchain_image }}
       credentials:
@@ -391,8 +391,19 @@ jobs:
     outputs:
       finalize_sha: ${{ steps.finalize.outputs.finalize_sha }}
       tag_already_exists: ${{ steps.tag_state.outputs.tag_already_exists }}
+      # Exact commit this job pushed: the caller's rollback job refuses to
+      # touch the branch unless its tip matches what this run wrote (#1462).
+      finalize_commit_sha: ${{ steps.finalize_commit.outputs.commit-sha }}
+      # Set by the first step, so a skipped job yields an empty string: the
+      # rollback job must not touch the branch when finalize never ran (#1462).
+      finalize_ran: ${{ steps.started.outputs.value }}
 
     steps:
+      # Ran/skipped marker for the finalize_result workflow output (#1462).
+      - name: Mark finalize as started
+        id: started
+        run: echo "value=true" >> "$GITHUB_OUTPUT"
+
       - name: Generate commit app token
         id: commit_app_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
@@ -432,6 +443,21 @@ jobs:
         with:
           mode: ${{ inputs.toolchain_mode }}
           devkit-version: ${{ inputs.devkit_version }}
+
+      # Regenerate the bot-entry block inside [VERSION] - TBD before stamping
+      # the date: any bot PR merged into the release branch mid-train is
+      # reachable from HEAD here, so it cannot ship unchronicled (#1423).
+      # Candidates stay changelog-neutral, matching the rest of finalize.
+      - name: Synthesize bot changelog entries
+        if: ${{ inputs.release_kind == 'final' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          TAG_PREFIX: ${{ inputs.tag_prefix }}
+        run: |
+          set -euo pipefail
+          synthesize-bot-changelog --version "$VERSION" --tag-prefix "$TAG_PREFIX"
 
       - name: Finalize CHANGELOG date
         if: ${{ inputs.release_kind == 'final' }}
@@ -494,6 +520,7 @@ jobs:
 
       - name: Commit and push finalization changes via API
         if: ${{ inputs.release_kind == 'final' }}
+        id: finalize_commit
         uses: vig-os/commit-action@0361e9aa65b64711a18286ac5dfdcba7cc7a2ac7  # v0.3.2
         env:
           GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
@@ -527,7 +554,7 @@ jobs:
           retry --retries 2 --backoff 5 --max-backoff 20 -- \
             gh workflow run sync-issues.yml \
               --ref "release/$VERSION" \
-              -f "target-branch=release/$VERSION"
+              -f "target-branch=sync/issue-mirror"
 
       - name: Wait for sync-issues completion
         if: ${{ inputs.release_kind == 'final' }}
@@ -583,6 +610,72 @@ jobs:
 
       - name: Pull sync-issues changes
         if: ${{ inputs.release_kind == 'final' }}
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "release/$VERSION"
+          git reset --hard "origin/release/$VERSION"
+
+      # Rendered by init-workspace.sh (#1424): DEVKIT_SYNC_TARGET mirror mode.
+      # The sync dispatch above targeted the mirror, so the release branch has
+      # no archive yet; fold the mirror's snapshot dirs in, then re-pull so
+      # the finalize SHA (the tag target) includes the fold commit. A missing
+      # mirror or an already-identical archive is a clean no-op. commit-action
+      # only adds/updates files — a path deleted on the mirror survives on the
+      # release branch until it is removed by hand (archives only grow, so
+      # this stays theoretical).
+      - name: Stage sync mirror archive for fold
+        if: ${{ inputs.release_kind == 'final' }}
+        id: mirror_fold
+        run: |
+          set -euo pipefail
+          MIRROR_REF="$(retry --retries 3 --backoff 3 --max-backoff 20 -- git ls-remote origin "refs/heads/sync/issue-mirror")"
+          if [ -z "$MIRROR_REF" ]; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "Mirror branch 'sync/issue-mirror' not found; skipping fold."
+            exit 0
+          fi
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "sync/issue-mirror"
+          staged=false
+          for dir in docs/issues docs/pull-requests; do
+            if git rev-parse -q --verify "FETCH_HEAD:${dir}" >/dev/null; then
+              git checkout FETCH_HEAD -- "${dir}"
+              staged=true
+            fi
+          done
+          if [ "$staged" != "true" ]; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "Mirror carries no snapshot dirs; skipping fold."
+            exit 0
+          fi
+          CHANGED="$(git status --porcelain -- docs/issues docs/pull-requests | awk '{print $2}')"
+          if [ -z "$CHANGED" ]; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "Release branch already matches the mirror archive; nothing to fold."
+            exit 0
+          fi
+          {
+            echo "file_paths<<PATHS_EOF"
+            printf '%s\n' "$CHANGED"
+            echo "PATHS_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "eligible=true" >> "$GITHUB_OUTPUT"
+          echo "Folding $(printf '%s\n' "$CHANGED" | wc -l) mirror archive path(s) into the release branch."
+
+      - name: Commit folded archive to the release branch
+        if: ${{ steps.mirror_fold.outputs.eligible == 'true' }}
+        uses: vig-os/commit-action@0361e9aa65b64711a18286ac5dfdcba7cc7a2ac7  # v0.3.2
+        env:
+          GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: refs/heads/release/${{ needs.validate.outputs.version }}
+          MAX_ATTEMPTS: "3"
+          COMMIT_MESSAGE: "chore: fold sync mirror archive into release ${{ needs.validate.outputs.version }}"
+          FILE_PATHS: ${{ steps.mirror_fold.outputs.file_paths }}
+
+      - name: Re-pull release branch after fold
+        if: ${{ steps.mirror_fold.outputs.eligible == 'true' }}
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |

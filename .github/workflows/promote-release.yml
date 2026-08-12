@@ -714,3 +714,56 @@ jobs:
             esac
           done
           echo "✓ Floating tag move complete for ${RELEASE_TAG}"
+
+  # Rendered by init-workspace.sh (#1424): DEVKIT_SYNC_TARGET mirror mode.
+  reset-sync-mirror:
+    name: Reset sync mirror onto main
+    needs: [resolve-toolchain, merge]
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ needs.resolve-toolchain.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_PULL_TOKEN || github.token }}
+    timeout-minutes: 5
+    if: ${{ needs.merge.result == 'success' }}
+    permissions:
+      contents: read
+      packages: read
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up devkit toolchain
+        uses: ./.github/actions/setup-devkit-toolchain
+        with:
+          mode: ${{ needs.resolve-toolchain.outputs.mode }}
+          devkit-version: ${{ needs.resolve-toolchain.outputs.image-tag }}
+
+      - name: Generate commit app token
+        id: commit_app_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
+
+      - name: Force-reset mirror to main
+        env:
+          APP_TOKEN: ${{ steps.commit_app_token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # After the merged release PR, main carries the folded archive; the
+          # mirror re-bases onto it so divergence stays bounded (#1424). Push,
+          # never the REST refs API (#1157, #1377). The mirror is unprotected
+          # and its history is regenerated state — a force reset loses
+          # nothing; a racing nightly sync self-heals at its next run.
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin main
+          MAIN_SHA="$(git rev-parse origin/main)"
+          REMOTE_URL="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          retry --retries 3 --backoff 5 --max-backoff 30 -- git push --force "$REMOTE_URL" "${MAIN_SHA}:refs/heads/sync/issue-mirror"
+          echo "Mirror 'sync/issue-mirror' reset to main @ ${MAIN_SHA}"
