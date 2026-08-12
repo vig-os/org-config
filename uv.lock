@@ -137,7 +137,7 @@ dev = [
 dev = [
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-cov", specifier = "==7.1.0" },
-    { name = "ruff", specifier = "==0.15.22" },
+    { name = "ruff", specifier = "==0.16.2" },
 ]
 
 [[package]]
