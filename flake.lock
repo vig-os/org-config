@@ -1,5 +1,45 @@
 {
   "nodes": {
+    "crane": {
+      "locked": {
+        "lastModified": 1785782307,
+        "narHash": "sha256-MPaRdVkf6zZP5fCPxYCi8Dr4pZzgmXzg8T9nVEbp3Mw=",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "2c71e194474d13de031d729b729c968ddbe3507f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ipetkov",
+        "repo": "crane",
+        "type": "github"
+      }
+    },
+    "fenix": {
+      "inputs": {
+        "nixpkgs": [
+          "vigos",
+          "nixpkgs"
+        ],
+        "rust-analyzer-src": [
+          "vigos",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786432497,
+        "narHash": "sha256-iunnvo2ZqbFOwp/LXL3vtlbaG+45FuiHk+YKpbSoAec=",
+        "owner": "nix-community",
+        "repo": "fenix",
+        "rev": "45d045a58ed69993eb1d349a86def638fea93a9f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "fenix",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -214,6 +254,8 @@
     },
     "vigos": {
       "inputs": {
+        "crane": "crane",
+        "fenix": "fenix",
         "flake-utils": "flake-utils",
         "git-hooks-nix": "git-hooks-nix",
         "home-manager": "home-manager",
@@ -224,11 +266,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1786543777,
-        "narHash": "sha256-7o9rWzEaDrEZQzIHCdqotZNEgWzW1HtIanS0sVEn+6w=",
+        "lastModified": 1786635757,
+        "narHash": "sha256-VaKNvqKF2Ak8MlimXj48wXyiTXbPGMZx9ZE6mCXjPic=",
         "owner": "vig-os",
         "repo": "devkit",
-        "rev": "eb314ff6d5f05d6829c65d6b575441a4d5cf7e5b",
+        "rev": "331ca550f2267ec62996a3e49a75d892f4a281cd",
         "type": "github"
       },
       "original": {
