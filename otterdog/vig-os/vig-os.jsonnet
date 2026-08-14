@@ -13,7 +13,7 @@ orgs.newOrg('vig-os', 'vig-os') {
     // by `otterdog apply`. A UI-created repo bypasses every default this config
     // exists to enforce and is never cleaned up automatically — apply creates
     // what the config declares but deliberately does not delete what it omits
-    // (apply.yml:72-73), so an undeclared repo surfaces only as an inventory
+    // (apply.yml:87), so an undeclared repo surfaces only as an inventory
     // drift issue (#21) and is removed by hand. Owners can always create
     // regardless of these flags; for them this stays discipline plus the drift
     // sweep (#121).
