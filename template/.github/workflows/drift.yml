@@ -4,11 +4,12 @@
 # `drift`/`critical` issues (ADR-0002). It mutates only THIS repo's issues, never
 # org state, so a Free-plan org may run it before the Team upgrade.
 #
-# CAVEAT (drift-layer dependency): the reusable `drift` workflow runs the in-house
-# `drift-layer` reconciler from the CALLER checkout. Until the shared drift layer
-# is published/vendored as a versioned artifact (issue #24 follow-up), a
-# downstream repo that has not vendored it cannot run this leg — keep drift
-# disabled and rely on `plan` for read-only coverage in the interim.
+# SELF-CONTAINED (issue #169): the reusable `drift` workflow reads the committed
+# config, `drift-allowlist.toml` and `unmanaged-controls.toml` from THIS repo's
+# checkout, and runs the in-house `drift-layer` reconciler from a second checkout
+# of the public engine repo at the exact SHA pinned in `uses:` below — no
+# vendoring in this repo, and the engine code can never skew from the pinned
+# workflow. Nothing to configure beyond the pin.
 #
 # PIN (ADR-0006, BINDING): replace `@vX.Y.Z` with a released tag of
 # vig-os/org-config (SHA for medtech; keep the tag in a trailing comment).

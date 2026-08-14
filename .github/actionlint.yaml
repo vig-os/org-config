@@ -1,0 +1,15 @@
+# actionlint configuration.
+#
+# The single ignore below is a TOOL-LAG suppression, not a baseline (issue
+# #169): `job.workflow_sha` — "the commit SHA of the workflow file that
+# defines the current job", i.e. inside a reusable workflow the exact SHA the
+# caller pins in `uses:` — is documented in the GitHub contexts reference
+# (github.com only; not on GHES) and supersedes the buggy
+# `github.job_workflow_sha` (actions/runner#2417). actionlint's `job` context
+# type (<= 1.7.12) still models only {check_run_id, container, services,
+# status} and flags the property as undefined. Scoped to drift.yml and to this
+# exact message; drop it once actionlint learns the property.
+paths:
+  .github/workflows/drift.yml:
+    ignore:
+      - 'property "workflow_sha" is not defined in object type'

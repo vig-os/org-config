@@ -125,12 +125,11 @@ Per ADR-0006, a **Free-plan** org runs **plan-first / read-only**:
 
 - Wire the **plan** caller (`.github/workflows/plan.yml`) immediately — it only
   reads, and gives useful review-time coverage.
-- **drift** is also read-only (it opens issues, never touches org state), but its
-  reconciler currently needs the shared drift layer present in this repo; until
-  that layer is published/vendored as a versioned artifact (a `vig-os/org-config`
-  follow-up to #24 — the same caveat carried in
-  [`.github/workflows/drift.yml`](.github/workflows/drift.yml)), keep drift
-  disabled and rely on plan.
+- Wire the **drift** caller (`.github/workflows/drift.yml`) too — it is also
+  read-only (it opens issues in this repo, never touches org state) and
+  self-contained: the reconciler runs from a checkout of the public engine repo
+  at the exact SHA pinned in `uses:`, so nothing is vendored here
+  (vig-os/org-config#169).
 - Do **not** wire **apply** yet. A Free private repo has no enforceable branch
   protection, so holding write credentials there is the worst-case blast radius.
 

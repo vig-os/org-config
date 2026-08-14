@@ -68,18 +68,25 @@
 # to scan; NO explicit `ref:` pin is needed. (The old gitflow `ref: dev` pin
 # bridged a released-`main` workflow to dev-resident config between releases;
 # that split is gone under trunk, so the pin is removed.) The `workflow_call` /
-# downstream-caller story is unchanged: a caller's reusable run still reads the
-# committed config, drift-layer code, and allow-list from the CALLER's checkout.
+# downstream-caller story: a caller's reusable run reads the committed config
+# and allow-list from the CALLER's checkout; the drift-layer CODE comes from a
+# second, engine checkout (see below).
 
-# REUSABLE INTERFACE (issue #24, ADR-0006): this workflow ALSO exposes
+# REUSABLE INTERFACE (issues #24/#169, ADR-0006): this workflow ALSO exposes
 # `workflow_call` so a downstream org's private `org-config` repo (from the
 # `template/` skeleton) can run its own scheduled drift, pinned to an exact
 # tag/SHA. A downstream caller owns the `schedule:` trigger in its thin caller
 # workflow and passes its org via `inputs`; the reusable body here reads the
-# committed config, drift-layer code, and allow-list from the CALLER's checkout.
-# Inputs default to `vig-os`/`org-config` and the App credentials fall through to
-# this repo's own bootstrap secrets on a non-`workflow_call` event, so this repo's
-# own daily `schedule` keeps byte-identical semantics.
+# committed config, allow-list and unmanaged-controls table from the CALLER's
+# checkout, while the drift-layer CODE runs from a second checkout of THIS
+# public engine repo at `job.workflow_sha` — the commit SHA of this very
+# reusable-workflow file, i.e. automatically the exact SHA the caller pins in
+# `uses:` (issue #169: single pin, SSoT — engine code and workflow can never
+# skew, and no drift-layer vendoring is required downstream). Inputs default to
+# `vig-os`/`org-config` and the App credentials fall through to this repo's own
+# bootstrap secrets on a non-`workflow_call` event, so this repo's own daily
+# `schedule` keeps byte-identical semantics (the engine checkout is skipped:
+# the primary checkout already IS the engine tree).
 name: Drift
 
 on:  # yamllint disable-line rule:truthy
@@ -243,6 +250,41 @@ jobs:
           fi
           echo "otterdog plan succeeded (exit 0); reconciling drift issues."
 
+      # ENGINE CHECKOUT (downstream callers only, issue #169): the reconcile
+      # step below runs the in-house drift layer (`src/drift_layer/`), which
+      # lives in THIS engine repo — a downstream caller's config-data checkout
+      # has no `src/`, `pyproject.toml` or `uv.lock`. On a downstream run,
+      # check out the engine at `job.workflow_sha` — per the GitHub context
+      # docs, the commit SHA of the workflow file that defines the current
+      # job, i.e. for a reusable-workflow job the exact SHA the caller
+      # pins in `uses:`. Single pin, SSoT: engine code and workflow can never
+      # skew, and the caller's Renovate bump moves both atomically. Guard
+      # first: an empty SHA would silently check out the engine's default
+      # branch (version skew) — fail loudly instead. Placed AFTER the plan leg
+      # so the otterdog plan provably runs on an untouched caller tree. On this
+      # repo's own runs both steps are skipped — the primary checkout already
+      # IS the engine tree, preserving byte-identical own-run semantics.
+      - name: Guard engine pin (downstream callers)
+        if: github.repository != 'vig-os/org-config'
+        env:
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${JOB_WORKFLOW_SHA}" ]; then
+            echo "::error::job.workflow_sha is empty on a downstream run; refusing to check out an unpinned engine tree (issue #169)"
+            exit 1
+          fi
+          echo "Engine checkout pinned to ${JOB_WORKFLOW_SHA}"
+
+      - name: Checkout engine repository (downstream callers)
+        if: github.repository != 'vig-os/org-config'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: vig-os/org-config
+          ref: ${{ job.workflow_sha }}
+          path: .drift-engine
+          persist-credentials: false
+
       # SECOND token, narrowed to issues:write on this repo only — the smallest
       # grant the issue-ops leg needs. Narrowing works fine for issues (unlike
       # the Actions-Variables read the plan leg needs), so the divergence-issue
@@ -290,13 +332,18 @@ jobs:
           # Org selector, via env (never inline `${{ }}` in `run:`). Empty inputs
           # -> vig-os, so `--org`/`--config-jsonnet` are byte-identical here.
           ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
+          # Where the drift-layer PROJECT lives (issue #169): the engine
+          # sub-checkout on downstream runs, this very checkout on own runs.
+          # `uv run --project` only picks the project/lockfile — cwd stays the
+          # caller root, so every data path below stays caller-relative.
+          DRIFT_PROJECT_DIR: ${{ github.repository != 'vig-os/org-config' && '.drift-engine' || '.' }}
         run: |
           set -euo pipefail
           # Tee (stdout+stderr) so the run summary can fence the reconciler's own
           # output — the actions taken plus the per-row control annotations —
           # without teaching the CLI anything about GitHub Actions. `pipefail`
           # keeps the tool's exit code authoritative through the pipe.
-          uv run drift-layer \
+          uv run --project "${DRIFT_PROJECT_DIR}" drift-layer \
             --plan-file plan.txt \
             --repo "${{ github.repository }}" \
             --org "${ORG_GITHUB_ID}" \

@@ -134,9 +134,8 @@ the callers). The private `exo-pet/org-config` repo is the pilot consumer
 ([#25](https://github.com/vig-os/org-config/issues/25)).
 
 A **Free-plan** org onboards read-only first: a private repo on Free has no
-enforceable branch protection, so `plan` (and, once the drift layer is
-available downstream, `drift`) is wired immediately and `apply` waits for the
-Team upgrade.
+enforceable branch protection, so `plan` and `drift` are wired immediately and
+`apply` waits for the Team upgrade.
 
 ## Known limitations
 
@@ -153,10 +152,6 @@ Team upgrade.
   [upstream #695](https://github.com/eclipse-csi/otterdog/issues/695)). Ruleset
   changes are applied by hand via `gh api` until that is fixed upstream; the
   committed jsonnet stays the source of truth.
-- **Downstream drift needs the drift layer in the caller's checkout.** The
-  reusable `drift` workflow runs `drift-layer` from the calling repo, and the
-  layer is not yet published as a versioned artifact — so a downstream repo that
-  has not vendored it runs `plan` only.
 
 ## Working in this repo
 
