@@ -499,11 +499,14 @@ orgs.newOrg('vig-os', 'vig-os') {
             'refs/heads/main',
           ],
           required_pull_request+: {
-            // A human must approve the smoke release PR: workflow-token
-            // approvals are blocked org-wide, and the dispatch listener's
-            // final-release gate polls `reviewDecision`, which GitHub only
-            // computes when reviews are required (vig-os/devkit#1391).
-            required_approving_review_count: 1,
+            // No human review: the repo is bot-authored release-validation
+            // scaffolding, and the dispatch listener's approval gate that
+            // needed `reviewDecision` to be computable (vig-os/devkit#1391)
+            // is removed by vig-os/devkit#1506. The operative controls are
+            // the required CI Summary check and devkit's published-smoke-
+            // release validation at promote; count-0-with-required-checks
+            // matches devkit's own Dev and Release protections (#167).
+            required_approving_review_count: 0,
           },
           required_status_checks+: {
             status_checks: [
