@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`devkit-smoke-test` Main protection no longer requires a human review** ([#167](https://github.com/vig-os/org-config/issues/167)): `required_approving_review_count` drops from 1 to 0. The requirement existed only so the dispatch listener's final-release gate could poll `reviewDecision`, which GitHub computes solely when the base branch requires reviews ([vig-os/devkit#1391](https://github.com/vig-os/devkit/issues/1391)) — a workaround, not a control: the release PR it guarded is entirely bot-authored scaffolding, so the approval carried no information. That gate is removed in devkit by [vig-os/devkit#1506](https://github.com/vig-os/devkit/issues/1506), part of the single-approval release train ([vig-os/devkit#1504](https://github.com/vig-os/devkit/issues/1504)); the operative controls are the ruleset's required `CI Summary` status check and devkit's published-smoke-release validation at promote, and count-0-with-required-checks matches devkit's own Dev and Release protections. Everything else in the ruleset is unchanged. **Sequencing:** this must be applied together with the devkit-side listener change, both before the next devkit release train — either half alone breaks the train (old poll + count 0 → empty `reviewDecision` → timeout; new listener + count 1 → unapprovable merge).
+
 ### Deprecated
 
 ### Removed
