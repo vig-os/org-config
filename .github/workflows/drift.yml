@@ -152,7 +152,16 @@ jobs:
     if: github.repository == format('{0}/{1}', inputs.org_github_id || 'vig-os', inputs.config_repo || 'org-config')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    permissions: {}
+    # `contents: read`, not `{}` (issue #173): every downstream caller is a
+    # PRIVATE repo (ADR-0006), and a zero-scope GITHUB_TOKEN cannot even read
+    # the private repo it runs in — the caller-checkout step fails with
+    # `fatal: repository not found`. This repo never noticed because it is
+    # public, where the zero-scope token still reads. Read-only stays the
+    # security model: the token can now READ the caller's tree (which the
+    # checkout already materializes) and nothing else; all org reads and issue
+    # writes remain on the two App tokens below.
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         # Default checkout ref (the triggering ref, trunk `main`): under the
