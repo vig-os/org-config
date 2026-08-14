@@ -17,9 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **The reusable `drift` workflow can now check out a private downstream caller** ([#173](https://github.com/vig-os/org-config/issues/173)): the drift job declared `permissions: {}`, so the caller-checkout step failed with `fatal: repository not found` on every private consumer — a zero-scope `GITHUB_TOKEN` cannot read the private repo it runs in, and every downstream org-config repo is private by design (ADR-0006). The engine repo never hit it because it is public. Found by the first real downstream run (exo-pet, pinned at v1.2.0) immediately after [#169](https://github.com/vig-os/org-config/issues/169) unblocked the drift leg. The job now grants `contents: read` — matching the reusable `plan`/`apply` jobs and the header's read-only security model; org reads and issue writes stay exclusively on the two App tokens.
-
 ### Security
+
+## [1.2.1] - TBD
+
+### Fixed
+
+- **The reusable `drift` workflow can now check out a private downstream caller** ([#173](https://github.com/vig-os/org-config/issues/173)): the drift job declared `permissions: {}`, so the caller-checkout step failed with `fatal: repository not found` on every private consumer — a zero-scope `GITHUB_TOKEN` cannot read the private repo it runs in, and every downstream org-config repo is private by design (ADR-0006). The engine repo never hit it because it is public. Found by the first real downstream run (exo-pet, pinned at v1.2.0) immediately after [#169](https://github.com/vig-os/org-config/issues/169) unblocked the drift leg. The job now grants `contents: read` — matching the reusable `plan`/`apply` jobs and the header's read-only security model; org reads and issue writes stay exclusively on the two App tokens.
 
 ## [v1.2.0](https://github.com/vig-os/org-config/releases/tag/v1.2.0) - 2026-08-14
 
