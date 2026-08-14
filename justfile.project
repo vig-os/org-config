@@ -139,17 +139,49 @@ validate:
 # services *args:
 #     nix run .#services -- {{args}}
 #
-# # Prepare release branch (manual workflow dispatch helper)
-# [group('release')]
-# prepare-release version:
-#     gh workflow run prepare-release.yml --ref dev -f "version={{ version }}"
+# ===============================================================================
+# RELEASE HELPERS
+# ===============================================================================
+# Thin `gh workflow run` wrappers for the release train documented in
+# docs/DOWNSTREAM_RELEASE.md (which advertises `just changelog-preview` and
+# `just promote-release`, so they have to exist here — that doc is devkit-managed
+# and cannot be edited in this repo).
 #
-# # Finalize and publish release (manual workflow dispatch helper)
-# [group('release')]
-# finalize-release version:
-#     gh workflow run release.yml --ref release/{{ version }} -f "version={{ version }}" -f "release-kind=final" -f "dry-run=false"
+# TRUNK model (`.vig-os` DEVKIT_WORKFLOW=trunk): `prepare-release` dispatches
+# from `main`; every later step dispatches from the `release/X.Y.Z` branch that
+# prepare created. Under the gitflow default this first ref would be `dev`.
 #
-# # Publish candidate release (manual workflow dispatch helper)
-# [group('release')]
-# publish-candidate version:
-#     gh workflow run release.yml --ref release/{{ version }} -f "version={{ version }}" -f "release-kind=candidate" -f "dry-run=false"
+# Order: changelog-preview -> prepare-release -> (review + approve the PR) ->
+# publish-candidate* -> finalize-release -> RE-APPROVE the PR -> promote-release.
+# The re-approval is not optional: finalize pushes to the release branch, and
+# `Main protection` dismisses stale reviews on push, so the approval that
+# authorized the final dispatch is already gone when promote validates it
+# (vig-os/devkit#1474).
+
+# Preview the bot-PR changelog block the release will synthesize (read-only)
+[group('release')]
+changelog-preview:
+    @prefix="$(sed -n 's/^DEVKIT_TAG_PREFIX=//p' .vig-os)"; \
+    repo="$(sed -n 's/^DEVKIT_REPO=//p' .vig-os)"; \
+    synthesize-bot-changelog --changelog CHANGELOG.md --tag-prefix "$prefix" \
+        --repo-url "https://github.com/$repo" --github-repository "$repo" --dry-run
+
+# Freeze the changelog, cut release/X.Y.Z and open the draft release PR
+[group('release')]
+prepare-release version:
+    gh workflow run prepare-release.yml --ref main -f "version={{ version }}"
+
+# Publish a release candidate (tag only; changelog-neutral)
+[group('release')]
+publish-candidate version:
+    gh workflow run release.yml --ref release/{{ version }} -f "version={{ version }}" -f "release-kind=candidate" -f "dry-run=false"
+
+# Stamp the changelog date, tag X.Y.Z and create the draft GitHub Release
+[group('release')]
+finalize-release version:
+    gh workflow run release.yml --ref release/{{ version }} -f "version={{ version }}" -f "release-kind=final" -f "dry-run=false"
+
+# Publish the draft release and merge the release PR (re-approve the PR first)
+[group('release')]
+promote-release version:
+    gh workflow run promote-release.yml --ref release/{{ version }} -f "version={{ version }}"
