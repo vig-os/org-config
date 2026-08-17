@@ -204,7 +204,22 @@ jobs:
             echo "ERROR: PR #$PR_NUMBER is still in draft"
             exit 1
           fi
-          if [ "$REVIEW_DECISION" = "APPROVED" ]; then
+
+          # Protection-aware approval gate (#1506): assert only what the base
+          # branch actually requires. On a repo whose main ruleset requires no
+          # approving reviews (the smoke repo, solo-adoption consumers) GitHub
+          # never computes reviewDecision, so an unconditional assertion falls
+          # into the #438 fallback, counts zero approved reviews, and fails a
+          # PR the platform itself would merge. The rules endpoint sees
+          # rulesets only, not classic branch protection — a classic-protection
+          # repo skips here and degrades to the platform's own merge-time
+          # refusal (fail-late, never fail-open).
+          REQUIRED_APPROVALS=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh api \
+            "repos/${GITHUB_REPOSITORY}/rules/branches/main" \
+            | jq '[.[] | select(.type == "pull_request") | .parameters.required_approving_review_count // 0] | max // 0')
+          if [ "$REQUIRED_APPROVALS" -eq 0 ]; then
+            echo "Base branch requires no approving reviews — approval gate skipped (#1506)"
+          elif [ "$REVIEW_DECISION" = "APPROVED" ]; then
             echo "PR #$PR_NUMBER is approved"
           elif [ "$REVIEW_DECISION" = "null" ] || [ -z "$REVIEW_DECISION" ]; then
             APPROVED_COUNT=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh api \
@@ -417,7 +432,14 @@ jobs:
             exit 1
           fi
 
-          if [ "$REVIEW_DECISION" = "APPROVED" ]; then
+          # Protection-aware approval gate (#1506) — same skip as validate;
+          # PR state can change between the jobs, so the merge copy re-checks.
+          REQUIRED_APPROVALS=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh api \
+            "repos/${GITHUB_REPOSITORY}/rules/branches/main" \
+            | jq '[.[] | select(.type == "pull_request") | .parameters.required_approving_review_count // 0] | max // 0')
+          if [ "$REQUIRED_APPROVALS" -eq 0 ]; then
+            echo "Base branch requires no approving reviews — approval gate skipped (#1506)"
+          elif [ "$REVIEW_DECISION" = "APPROVED" ]; then
             echo "PR #$PR_NUMBER is approved"
           elif [ "$REVIEW_DECISION" = "null" ] || [ -z "$REVIEW_DECISION" ]; then
             APPROVED_COUNT=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh api \
@@ -614,21 +636,32 @@ jobs:
       GH_REPO: ${{ github.repository }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Set up devkit toolchain
-        uses: ./.github/actions/setup-devkit-toolchain
-        with:
-          mode: ${{ needs.resolve-toolchain.outputs.mode }}
-          devkit-version: ${{ needs.resolve-toolchain.outputs.image-tag }}
-
+      # Token FIRST, then check out with it. Tag pushes must authenticate as the
+      # Release App: the default github.token is not a bypass actor for the Tag
+      # ruleset, and this job deliberately keeps `contents: read` so it cannot
+      # push under the Actions identity at all. The token has to arrive through
+      # CHECKOUT — git authenticates via the credentials checkout persists as
+      # http.<host>.extraheader, and that header outranks any token embedded in
+      # a remote URL, so the previous "App token in the push URL" form was
+      # silently ignored (#1508). Do not "fix" a future 403 here by granting
+      # contents: write; that would move tag pushes to the Actions identity.
       - name: Generate release app token
         id: release_app_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
           client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          token: ${{ steps.release_app_token.outputs.token }}
+
+      - name: Set up devkit toolchain
+        uses: ./.github/actions/setup-devkit-toolchain
+        with:
+          mode: ${{ needs.resolve-toolchain.outputs.mode }}
+          devkit-version: ${{ needs.resolve-toolchain.outputs.image-tag }}
 
       - name: Move floating major/minor tags
         env:
@@ -663,16 +696,13 @@ jobs:
           REST="${VERSION#*.}"
           MINOR="${REST%%.*}"
 
-          # Tag pushes must authenticate as the Release App EXPLICITLY: the
-          # checkout step's persisted credentials are the default github.token,
-          # which is not a bypass actor for the Tag ruleset.
-          REMOTE_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-
           # `git push <sha>:<ref>` requires the commit object locally, and the
           # checkout above is a shallow clone of the workflow head — fetch the
-          # release tag so its peeled commit is available to push.
+          # release tag so its peeled commit is available to push. `origin`
+          # carries the Release App credentials the checkout persisted (#1508),
+          # which an unauthenticated fetch would lack on a private repo.
           retry --retries 3 --backoff 5 --max-backoff 30 -- \
-            git fetch --no-tags --depth 1 "$REMOTE_URL" "refs/tags/${RELEASE_TAG}"
+            git fetch --no-tags --depth 1 origin "refs/tags/${RELEASE_TAG}"
 
           # Create-or-update a lightweight floating tag at the release commit,
           # idempotently (skip when it already points there). Force is required
@@ -692,11 +722,12 @@ jobs:
             # (#1157, #1377) — while the very same installation token pushing
             # tags over git is bypassed fine (exactly how release-publish.yml
             # creates the release tags). Push also unifies create and move
-            # into one branch-free path. Publish + merge already succeeded, so
-            # on failure fail loud with actionable remediation rather than
-            # leaving the advertised `@${name}` pin silently missing or stale.
+            # into one branch-free path. `origin` is the App-authenticated
+            # remote (#1508). Publish + merge already succeeded, so on failure
+            # fail loud with actionable remediation rather than leaving the
+            # advertised `@${name}` pin silently missing or stale.
             if ! retry --retries 3 --backoff 5 --max-backoff 30 -- \
-                git push --force "$REMOTE_URL" "${TARGET_SHA}:refs/tags/${name}"; then
+                git push --force origin "${TARGET_SHA}:refs/tags/${name}"; then
               echo "::error title=Floating tag ${name} not moved::Could not force-push floating tag '${name}' to ${TARGET_SHA}. The GitHub Release is published and the release PR merged — only this floating tag is missing or stale, which silently breaks the advertised 'uses: ...@${name}' pin. The push authenticates as the Release App, which the repo Tag ruleset must list as a bypass actor; verify the ruleset's bypass list and the RELEASE_APP_CLIENT_ID / RELEASE_APP_PRIVATE_KEY secrets, or remediate once by hand (temporarily add an admin bypass to the ruleset, force-move refs/tags/${name} -> ${TARGET_SHA}, then revert). See https://github.com/vig-os/devkit/blob/main/docs/MIGRATION.md#first-release-floating-tags."
               return 1
             fi
@@ -735,15 +766,14 @@ jobs:
         shell: bash
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Set up devkit toolchain
-        uses: ./.github/actions/setup-devkit-toolchain
-        with:
-          mode: ${{ needs.resolve-toolchain.outputs.mode }}
-          devkit-version: ${{ needs.resolve-toolchain.outputs.image-tag }}
-
+      # Token FIRST, then check out with it: git authenticates through the
+      # credentials checkout persists as http.<host>.extraheader, and that
+      # header outranks any userinfo embedded in a push URL. The previous
+      # form (default checkout + token in the URL) therefore pushed as
+      # github-actions[bot] and 403'd on every run (#1503). `contents: read`
+      # above is deliberate and stays: the mirror reset must carry the Commit
+      # App identity, so do not "fix" a future 403 by granting the Actions
+      # token `contents: write`.
       - name: Generate commit app token
         id: commit_app_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
@@ -751,19 +781,61 @@ jobs:
           client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
           private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
 
-      - name: Force-reset mirror to main
-        env:
-          APP_TOKEN: ${{ steps.commit_app_token.outputs.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          token: ${{ steps.commit_app_token.outputs.token }}
+
+      - name: Set up devkit toolchain
+        uses: ./.github/actions/setup-devkit-toolchain
+        with:
+          mode: ${{ needs.resolve-toolchain.outputs.mode }}
+          devkit-version: ${{ needs.resolve-toolchain.outputs.image-tag }}
+
+      - name: Verify main carries the mirror archive
+        id: archive_guard
         run: |
           set -euo pipefail
-          # After the merged release PR, main carries the folded archive; the
-          # mirror re-bases onto it so divergence stays bounded (#1424). Push,
-          # never the REST refs API (#1157, #1377). The mirror is unprotected
-          # and its history is regenerated state — a force reset loses
-          # nothing; a racing nightly sync self-heals at its next run.
+          # The reset below is only the harmless housekeeping its comment
+          # claims if main ALREADY carries the archive the mirror is being
+          # reset away from — the release fold puts it there (#1424). When the
+          # fold is skipped or broken (#1502), force-pushing main onto the
+          # mirror would delete the only copy of the snapshots. So assert the
+          # precondition and skip loudly instead: a stale mirror self-heals at
+          # the next nightly sync, deleted snapshots do not.
           retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin main
-          MAIN_SHA="$(git rev-parse origin/main)"
-          REMOTE_URL="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          retry --retries 3 --backoff 5 --max-backoff 30 -- git push --force "$REMOTE_URL" "${MAIN_SHA}:refs/heads/sync/issue-mirror"
+          MAIN_SHA="$(git rev-parse FETCH_HEAD)"
+          echo "main_sha=$MAIN_SHA" >> "$GITHUB_OUTPUT"
+          MIRROR_REF="$(retry --retries 3 --backoff 3 --max-backoff 20 -- git ls-remote origin "refs/heads/sync/issue-mirror")"
+          if [ -z "$MIRROR_REF" ]; then
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Mirror branch 'sync/issue-mirror' not found; nothing to reset."
+            exit 0
+          fi
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "sync/issue-mirror"
+          STRANDED="$(git diff --name-only --no-renames --diff-filter=MD FETCH_HEAD "$MAIN_SHA" -- docs/issues docs/pull-requests)"
+          if [ -n "$STRANDED" ]; then
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Skipping the mirror reset: main is missing or stale for $(printf '%s\n' "$STRANDED" | wc -l) archive path(s) the mirror carries. Check the release fold (#1502)."
+            printf '%s\n' "$STRANDED"
+            exit 0
+          fi
+          echo "safe=true" >> "$GITHUB_OUTPUT"
+          echo "main carries the mirror archive; the reset is safe."
+
+      - name: Force-reset mirror to main
+        if: ${{ steps.archive_guard.outputs.safe == 'true' }}
+        env:
+          MAIN_SHA: ${{ steps.archive_guard.outputs.main_sha }}
+        run: |
+          set -euo pipefail
+          # After the merged release PR, main carries the folded archive (the
+          # step above proved it), so the mirror re-bases onto main and its
+          # divergence stays bounded (#1424). Push, never the REST refs API
+          # (#1157, #1377). The mirror is unprotected and its history is
+          # regenerated state — with the guard above passing, a force reset
+          # loses nothing; a racing nightly sync self-heals at its next run.
+          # The push authenticates as the Commit App through the credentials
+          # the checkout persisted (#1503).
+          retry --retries 3 --backoff 5 --max-backoff 30 -- git push --force origin "${MAIN_SHA}:refs/heads/sync/issue-mirror"
           echo "Mirror 'sync/issue-mirror' reset to main @ ${MAIN_SHA}"
