@@ -129,7 +129,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d  # v10.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
 
       # Otterdog version pin: on this repo's own events, justfile.project
       # (`otterdog_version`) is the single source of truth (ADR-0005). Downstream
