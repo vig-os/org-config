@@ -15,6 +15,11 @@ Nd = "Nd"
 passt = "passt"
 # gpg `--with-colons` output field name for a key fingerprint (#22 apply bridge)
 fpr = "fpr"
+# `mis-parse` in the devkit-generated mirror-fold block of release-core.yml
+# (#181). Devkit's own .typos.toml allows it; this seeded file is never
+# overwritten on upgrade, so the entry has to be added by hand. Drop it once
+# vig-os/devkit#1529 rewords the generated comment.
+mis = "mis"
 
 [files]
 # SOPS/age ciphertext (#22) is base64 blobs, not prose — spell-checking it only
