@@ -775,6 +775,11 @@ orgs.newOrg('vig-os', 'vig-os') {
             'refs/heads/main',
           ],
           required_pull_request+: {
+            // An approval must cover the code being merged: without this, a
+            // review of one commit survives every later push to the branch.
+            // Main only — Dev and Release require 0 approvals, so they have
+            // nothing to dismiss (#118, converged here by #184).
+            dismisses_stale_reviews: true,
             required_approving_review_count: 1,
             requires_code_owner_review: true,
             requires_review_thread_resolution: true,
