@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`sync-issues-action` Main protection now dismisses stale reviews on push** ([#184](https://github.com/vig-os/org-config/issues/184)): `dismisses_stale_reviews: true` joins the `required_pull_request` block, so an approval must cover the code actually being merged — without it, a review of one commit survives every later push and the 1-approval gate can be satisfied by a commit nobody reviewed. Straight convergence on the org decision devkit already records ([#118](https://github.com/vig-os/org-config/issues/118)); the two action repos no longer differ here by accident. Main only — Dev and Release require 0 approvals, so they have nothing to dismiss. Everything else in the ruleset is unchanged; deliberately **not** included: `requires_last_push_approval` (self-merge-blocking for a solo maintainer, declined for devkit under #118) and `strict` up-to-date branches (worth its own decision — `commit-action` and devkit carry it, this repo does not). Prompted by OpenSSF Scorecard alert [sync-issues-action#15](https://github.com/vig-os/sync-issues-action/security/code-scanning/15), which this improves but intentionally does not close: its remaining warnings (approval count 1, last-push approval off, up-to-date branches off) are deliberate.
+
 ### Deprecated
 
 ### Removed
