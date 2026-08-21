@@ -847,7 +847,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       allow_rebase_merge: true,
       allow_squash_merge: true,
       allow_update_branch: false,
-      code_scanning_default_setup_enabled: true,
       delete_branch_on_merge: false,
       description: 'FAIR Data on HDF5 — self-describing, FAIR-principled data format for scientific data products',
       private_vulnerability_reporting_enabled: true,
@@ -884,20 +883,12 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('vigos-mvp') {
       allow_update_branch: false,
-      code_scanning_default_languages+: [
-        'python',
-      ],
-      code_scanning_default_setup_enabled: true,
       delete_branch_on_merge: false,
       description: 'MVP with basic functions',
       private_vulnerability_reporting_enabled: true,
     } + orgs.legacyMergePolicy,
     orgs.newRepo('vs-dolt') {
       allow_update_branch: false,
-      code_scanning_default_languages+: [
-        'javascript-typescript',
-      ],
-      code_scanning_default_setup_enabled: true,
       delete_branch_on_merge: false,
       description: 'VS Code extension, open source SQL workbench for your MySQL and PostgreSQL compatible database with version control features when connected to Dolt.',
       has_issues: false,

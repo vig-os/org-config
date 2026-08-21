@@ -132,6 +132,29 @@ the enforced org code-security configuration, reads disabled live, and no
 repo-level write moves it. Asserting the stuck state instead would record a lie.
 """
 
+# --- Code scanning ---------------------------------------------------------------
+
+[[control]]
+key = "codeql-default-setup-suppressed"
+scope = "org"
+title = "CodeQL default setup disabled in org code-security configuration 237480"
+endpoint = "/orgs/{org}/code-security/configurations/237480"
+path = "code_scanning_default_setup"
+expect = "disabled"
+reason = """
+Advanced, devkit-scaffolded `codeql.yml` workflows are the org's one code
+scanning mechanism (#189): versioned, SHA-pinned, and merge-gating as required
+status checks. Default setup is UI-database state — its language list flaps
+under GitHub's dynamic detection and otterdog models it only partially. This
+ENFORCED configuration is what actually pins default-setup enablement on
+attached repos (repo-level state writes bounce; #186's apply showed language
+writes go through, enablement does not). Otterdog has no model for org
+code-security configurations at all — its only knob covers default-for-new-repo
+configs, of which this org has none — so a UI re-enable here would silently
+re-arm default setup fleet-wide with nothing but this row to notice.
+"""
+refs = ["#189"]
+
 # --- New-repository security defaults ------------------------------------------
 #
 # These decide what a repo created TOMORROW starts with. Otterdog models the
