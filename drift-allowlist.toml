@@ -17,14 +17,8 @@
 #     repository = "some-repo"
 #     reason = "why it is intentionally not under declarative management"
 
-[[expected]]
-resource = 'repository[name="vs-dolt"]'
-reason = """
-code_scanning_default_languages always reports as changed: GitHub's import splits
-`javascript-typescript` into `[javascript, typescript]`, a form otterdog's own
-validator rejects, so the committed config keeps the schema-valid
-`javascript-typescript`. The diff is cosmetic and expected on every run (see
-plan.yml footnote and ADR-0002).
-"""
+# [[expected]] entries go here — none at present. The long-standing vs-dolt
+# code_scanning_default_languages entry was retired by #189: with CodeQL default
+# setup suppressed org-wide, the field otterdog could not round-trip is gone.
 
 # [[unmanaged]] entries go here — none at present.

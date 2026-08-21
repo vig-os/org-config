@@ -139,13 +139,6 @@ enforceable branch protection, so `plan` and `drift` are wired immediately and
 
 ## Known limitations
 
-- **Every plan reports one benign change.** `otterdog import` splits
-  `javascript-typescript` into two `code_scanning_default_languages` values that
-  its own validator rejects, so the committed config keeps the schema-valid
-  form and the `vs-dolt` diff never converges
-  ([upstream #694](https://github.com/eclipse-csi/otterdog/issues/694)). It is
-  allow-listed in `drift-allowlist.toml`, so it raises no drift issue — but a
-  clean plan reads `0 add, 1 change, 0 delete`, not all zeros.
 - **Rulesets are not machine-writable at the pinned otterdog version.** Any
   ruleset whose required status checks carry a numeric app prefix (`15368:…`)
   fails to apply ([#69](https://github.com/vig-os/org-config/issues/69),

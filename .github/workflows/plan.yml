@@ -220,19 +220,6 @@ jobs:
             status="Plan exited with code \`${PLAN_RC}\`. \`plan\` returns 0 on drift, so a nonzero code means invalid config, auth, or a harness error — not drift. See the run log."
           fi
 
-          # vig-os-specific known artifact; downstream orgs get no footnote (#56).
-          footnote=""
-          if [ "${ORG_GITHUB_ID}" = "vig-os" ]; then
-            footnote=$(cat <<'FOOT'
-          > **Expected benign drift — do not chase:** `vs-dolt` › `code_scanning_default_languages`
-          > always reports as changed. GitHub's import splits `javascript-typescript` into
-          > `[javascript, typescript]`, a form otterdog's own validator rejects, so the committed
-          > config keeps the schema-valid `javascript-typescript`. The diff is cosmetic and expected
-          > on every run.
-          FOOT
-            )
-          fi
-
           # --- Job summary (generous 1 MiB budget: full output) ---
           {
             echo "## Otterdog plan — \`${ORG_GITHUB_ID}\` (read-only)"
@@ -244,8 +231,6 @@ jobs:
             echo '```text'
             cat plan.txt
             echo '```'
-            echo
-            echo "${footnote}"
             echo
             echo "[Run log](${RUN_URL})"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -277,8 +262,6 @@ jobs:
             echo '```'
             echo
             echo '</details>'
-            echo
-            echo "${footnote}"
             echo
             echo "[Run log](${RUN_URL}) · triggered by \`${EVENT_NAME}\`"
           } > comment-body.md
