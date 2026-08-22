@@ -478,7 +478,11 @@ orgs.newOrg('vig-os', 'vig-os') {
           ],
           required_pull_request+: {
             required_approving_review_count: 0,
-            requires_code_owner_review: true,
+            // Deliberately off: `.github/CODEOWNERS` is the devkit-seeded stub
+            // with every rule line commented out, so no owner ever matches and
+            // the flag gates nothing. Populating it would recreate the #115
+            // unsatisfiable single-owner gate instead (#187).
+            requires_code_owner_review: false,
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
@@ -752,7 +756,10 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('sync-issues-action') {
       allow_auto_merge: true,
-      allow_update_branch: false,
+      // On so the "Update branch" button (and auto-merge's auto-update) can
+      // satisfy Main protection's `strict` requirement without a manual
+      // rebase (#188).
+      allow_update_branch: true,
       custom_properties+: {
         type: ['tools'],
       },
@@ -769,7 +776,11 @@ orgs.newOrg('vig-os', 'vig-os') {
           ],
           required_pull_request+: {
             required_approving_review_count: 0,
-            requires_code_owner_review: true,
+            // Deliberately off: `.github/CODEOWNERS` is the devkit-seeded stub
+            // with every rule line commented out, so no owner ever matches and
+            // the flag gates nothing. Populating it would recreate the #115
+            // unsatisfiable single-owner gate instead (#187).
+            requires_code_owner_review: false,
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
@@ -790,7 +801,11 @@ orgs.newOrg('vig-os', 'vig-os') {
             // nothing to dismiss (#118, converged here by #184).
             dismisses_stale_reviews: true,
             required_approving_review_count: 1,
-            requires_code_owner_review: true,
+            // Deliberately off, same rationale as Dev protection: the seeded
+            // CODEOWNERS stub has no active rule, so the flag gates nothing,
+            // and populating it would recreate the #115 unsatisfiable
+            // single-owner gate (#187).
+            requires_code_owner_review: false,
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
@@ -798,6 +813,11 @@ orgs.newOrg('vig-os', 'vig-os') {
               '15368:CI Summary',
               '15368:Dist Check',
             ],
+            // Up-to-date branches: the checks must have run against the merge
+            // result, not a stale base. Same principle as the stale-review
+            // dismissal above, applied to CI; `commit-action` and devkit
+            // already carry it (#188).
+            strict: true,
           },
         },
         orgs.newRepoRuleset('Release protection') {
