@@ -1,0 +1,118 @@
+# Apply driver for THIS repo (`vig-os/org-config`) — the engine's own trigger for
+# the reusable `apply.yml`, plus the pre-approval plan preview that must not be
+# part of the reusable graph.
+#
+# WHY THIS FILE EXISTS (#176, regression from #105): GitHub validates the
+# caller-permission cap over EVERY job in a called workflow's graph at ASSEMBLY
+# time, BEFORE any `if:` is evaluated. #105 added an engine-only `preview` job
+# INSIDE `apply.yml` that declares `pull-requests: write`; its
+# `if: inputs.org_github_id == ''` never got a chance to exclude it, so every
+# downstream caller scaffolded from `template/.github/workflows/apply.yml` — which
+# grants exactly `contents: read`, the honest grant for a workflow that only reads
+# the committed config — died with `startup_failure` and zero jobs. Every consumer
+# was broken from v1.1.0 onward (found by exo-pet on a v1.2.1 pin). The preview is
+# engine-only by design, so it lives HERE, out of the reusable graph, and
+# `apply.yml` is back to a single `contents: read` job — an honest caller contract
+# again.
+#
+# The approver still sees the preview in the SAME run as the production approval
+# prompt: `preview` and `apply` are two jobs of this one workflow run, so the
+# exact-tree plan lands in this run's job summary right next to the pending
+# deployment-approval button, exactly as #105 intended.
+#
+# CALLER-CONTRACT REGRESSION TEST (load-bearing, do not weaken): the `apply` job
+# below grants exactly `contents: read` — byte-identical to the grant in
+# `template/.github/workflows/apply.yml` — and GitHub runs the SAME cap algorithm
+# for a local `./` call as for a pinned `owner/repo@ref` call. So every apply this
+# engine performs live-tests the downstream contract: if a future edit to
+# `apply.yml` ever re-introduces a job permission beyond `contents: read`, THIS
+# workflow fails at startup before any consumer does. NEVER widen this job's grant
+# to make an apply.yml change "work" — fix apply.yml instead.
+#
+# SERIALIZED MUTATIONS (ADR-0007 BINDING): the static `otterdog-mutate`
+# concurrency group with `cancel-in-progress: false` means overlapping applies
+# queue and run one at a time, never cancelling a run mid-mutation. drift.yml and
+# testbed-e2e.yml declare this SAME `otterdog-mutate` group so apply-vs-drift is
+# serialized too — a reconciler racing itself (or a concurrent apply) manufactures
+# phantom drift. Since #176 this literal group lives here, at the top of the
+# engine's own graph; the nested `apply.yml` group is inert inside this hold.
+#
+# Naming: this workflow is `Apply` (and `apply.yml` is `Apply (reusable)`) so that
+# `${{ github.workflow }}` — which resolves to the TOP-LEVEL caller's name inside a
+# called workflow, and which plan.yml builds its concurrency group from — stays
+# byte-identical to what it was when `apply.yml` carried these triggers itself.
+name: Apply
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      # Applied state is trunk `main` (#63). `dev` is retained only so the
+      # trunk-migration PR (#63) itself still fires this last dev-based apply
+      # (which flips the production branch policy to `main`); inert once `dev` is
+      # deleted.
+      - main
+      - dev
+    # Trigger scope: only `otterdog.json` / `otterdog/**` and the SOPS secret
+    # sources (`secrets/**`, `.sops.yaml`) change what apply would do — rotating a
+    # secret value (#22, ADR-0003) is a normal PR that must re-apply. Engine or
+    # workflow edits carry no config delta, so they are deliberately NOT in
+    # `paths:` — editing this file does not trigger an apply. `workflow_dispatch`
+    # covers manual reruns.
+    paths:
+      - otterdog.json
+      - otterdog/**
+      - secrets/**
+      - .sops.yaml
+  workflow_dispatch:
+
+concurrency:
+  group: otterdog-mutate
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  # Pre-approval plan preview (#105): read-only plan of the EXACT tree this run
+  # would apply, written into this run's job summary so the deployment approver
+  # sees the pending mutation one click from the approve button. Reuses plan.yml
+  # via a local `workflow_call` (single source of the plan harness); ungated (no
+  # environment) because the read path carries the same trust level as plan.yml on
+  # PRs and drift.yml on schedule. ENGINE-ONLY BY CONSTRUCTION since #176: this
+  # driver workflow is never called by anyone, so no `if:` is needed to keep the
+  # preview off downstream callers — and, unlike the #105 arrangement, its
+  # `pull-requests: write` can no longer leak into the reusable graph's permission
+  # cap. A downstream org wires its own preview beside its apply caller if it wants
+  # one. Deliberately NOT a `needs:` of `apply`: a preview-harness failure must
+  # never block a legitimate apply, and the apply pauses on human approval
+  # regardless.
+  preview:
+    name: Preview plan for approval
+    permissions:
+      contents: read          # checkout of the committed config for the plan
+      # Declared by plan.yml's job and therefore required here by the caller
+      # permission cap; inert on push — the comment step is PR-event-gated.
+      pull-requests: write
+    uses: ./.github/workflows/plan.yml
+    secrets:
+      ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+      ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+
+  # No `with:` — apply.yml's input defaults (`vig-os` / `org-config`, empty
+  # otterdog pin so justfile.project stays the SSoT) reproduce the previous
+  # own-push semantics exactly. No `name:` either, so the job renders as
+  # `apply / <apply.yml's job name>`.
+  #
+  # SOPS_AGE_KEY MUST be passed: `secrets/vig-os.yaml` exists in this repo, so
+  # apply.yml's `hashFiles('secrets/*.yaml')`-gated decrypt step DOES run, and a
+  # called workflow sees only the secrets its caller passes. Passed explicitly
+  # rather than with `secrets: inherit` — zizmor's `secrets-inherit` baseline
+  # covers release workflows only, and this file must stay clean of zizmor.yml
+  # entries.
+  apply:
+    permissions:
+      contents: read          # read the committed otterdog config
+    uses: ./.github/workflows/apply.yml
+    secrets:
+      ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+      ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}

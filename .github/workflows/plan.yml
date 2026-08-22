@@ -111,8 +111,8 @@ jobs:
     name: Plan committed config against live ${{ inputs.org_github_id || 'vig-os' }}
     # ADR-0007 BINDING: never expose org-admin credentials to fork PRs. `push`
     # is admitted because it is fork-safe by construction (a fork cannot push
-    # to the base repo) — it is how apply.yml's pre-approval `preview` job
-    # reaches this workflow via `workflow_call` on a trunk push (#105).
+    # to the base repo) — it is how apply-engine.yml's pre-approval `preview`
+    # job reaches this workflow via `workflow_call` on a trunk push (#105).
     if: >-
       github.event_name == 'workflow_dispatch'
       || github.event_name == 'push'

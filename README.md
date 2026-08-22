@@ -27,7 +27,7 @@ in `template/`. Three repo-owned workflows drive it:
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | [`plan.yml`](.github/workflows/plan.yml) | pull request touching the config, or manual | Read-only `otterdog plan` against the live org; posts the exact diff as a PR comment. Same-repo PRs only — fork PRs get static checks and never see credentials. |
-| [`apply.yml`](.github/workflows/apply.yml) | push to `main` touching the config, or manual | Mutating `otterdog apply`, inside the reviewer-gated `production` environment. |
+| [`apply.yml`](.github/workflows/apply.yml) | push to `main` touching the config, or manual — via [`apply-engine.yml`](.github/workflows/apply-engine.yml) | Mutating `otterdog apply`, inside the reviewer-gated `production` environment. `workflow_call`-only: it has no triggers of its own and a single `contents: read` job, so a consumer needs nothing beyond that grant. `apply-engine.yml` is this repo's own trigger for it and runs the pre-approval plan preview in the same run, next to the approval prompt. |
 | [`drift.yml`](.github/workflows/drift.yml) | daily 03:17 UTC, or manual | Read-only plan fed to the in-house drift layer, which reconciles divergence into deduplicated issues; also sweeps the live repo inventory against the declared set. |
 
 All mutating runs share one `otterdog-mutate` concurrency group that never
