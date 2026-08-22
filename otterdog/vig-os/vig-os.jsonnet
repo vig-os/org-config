@@ -756,7 +756,10 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('sync-issues-action') {
       allow_auto_merge: true,
-      allow_update_branch: false,
+      // On so the "Update branch" button (and auto-merge's auto-update) can
+      // satisfy Main protection's `strict` requirement without a manual
+      // rebase (#188).
+      allow_update_branch: true,
       custom_properties+: {
         type: ['tools'],
       },
@@ -810,6 +813,11 @@ orgs.newOrg('vig-os', 'vig-os') {
               '15368:CI Summary',
               '15368:Dist Check',
             ],
+            // Up-to-date branches: the checks must have run against the merge
+            // result, not a stale base. Same principle as the stale-review
+            // dismissal above, applied to CI; `commit-action` and devkit
+            // already carry it (#188).
+            strict: true,
           },
         },
         orgs.newRepoRuleset('Release protection') {
