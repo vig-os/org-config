@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [v1.2.2](https://github.com/vig-os/org-config/releases/tag/v1.2.2) - 2026-08-22
+
+### Changed
+
 - **`org-config`'s own Main protection no longer requires a human review** ([#195](https://github.com/vig-os/org-config/issues/195)): `required_approving_review_count` drops from 1 to 0 and `requires_code_owner_review` from `true` to an explicit `false`. The repo is solo-maintained, so both halves of the gate were structurally unsatisfiable on a self-authored PR — GitHub will not accept an author's own review, and every `.github/CODEOWNERS` rule names the author — leaving one possible outcome: a routine `#OrganizationAdmin` bypass on every merge. That is worse than no gate at all, because it normalizes bypassing and fills the audit trail with overrides that record nothing; an honest zero is more truthful than a requirement that is always waived. The same pathology diagnosed on devkit in [#115](https://github.com/vig-os/org-config/issues/115) and resolved on `devkit-smoke-test` in [#167](https://github.com/vig-os/org-config/issues/167). The operative controls are untouched and are what actually bind: the required `CI Summary` status check on `main`, `requires_review_thread_resolution`, the bypass-free `Signed commits` ruleset, and above all the `production` environment gate (reviewer `@c-vigo`, `main`-only branch policy) that stops every live apply with the exact-tree plan preview one click from the approve button — so a human still approves each mutation of the live org, however the PR merged. Accepted trade-off, stated plainly: bot-authored PRs (Renovate, the release train) *were* approvable and so the count-1 gate did bind there; at count 0 they may now merge on green CI without review. The blast radius is a merged commit, not an applied one — nothing reaches the live org without the environment approval. `requires_code_owner_review` is declared as an explicit `false` with an inline rationale rather than deleted (the vendored default is already `false`), so the config states the decision. Out of scope: every other repo's rulesets — devkit deliberately keeps count 1, since its bot-authored release PRs make the gate satisfiable and therefore worth keeping.
 
 - **`sync-issues-action` Main protection now requires up-to-date branches** ([#188](https://github.com/vig-os/org-config/issues/188)): `strict: true` joins the ruleset's `required_status_checks` block, so `CI Summary` and `Dist Check` must have run against the merge result rather than a stale base — without it a PR whose checks passed before `main` moved could merge untested as it will actually land. Same principle as [#184](https://github.com/vig-os/org-config/issues/184)'s stale-review dismissal, applied to CI instead of review: the gates must cover the code actually being merged. `commit-action` and devkit have carried `strict` since their rulesets were written, so this removes an accidental difference between sibling repos rather than inventing a policy; it was explicitly deferred out of #184 as worth its own decision, and this is that decision. The repo's `allow_update_branch` flips to `true` alongside it, so the **Update branch** button (and auto-merge's auto-update) satisfies the requirement without a manual rebase. Cost: one CI re-run per merge, and only when `main` has moved since the branch last built — rare on a low-traffic, solo-maintained repo with short CI. Also clears the `'up-to-date branches' is disabled` warning on OpenSSF Scorecard alert [sync-issues-action#15](https://github.com/vig-os/sync-issues-action/security/code-scanning/15), which stays open: its remaining warnings (approval count 1, last-push approval off) are deliberate for a solo maintainer.
@@ -23,15 +35,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`sync-issues-action` Main protection now dismisses stale reviews on push** ([#184](https://github.com/vig-os/org-config/issues/184)): `dismisses_stale_reviews: true` joins the `required_pull_request` block, so an approval must cover the code actually being merged — without it, a review of one commit survives every later push and the 1-approval gate can be satisfied by a commit nobody reviewed. Straight convergence on the org decision devkit already records ([#118](https://github.com/vig-os/org-config/issues/118)); the two action repos no longer differ here by accident. Main only — Dev and Release require 0 approvals, so they have nothing to dismiss. Everything else in the ruleset is unchanged; deliberately **not** included: `requires_last_push_approval` (self-merge-blocking for a solo maintainer, declined for devkit under #118) and `strict` up-to-date branches (worth its own decision — `commit-action` and devkit carry it, this repo does not). Prompted by OpenSSF Scorecard alert [sync-issues-action#15](https://github.com/vig-os/sync-issues-action/security/code-scanning/15), which this improves but intentionally does not close: its remaining warnings (approval count 1, last-push approval off, up-to-date branches off) are deliberate.
 
-### Deprecated
+#### Dependencies
 
-### Removed
+- Update `astral-sh/setup-uv` from `v10.0.0` to `v10.0.1` ([#177](https://github.com/vig-os/org-config/pull/177))
+- Update `ruff` from `==0.16.2` to `==0.16.3` ([#178](https://github.com/vig-os/org-config/pull/178))
+- Lock file maintenance (pip) ([#179](https://github.com/vig-os/org-config/pull/179))
+- Adopt vigOS devkit 1.10.0 ([#183](https://github.com/vig-os/org-config/pull/183)) — [release notes](https://github.com/vig-os/devkit/releases/tag/1.10.0)
 
 ### Fixed
 
 - **The reusable `apply` workflow no longer exceeds a `contents: read` caller grant — downstream applies start again** ([#176](https://github.com/vig-os/org-config/issues/176)): GitHub validates the caller-permission cap over **every** job in a called workflow's graph at assembly time, **before** any `if:` is evaluated. So the engine-only `preview` job that [#105](https://github.com/vig-os/org-config/issues/105) added inside `apply.yml` — gated `if: inputs.org_github_id == ''` but declaring `pull-requests: write` — was counted against the cap on every downstream call, and each consumer scaffolded from `template/.github/workflows/apply.yml` (which grants exactly `contents: read`, the honest grant for a workflow that only reads the committed config) died with `startup_failure` and zero jobs. Every template-scaffolded consumer was broken from `v1.1.0` onward; found by exo-pet on a `v1.2.1` pin. The preview moves to a new engine-only driver, `.github/workflows/apply-engine.yml`, which now carries this repo's `push`/`workflow_dispatch` triggers and the literal cross-workflow `otterdog-mutate` concurrency group, and runs `preview` and `apply` as two jobs of one run — so the approver still sees the exact-tree plan in the same run's summary, right next to the approve button, exactly as #105 intended. `apply.yml` is now `workflow_call`-only with a single `contents: read` job, and since the engine's own applies go through the same cap algorithm as a pinned downstream call, every engine apply live-tests the downstream contract. `template/` is unchanged apart from a clarifying comment: **no caller edit is needed** — consumers that added an interim `pull-requests: write` to work around this can drop it once they bump their pin.
-
-### Security
 
 ## [v1.2.1](https://github.com/vig-os/org-config/releases/tag/v1.2.1) - 2026-08-14
 
