@@ -478,7 +478,11 @@ orgs.newOrg('vig-os', 'vig-os') {
           ],
           required_pull_request+: {
             required_approving_review_count: 0,
-            requires_code_owner_review: true,
+            // Deliberately off: `.github/CODEOWNERS` is the devkit-seeded stub
+            // with every rule line commented out, so no owner ever matches and
+            // the flag gates nothing. Populating it would recreate the #115
+            // unsatisfiable single-owner gate instead (#187).
+            requires_code_owner_review: false,
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
@@ -769,7 +773,11 @@ orgs.newOrg('vig-os', 'vig-os') {
           ],
           required_pull_request+: {
             required_approving_review_count: 0,
-            requires_code_owner_review: true,
+            // Deliberately off: `.github/CODEOWNERS` is the devkit-seeded stub
+            // with every rule line commented out, so no owner ever matches and
+            // the flag gates nothing. Populating it would recreate the #115
+            // unsatisfiable single-owner gate instead (#187).
+            requires_code_owner_review: false,
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
@@ -790,7 +798,11 @@ orgs.newOrg('vig-os', 'vig-os') {
             // nothing to dismiss (#118, converged here by #184).
             dismisses_stale_reviews: true,
             required_approving_review_count: 1,
-            requires_code_owner_review: true,
+            // Deliberately off, same rationale as Dev protection: the seeded
+            // CODEOWNERS stub has no active rule, so the flag gates nothing,
+            // and populating it would recreate the #115 unsatisfiable
+            // single-owner gate (#187).
+            requires_code_owner_review: false,
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
