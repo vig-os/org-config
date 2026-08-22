@@ -13,20 +13,27 @@
 #     that environment pauses the run until the reviewer approves — this wait IS
 #     the designed manual gate before any write token touches live `vig-os`. No
 #     `apply` mutates without a human first approving the deployment.
-#   - `apply` runs ONLY from trunk `main`: `push` events fire on this repo, never
-#     on a fork (a fork cannot push to the base repo), so org-admin credentials
-#     are never exposed to fork code (OWASP CICD-SEC-4, Poisoned Pipeline
-#     Execution). The `if:` below asserts the repo identity as belt-and-braces.
+#   - `apply` runs ONLY from trunk `main`: the trigger now lives in
+#     `apply-engine.yml` (#176), whose `push` events fire on this repo, never on a
+#     fork (a fork cannot push to the base repo), so org-admin credentials are
+#     never exposed to fork code (OWASP CICD-SEC-4, Poisoned Pipeline Execution).
+#     The `if:` below asserts the repo identity as belt-and-braces.
 #   - Least-privilege `permissions: contents: read` — the job only reads the
 #     committed config; all write capability rides the App installation token,
-#     not GITHUB_TOKEN.
+#     not GITHUB_TOKEN. STANDING RULE (#176): no job in this workflow may EVER
+#     declare a permission beyond `contents: read`. That is the grant the
+#     template caller gives, GitHub caps a called workflow's whole job graph
+#     against it at assembly time (before any `if:`), and exceeding it fails
+#     every consumer at startup with zero jobs.
 #
-# SERIALIZED MUTATIONS (ADR-0007 BINDING): the static `otterdog-mutate`
-# concurrency group with `cancel-in-progress: false` means overlapping applies
-# queue and run one at a time, never cancelling a run mid-mutation. The future
-# scheduled drift workflow (#20/#21) MUST declare this SAME `otterdog-mutate`
+# SERIALIZED MUTATIONS (ADR-0007 BINDING): every mutation runs under an
+# `otterdog-mutate` concurrency group with `cancel-in-progress: false`, so
+# overlapping applies queue and run one at a time, never cancelling a run
+# mid-mutation. drift.yml and testbed-e2e.yml declare this SAME `otterdog-mutate`
 # group so apply-vs-drift is serialized too — a reconciler racing itself (or a
-# concurrent apply) manufactures phantom drift.
+# concurrent apply) manufactures phantom drift. Since #176 the engine's own runs
+# take the literal group from `apply-engine.yml`; see the `concurrency:` note
+# below for what the group here resolves to.
 #
 # SUPERSESSION GUARD (#105): the environment approval gates the RUN, not the
 # TREE. Applies queue behind the approval wait, so a later merge to the applied
@@ -34,20 +41,17 @@
 # mutate live toward a config that is no longer on trunk (incident #99: an
 # approved stale tree recreated three intentionally deleted repos as stubs).
 # Two defenses:
-#   - the ungated, read-only `preview` job below runs the EXACT tree's plan
-#     into this run's job summary, so the approver can inspect the pending
-#     mutation before approving (this repo's own events only);
+#   - the ungated, read-only `preview` job in `apply-engine.yml` runs the EXACT
+#     tree's plan into the same run's job summary, so the approver can inspect
+#     the pending mutation before approving (this repo's own events only);
 #   - the gated job's FIRST step re-checks that `github.sha` is still the tip
 #     of the applied branch and neutral-skips the entire apply otherwise — the
 #     newer queued run carries the superseded delta. Consequence: re-running an
-#     old run can never apply an old tree; to re-apply the CURRENT state, use
-#     `workflow_dispatch` for a fresh run.
+#     old run can never apply an old tree; to re-apply the CURRENT state,
+#     dispatch `apply-engine.yml` (`Apply`) for a fresh run.
 #
-# Trigger scope: only `otterdog.json` / `otterdog/**` and the SOPS secret sources
-# (`secrets/**`, `.sops.yaml`) change apply anything — rotating a secret value
-# (#22, ADR-0003) is a normal PR that must re-apply. Engine or workflow edits
-# carry no config delta, so they are deliberately NOT in `paths:` — editing this
-# file does not trigger an apply. `workflow_dispatch` covers manual reruns.
+# Trigger scope: the `paths:` filter that decides which changes apply lives with
+# the trigger in `apply-engine.yml` (#176).
 #
 # SECRETS-AS-CODE (issue #22, ADR-0003, BINDING): committed ciphertext under
 # `secrets/*.yaml` is decrypted IN-MEMORY here and never logged. otterdog has
@@ -104,31 +108,17 @@
 # summary still records otterdog's own apply output so a reviewer can see
 # exactly what was and was not applied.
 
-# REUSABLE INTERFACE (issue #24, ADR-0006): this workflow ALSO exposes
-# `workflow_call` so a downstream org's private `org-config` repo (from the
-# `template/` skeleton) can call it pinned to an exact tag/SHA. Inputs default to
-# `vig-os`/`org-config` and the App/age credentials fall through to this repo's
-# own bootstrap secrets on a non-`workflow_call` event, so this repo's own `push`
-# to `main` keeps byte-identical semantics. NOTE (ADR-0006 sequencing): a Free
+# REUSABLE INTERFACE (issue #24, ADR-0006): this workflow is `workflow_call`-ONLY
+# (#176), so a downstream org's private `org-config` repo (from the `template/`
+# skeleton) can call it pinned to an exact tag/SHA. Inputs default to
+# `vig-os`/`org-config`. The engine's OWN events reach this workflow through
+# `apply-engine.yml`, which passes no `with:` — so the defaults reproduce the
+# previous own-push semantics exactly. NOTE (ADR-0006 sequencing): a Free
 # downstream org onboards read-only (plan+drift) and only wires this apply caller
 # AFTER upgrading to Team — apply is the write path.
-name: Apply
+name: Apply (reusable)
 
 on:  # yamllint disable-line rule:truthy
-  push:
-    branches:
-      # Applied state is trunk `main` (#63). `dev` is retained only so the
-      # trunk-migration PR (#63) itself still fires this last dev-based apply
-      # (which flips the production branch policy to `main`); inert once `dev` is
-      # deleted.
-      - main
-      - dev
-    paths:
-      - otterdog.json
-      - otterdog/**
-      - secrets/**
-      - .sops.yaml
-  workflow_dispatch:
   workflow_call:
     inputs:
       org_github_id:
@@ -168,12 +158,21 @@ on:  # yamllint disable-line rule:truthy
           the decrypt step is skipped when no `secrets/*.yaml` exist.
         required: false
 
-# Static, cross-workflow concurrency group so all mutations serialize (never
-# cancel mid-apply). Caller-scoped: the org suffix is EMPTY on this repo's own
-# events, so the group stays literally `otterdog-mutate` here — byte-identical,
-# and drift.yml + testbed-e2e.yml keep sharing it. A downstream caller passes its
-# org, yielding `otterdog-mutate-<org>`, so its mutations never serialize against
-# vig-os's.
+# Caller-scoped concurrency group so a downstream caller's mutations serialize
+# among themselves (`otterdog-mutate-<org>`, never cancelled mid-apply) without
+# serializing against vig-os's. The EXPRESSION is a downstream contract and stays
+# byte-identical.
+#
+# What it resolves to on the engine's own runs CHANGED with #176, and the old
+# claim ("the org suffix is EMPTY on this repo's own events, so the group stays
+# literally `otterdog-mutate` here") is now false: the engine no longer triggers
+# this workflow directly — it reaches it through `apply-engine.yml`, which holds
+# the literal cross-workflow `otterdog-mutate` group shared with drift.yml and
+# testbed-e2e.yml. That call supplies no `with:`, so the `vig-os` input default
+# applies and the group HERE resolves to `otterdog-mutate-vig-os` — a singleton,
+# nested inside the outer `otterdog-mutate` hold and joined by nothing else. It is
+# therefore inert by construction, and deliberately NOT "fixed" by changing the
+# input default: the default is what keeps a downstream caller's own group correct.
 concurrency:
   group: otterdog-mutate${{ inputs.org_github_id && format('-{0}', inputs.org_github_id) || '' }}
   cancel-in-progress: false
@@ -181,32 +180,6 @@ concurrency:
 permissions: {}
 
 jobs:
-  # Pre-approval plan preview (#105): read-only plan of the EXACT tree this run
-  # would apply, written into this run's job summary so the deployment approver
-  # sees the pending mutation one click from the approve button. Reuses
-  # plan.yml via a local `workflow_call` (single source of the plan harness);
-  # ungated (no environment) because the read path carries the same trust level
-  # as plan.yml on PRs and drift.yml on schedule. THIS REPO'S OWN EVENTS ONLY:
-  # the empty-inputs test below distinguishes an own push/dispatch (inputs
-  # context empty) from a downstream `workflow_call` (inputs default to
-  # 'vig-os'), so downstream callers are unaffected and nested `./` workflow
-  # resolution is never relied on (#56) — a downstream org wires its own
-  # preview beside its apply caller if it wants one. Deliberately NOT a `needs:`
-  # of `apply`: a preview harness failure must never block a legitimate apply,
-  # and the apply pauses on human approval regardless.
-  preview:
-    name: Preview plan for approval
-    if: inputs.org_github_id == ''
-    permissions:
-      contents: read          # checkout of the committed config for the plan
-      # Declared by plan.yml's job and therefore required here by the caller
-      # permission cap; inert on push — the comment step is PR-event-gated.
-      pull-requests: write
-    uses: ./.github/workflows/plan.yml
-    secrets:
-      ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
-      ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
-
   apply:
     name: Apply committed config to live ${{ inputs.org_github_id || 'vig-os' }}
     # ADR-0007 BINDING: apply runs only from the config repo's own trunk; a fork

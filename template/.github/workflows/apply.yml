@@ -12,6 +12,11 @@
 #
 # PIN (ADR-0006, BINDING): replace `@vX.Y.Z` with a released tag of
 # vig-os/org-config (SHA for medtech; keep the tag in a trailing comment).
+#
+# PERMISSIONS: `contents: read` on the job below is the COMPLETE required grant —
+# the engine's apply job only reads the committed config, and all write capability
+# rides the GitHub App installation token, not GITHUB_TOKEN. Nothing wider is ever
+# needed (#176).
 name: Apply
 
 on:  # yamllint disable-line rule:truthy
