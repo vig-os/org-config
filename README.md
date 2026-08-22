@@ -139,12 +139,17 @@ enforceable branch protection, so `plan` and `drift` are wired immediately and
 
 ## Known limitations
 
-- **Rulesets are not machine-writable at the pinned otterdog version.** Any
-  ruleset whose required status checks carry a numeric app prefix (`15368:…`)
-  fails to apply ([#69](https://github.com/vig-os/org-config/issues/69),
-  [upstream #695](https://github.com/eclipse-csi/otterdog/issues/695)). Ruleset
-  changes are applied by hand via `gh api` until that is fixed upstream; the
-  committed jsonnet stays the source of truth.
+- **Repository rulesets are not readable on a private repo below Enterprise.**
+  The pinned otterdog's `github_organization.py` loads live repo rulesets only
+  when the repository is public or the org is on the `enterprise` plan —
+  stricter than the GitHub API, which supports repo rulesets on **Team**
+  ([#107](https://github.com/vig-os/org-config/issues/107),
+  [upstream #729](https://github.com/eclipse-csi/otterdog/issues/729)). A
+  private downstream org on Team (`exo-pet`) that declares a repo ruleset
+  therefore sees a permanent phantom `add` in every plan, and an apply would
+  `POST` a ruleset that already exists. Those rulesets are managed by hand via
+  `gh api`, with the declaration left out of the jsonnet until a fixed otterdog
+  release is pinned.
 
 ## Working in this repo
 
