@@ -598,8 +598,17 @@ orgs.newOrg('vig-os', 'vig-os') {
             'refs/heads/main',
           ],
           required_pull_request+: {
-            required_approving_review_count: 1,
-            requires_code_owner_review: true,
+            // No human review: the repo is solo-maintained, so an approval
+            // (and the single-owner CODEOWNERS gate) is unsatisfiable on
+            // self-authored PRs and its only outcome was a routine
+            // #OrganizationAdmin bypass on every merge — the #115 pathology.
+            // The operative controls are the required CI Summary check and
+            // the `production` environment approval (@c-vigo) that gates every
+            // live apply with the plan preview in the same run;
+            // count-0-with-required-checks matches devkit's Dev and Release
+            // protections and devkit-smoke-test's Main (#167, #195).
+            required_approving_review_count: 0,
+            requires_code_owner_review: false,
             requires_review_thread_resolution: true,
           },
           required_status_checks+: {
