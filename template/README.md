@@ -135,14 +135,53 @@ Per ADR-0006, a **Free-plan** org runs **plan-first / read-only**:
 
 ## After the Team upgrade (enable apply)
 
-Once the org is on **GitHub Team** and the App install is granted write:
+Once the org is on **GitHub Team** and the App install is granted write, add the
+**apply** caller (`.github/workflows/apply.yml`) — then pick the mode that
+matches what this repo can actually enforce. The caller's header spells both out;
+the short version:
 
-1. Create a `production` **environment** in this repo's settings with a
-   **required reviewer** and a deployment-branch policy limited to `main`. The
-   reusable apply workflow runs in that environment, so every mutation pauses for
-   human approval.
-2. Add the **apply** caller (`.github/workflows/apply.yml`). It runs
-   `otterdog apply` from `main` on merge, serialized so mutations never race.
+- **Private repo below Enterprise → dispatch-only (Mode B, the default).**
+  Environment **required reviewers are unavailable on a private repo below
+  Enterprise** — adding one returns **HTTP 422** — so a `production` environment
+  gates nothing and an apply-on-merge trigger would write to the live org with no
+  human gate at all. The caller therefore ships with **no `push:` trigger**: you
+  merge, then dispatch **Actions -> Apply -> Run workflow**, and **that dispatch
+  is the approval gate**.
+- **Public repo, or an Enterprise org → apply-on-merge (Mode A).** Create a
+  `production` **environment** with a **required reviewer** and a
+  deployment-branch policy limited to `main`, then uncomment the caller's `push:`
+  block. The reusable workflow runs in that environment, so every mutation pauses
+  for human approval, and mutations stay serialized so they never race.
+
+### Set up the apply tracker (Mode B)
+
+Merging notifies nobody — GitHub suppresses self-activity email, so a merged,
+undispatched config change is a silent state whose first signal would be the next
+daily drift run. The shipped **apply-reminder** caller
+(`.github/workflows/apply-reminder.yml`, active by default) closes that gap by
+commenting each pending apply onto a long-standing tracker issue, and the apply
+caller posts the "applied" confirmation on the same thread
+([vig-os/org-config#202](https://github.com/vig-os/org-config/issues/202)). Four
+one-off steps:
+
+1. Create an issue titled **Apply dispatch tracker** in this repo and **pin** it
+   (**Issues -> New issue**, then **Pin issue** from the issue's right-hand
+   menu).
+2. **Assign** the admins who must be told. The **assignee list IS the
+   notification list** — assignment emails them on every later bot comment
+   regardless of watch settings, and you change who is notified by editing the
+   assignees, never a workflow.
+3. Create a **`pending-apply`** label (**Settings -> Labels -> New label**, or
+   `gh label create pending-apply`). The reminder sets it on merge and the apply
+   clears it, so the tracker shows at a glance whether anything is waiting. If
+   the label is missing the run only warns; it never fails.
+4. Put the issue **number** into `tracker_issue` in **both**
+   `.github/workflows/apply-reminder.yml` and `.github/workflows/apply.yml`.
+
+**Opting out:** delete `.github/workflows/apply-reminder.yml`. Leaving
+`tracker_issue` empty is also safe — every run is then a logged, green no-op.
+Mode A orgs should delete the reminder caller: there, the merge itself starts the
+run.
 
 ## Keeping the pins current
 

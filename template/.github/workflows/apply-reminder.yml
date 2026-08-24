@@ -1,0 +1,60 @@
+# Apply-dispatch reminder caller (downstream org-config skeleton, ADR-0006).
+#
+# WHY: on a PRIVATE config repo below Enterprise, environment required reviewers
+# are unavailable (creating one returns HTTP 422), so `apply` is DISPATCH-ONLY —
+# merging a config PR previews via `plan` but writes nothing until a human
+# dispatches Apply, and that dispatch is the approval gate. Merged-but-unapplied
+# is therefore a silent state: GitHub sends the admin who merged no self-activity
+# email, and the first signal would be the next scheduled drift run, up to a day
+# later. This caller closes the gap — on every merge touching the config it
+# comments the pending apply (merge commit, PR link, dispatch command) onto a
+# pinned tracker issue and labels it `pending-apply`. The apply caller then posts
+# the "applied" confirmation and clears the label, so the tracker thread pairs
+# every merge with the run that applied it (vig-os/org-config#202).
+#
+# SETUP — four one-off steps (see the onboarding runbook's "enable apply"
+# section); until step 4 is done every run is a logged, GREEN no-op:
+#   1. Create an issue titled "Apply dispatch tracker" in this repo and PIN it.
+#   2. ASSIGN the admins who must be notified — the assignee list IS the
+#      notification list (assignment emails them regardless of watch settings)
+#      and is changed without touching any workflow.
+#   3. Create a `pending-apply` label (Settings -> Labels, or
+#      `gh label create pending-apply`).
+#   4. Put the issue NUMBER in `tracker_issue` below AND in `apply.yml`.
+#
+# ACTIVE BY DEFAULT, EASY TO OPT OUT: delete this file to drop the leg entirely.
+# An org running apply-on-merge behind a real reviewer gate (public repo, or
+# Enterprise) does not need it — there the merge itself starts the run.
+#
+# PERMISSIONS: `issues: write` + `contents: read` on the job below is the COMPLETE
+# grant. There are no secrets to wire: the comment and the label are same-repo
+# issue writes on the workflow `GITHUB_TOKEN`, and the engine workflow performs no
+# checkout and mints no App token.
+#
+# PIN (ADR-0006, BINDING): replace `@vX.Y.Z` with a released tag of
+# vig-os/org-config (SHA for medtech; keep the tag in a trailing comment).
+name: Apply reminder
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+    # The SAME four paths the apply caller consumes — a narrower filter would let
+    # a SOPS secret rotation merge with no reminder, which is exactly the silent
+    # state this leg exists to close.
+    paths:
+      - otterdog.json
+      - otterdog/**
+      - secrets/**
+      - .sops.yaml
+
+jobs:
+  remind:
+    permissions:
+      issues: write          # comment on the tracker issue and label it pending-apply
+      contents: read         # a private repo's GITHUB_TOKEN needs it (vig-os/org-config#173)
+    uses: vig-os/org-config/.github/workflows/apply-reminder.yml@vX.Y.Z  # TODO(pin): exact tag or SHA
+    with:
+      org_github_id: YOUR_ORG      # TODO: this org's GitHub login (e.g. exo-pet)
+      config_repo: org-config      # TODO: this repo's name, if different
+      tracker_issue: ""            # TODO(tracker): number of the pinned "Apply dispatch tracker" issue

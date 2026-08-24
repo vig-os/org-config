@@ -137,6 +137,16 @@ A **Free-plan** org onboards read-only first: a private repo on Free has no
 enforceable branch protection, so `plan` and `drift` are wired immediately and
 `apply` waits for the Team upgrade.
 
+A **private** consumer also has no environment required reviewers (they need
+Enterprise), so its apply is dispatch-only — the dispatch is the approval gate —
+and merged-but-unapplied would otherwise be silent. A fourth reusable workflow,
+[`apply-reminder.yml`](.github/workflows/apply-reminder.yml), exists for exactly
+that case: it comments each pending apply onto a pinned tracker issue whose
+assignees are the notification list, and `apply` closes the loop on the same
+thread ([#202](https://github.com/vig-os/org-config/issues/202)). It is
+downstream-only machinery — this repo is public, its apply is reviewer-gated, and
+nothing here calls it.
+
 ## Known limitations
 
 - **Repository rulesets are not readable on a private repo below Enterprise.**

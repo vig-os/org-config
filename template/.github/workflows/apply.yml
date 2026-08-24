@@ -1,14 +1,35 @@
-# Apply-on-merge caller (downstream org-config skeleton, ADR-0006).
+# Apply caller (downstream org-config skeleton, ADR-0006).
 #
 # WRITE PATH — enable LAST. Per ADR-0006 sequencing, a Free-plan org onboards
 # read-only (plan + drift) first; only AFTER it upgrades to GitHub Team and its
 # App install is granted write does apply get wired. Until then, keep this file
-# absent or its trigger commented out.
+# absent.
 #
-# The reusable workflow runs in the `production` environment (a required-reviewer
-# human gate on every mutation). Create a `production` environment in this repo's
-# Settings with a required reviewer and a `main`-only deployment-branch policy
-# before the first apply.
+# TWO MODES — pick ONE before the first apply. The reusable job declares
+# `environment: production`, so both modes enter that environment; what differs
+# is whether the environment can actually gate anything.
+#
+#   MODE B — DISPATCH-ONLY  (the DEFAULT below; private Team/Free orgs)
+#     A private repo below Enterprise CANNOT have environment required reviewers:
+#     adding one returns HTTP 422. The `production` environment therefore exists
+#     but gates nothing, and an apply-on-merge trigger would write to the live org
+#     with NO human gate at all. So there is no `push:` trigger: apply runs only
+#     when a human dispatches it (Actions -> Apply -> Run workflow), and THAT
+#     DISPATCH IS THE APPROVAL GATE. Review the plan comment on the PR, merge,
+#     then dispatch.
+#     Pair it with `apply-reminder.yml` (shipped, active by default): merging
+#     alone notifies nobody, so the reminder writes each pending apply onto a
+#     pinned tracker issue whose assignees get the mail.
+#
+#   MODE A — APPLY-ON-MERGE, REVIEWER-GATED  (public repos, or Enterprise orgs)
+#     Where required reviewers ARE available, the environment is the human gate
+#     and apply can safely run on merge. To switch:
+#       1. Create a `production` environment in this repo's Settings with a
+#          REQUIRED REVIEWER and a deployment-branch policy limited to `main`.
+#          (If this 422s, you are on Mode B — stay there.)
+#       2. Uncomment the `push:` block below.
+#       3. Delete `.github/workflows/apply-reminder.yml` — the merge itself now
+#          starts the run, so there is nothing to remind anyone about.
 #
 # PIN (ADR-0006, BINDING): replace `@vX.Y.Z` with a released tag of
 # vig-os/org-config (SHA for medtech; keep the tag in a trailing comment).
@@ -16,18 +37,23 @@
 # PERMISSIONS: `contents: read` on the job below is the COMPLETE required grant —
 # the engine's apply job only reads the committed config, and all write capability
 # rides the GitHub App installation token, not GITHUB_TOKEN. Nothing wider is ever
-# needed (#176).
+# needed (#176), including for the tracker comment, which rides a narrowed App
+# token minted inside the engine workflow.
 name: Apply
 
 on:  # yamllint disable-line rule:truthy
-  push:
-    branches:
-      - main
-    paths:
-      - otterdog.json
-      - otterdog/**
-      - secrets/**
-      - .sops.yaml
+  # MODE A ONLY — uncomment together with creating the required-reviewer
+  # `production` environment (see the header). Leave commented out on a private
+  # Team/Free org: without an enforceable reviewer this would apply to the live
+  # org on merge with no human gate.
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - otterdog.json
+  #     - otterdog/**
+  #     - secrets/**
+  #     - .sops.yaml
   workflow_dispatch:
 
 jobs:
@@ -41,6 +67,10 @@ jobs:
       # Keep in lockstep with the engine's justfile.project otterdog pin (#56);
       # Renovate can bump this alongside the engine SHA pin above.
       otterdog_version: "1.4.0"
+      # Mode B only: on success, comment "applied" on the tracker issue and clear
+      # the `pending-apply` label the reminder set. Must match the number in
+      # `apply-reminder.yml`; empty leaves the leg out.
+      tracker_issue: ""            # TODO(tracker): number of the pinned "Apply dispatch tracker" issue
     secrets:
       ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
       ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
