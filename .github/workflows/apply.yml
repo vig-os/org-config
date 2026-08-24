@@ -140,6 +140,17 @@ on:  # yamllint disable-line rule:truthy
           `justfile.project` (ADR-0005 SSoT).
         type: string
         default: ''
+      tracker_issue:
+        description: >-
+          Number of the caller's pinned "Apply dispatch tracker" issue (#202).
+          When set, a SUCCESSFUL apply comments "applied" on that issue and
+          clears the `pending-apply` label `apply-reminder.yml` set on merge, so
+          the tracker thread pairs every config merge with the run that applied
+          it. Empty — the default, and this repo's own runs — leaves the leg out
+          entirely, byte-identical to the pre-#202 behaviour. Typed `string`,
+          not `number`, per the `otterdog_version` optional-input idiom.
+        type: string
+        default: ''
     # Secret names MATCH this repo's bootstrap Actions secrets (github-app.md /
     # ADR-0003), so the credential references below are byte-identical whether
     # reached on this repo's own push (repo secrets) or via `workflow_call`
@@ -442,6 +453,82 @@ jobs:
             echo
             echo "[Run log](${RUN_URL}) · triggered by \`${EVENT_NAME}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # --- Close the apply-dispatch loop (#202) ----------------------------
+      # Downstream orgs where apply is dispatch-only (a private repo below
+      # Enterprise cannot have environment required reviewers — HTTP 422 — so the
+      # dispatch IS the gate) run `apply-reminder.yml` on merge: it comments the
+      # PENDING apply onto a pinned tracker issue and labels it `pending-apply`.
+      # These two steps close that loop, so the tracker thread becomes a durable
+      # audit record pairing every config merge with the run that applied it, and
+      # the label answers "is anything still waiting?" at a glance.
+      #
+      # NOT on GITHUB_TOKEN: the #176 STANDING RULE above caps this workflow's
+      # whole job graph at `contents: read` at assembly time, BEFORE any `if:` is
+      # evaluated, so declaring `issues: write` here would startup-fail every
+      # existing consumer. The comment rides a narrowed App token instead —
+      # drift.yml's issue-ops pattern (`permission-issues: write`, scoped to the
+      # caller's config repo) — which needs no caller change and no new App grant
+      # (Issues R/W is already held, docs/runbooks/github-app.md).
+      #
+      # GUARD — all three terms are load-bearing:
+      #   - `inputs.tracker_issue != ''` keeps the leg off for callers that never
+      #     opted in, and for this repo's own runs (public, reviewer-gated).
+      #   - `steps.apply.outcome != 'skipped'` excludes a SUPERSEDED run (#105),
+      #     which skips the apply yet stays green.
+      #   - `steps.apply.outputs.rc == '0'` is the only truth about the apply
+      #     itself: the apply step runs under `set +e`, so its OUTCOME is
+      #     `success` even when otterdog failed.
+      # A weaker guard would post "applied" for a run that applied nothing.
+      - name: Mint narrowed App token for the tracker comment (issues:write)
+        id: tracker-token
+        if: inputs.tracker_issue != '' && steps.apply.outcome != 'skipped' && steps.apply.outputs.rc == '0'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          # Narrows cleanly (unlike the Actions-Variables read the apply itself
+          # needs), scoped to issues on the caller's own config repo only.
+          client-id: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
+          owner: ${{ inputs.org_github_id || 'vig-os' }}
+          repositories: ${{ inputs.config_repo || 'org-config' }}
+          permission-issues: write
+
+      - name: Close the loop on the apply tracker (#202)
+        if: inputs.tracker_issue != '' && steps.apply.outcome != 'skipped' && steps.apply.outputs.rc == '0'
+        env:
+          GH_TOKEN: ${{ steps.tracker-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+          TRACKER_ISSUE: ${{ inputs.tracker_issue }}
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if ! [[ "${TRACKER_ISSUE}" =~ ^[0-9]+$ ]]; then
+            echo "::warning::tracker_issue \"${TRACKER_ISSUE}\" is not an issue number — skipping the applied confirmation."
+            exit 0
+          fi
+          {
+            echo "<!-- otterdog-apply-applied -->"
+            echo "**Applied.** The committed config is live on \`${ORG_GITHUB_ID}\`."
+            echo
+            echo "- Tree: [\`${COMMIT_SHA:0:7}\`](${SERVER_URL}/${REPO}/commit/${COMMIT_SHA})"
+            echo "- Run: [${RUN_URL}](${RUN_URL})"
+          } > applied-body.md
+          jq -Rs '{body: .}' applied-body.md > applied-payload.json
+          gh api --method POST "repos/${REPO}/issues/${TRACKER_ISSUE}/comments" --input applied-payload.json >/dev/null
+          echo "applied confirmation posted on tracker #${TRACKER_ISSUE}"
+
+          # Tolerant: a 404 here means the label is already absent (nothing was
+          # pending, or a previous run cleared it) or the repo never created it.
+          # Neither is a failed mutation, so it warns instead of reddening a run
+          # whose apply succeeded.
+          if gh api --method DELETE "repos/${REPO}/issues/${TRACKER_ISSUE}/labels/pending-apply" >/dev/null; then
+            echo "cleared pending-apply from tracker #${TRACKER_ISSUE}"
+          else
+            echo "::warning::could not clear the \`pending-apply\` label from tracker #${TRACKER_ISSUE} (already absent, or the label does not exist in this repo). The applied confirmation was posted regardless."
+          fi
 
       # Reflect otterdog's exit code as the job status AFTER the summary is
       # written, so a failed/partial mutation reddens the check while the summary

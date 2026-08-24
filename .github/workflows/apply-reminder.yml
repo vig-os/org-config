@@ -1,0 +1,179 @@
+# Apply-dispatch reminder — on a config merge, writes the PENDING apply onto a
+# long-standing tracker issue so a dispatch-only org is told, immediately, that
+# something is waiting (issue #202).
+#
+# WHY THIS EXISTS: on a PRIVATE org-config repo below Enterprise, environment
+# required reviewers are unavailable (creating one returns HTTP 422), so the
+# engine's apply-on-merge-with-approval model degrades to `workflow_dispatch`-
+# only: merging a config PR previews via `plan` but writes nothing until a human
+# dispatches `apply` — there, the dispatch IS the approval gate. Merged-but-
+# unapplied is then a SILENT state: GitHub suppresses self-activity email, so the
+# admin who merged is notified by nothing, and the first signal is the next
+# scheduled drift run — up to a day later. This workflow closes that gap by
+# commenting the pending apply onto a pinned "Apply dispatch tracker" issue whose
+# ASSIGNEES are the notification list (assignment emails them regardless of watch
+# settings, and the list is changed without touching any workflow).
+#
+# DOWNSTREAM-ONLY MACHINERY: this repo is public and its own apply runs behind a
+# real `production` reviewer gate, so the gap does not exist here and nothing in
+# this repo calls this workflow — it is `workflow_call`-only and never runs on
+# `vig-os/org-config`. It lives here rather than vendored in a consumer per the
+# #169 principle: downstream repos hold config data and thin callers only.
+#
+# OPTIONAL, ACTIVE BY DEFAULT: `template/` ships the caller enabled and the
+# onboarding runbook makes tracker setup a standard step. An org opts out by
+# deleting the caller; leaving `tracker_issue` empty makes every run a logged,
+# GREEN no-op, so a template-faithful org that has not yet created its tracker
+# gets a skip, never a red check.
+#
+# NO SECRETS, NO CHECKOUT, NO THIRD-PARTY ACTIONS: the comment and the label are
+# same-repo issue writes on the workflow `GITHUB_TOKEN`, and nothing here reads
+# the committed config — so there is no checkout, no App token, and no `secrets:`
+# block for a caller to wire.
+#
+# CONCURRENCY: its OWN `apply-reminder-<org>` group — deliberately NOT the
+# `otterdog-mutate-<org>` group apply/drift/testbed share, where a reminder would
+# queue uselessly behind a 30-minute apply and land long after it was useful.
+# `cancel-in-progress: false`: each merge earns its own line in the tracker
+# thread, and dropping one would silently lose exactly the notification this
+# workflow exists to send.
+#
+# PR LINK: parsed from the merge commit title's `(#N)` suffix, which house policy
+# guarantees (merge commits only, `merge_commit_title: PR_TITLE`). A direct push
+# carrying no such suffix degrades to a commit-only comment — never a failure.
+name: Apply reminder (reusable)
+
+on:  # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      tracker_issue:
+        description: >-
+          Number of the caller's pinned "Apply dispatch tracker" issue. Empty —
+          the default — makes every run a logged no-op, which is what a
+          template-faithful org gets until it creates the tracker. Typed
+          `string`, not `number`, per the established optional-input idiom
+          (`otterdog_version`): `number` has no empty sentinel.
+        type: string
+        default: ''
+      org_github_id:
+        description: >-
+          GitHub login of the org whose config merged — the repo-identity guard
+          and the concurrency group. Defaults to `vig-os`.
+        type: string
+        default: vig-os
+      config_repo:
+        description: >-
+          Name of the org's config repo. Defaults to `org-config`.
+        type: string
+        default: org-config
+
+# Own group, never the shared `otterdog-mutate-<org>` one (see the header).
+concurrency:
+  group: apply-reminder-${{ inputs.org_github_id || 'vig-os' }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  remind:
+    name: Remind that apply is pending on ${{ inputs.org_github_id || 'vig-os' }}
+    # Repo-identity guard, mirroring apply.yml: the caller's `push` events fire on
+    # its own repo, never on a fork (a fork cannot push to the base repo), and
+    # this asserts that as belt-and-braces so a fork can never comment-spam the
+    # tracker. Generalized to the caller's own `<org>/<config_repo>`.
+    if: github.repository == format('{0}/{1}', inputs.org_github_id || 'vig-os', inputs.config_repo || 'org-config')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write           # comment on the tracker issue and label it pending-apply
+      contents: read          # #173: a zero-scope GITHUB_TOKEN cannot read the private repo it runs in
+    steps:
+      # Resolve everything the two write steps need, and decide up front whether
+      # this run has anything to do. A missing or non-numeric `tracker_issue` is a
+      # SKIP, not a failure: the workflow ships active by default, so a config
+      # merge in an org that has not finished tracker onboarding must not redden.
+      - name: Resolve tracker and merge context
+        id: context
+        env:
+          TRACKER_ISSUE: ${{ inputs.tracker_issue }}
+          # Via env, never inline `${{ }}` in `run:` — a commit message is
+          # attacker-influenced text and inlining it is a template-injection hole.
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TRACKER_ISSUE}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::no tracker_issue configured — the apply reminder is a no-op (#202). Create a pinned \"Apply dispatch tracker\" issue and pass its number to enable it, or delete the caller to opt out."
+            exit 0
+          fi
+          if ! [[ "${TRACKER_ISSUE}" =~ ^[0-9]+$ ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::tracker_issue \"${TRACKER_ISSUE}\" is not an issue number — skipping the apply reminder."
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+          # House policy guarantees merge commits titled `<PR title> (#N)`; a
+          # direct push without one degrades to a commit-only reminder.
+          title="$(printf '%s\n' "${HEAD_COMMIT_MESSAGE}" | head -n 1)"
+          pr=""
+          if [[ "${title}" =~ \(#([0-9]+)\)[[:space:]]*$ ]]; then
+            pr="${BASH_REMATCH[1]}"
+            echo "resolved PR #${pr} from the merge commit title"
+          else
+            echo "head commit title carries no \`(#N)\` suffix — posting a commit-only reminder"
+          fi
+          echo "pr_number=${pr}" >> "$GITHUB_OUTPUT"
+
+      - name: Comment the pending apply on the tracker
+        if: steps.context.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+          TRACKER_ISSUE: ${{ inputs.tracker_issue }}
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          {
+            echo "<!-- otterdog-apply-reminder -->"
+            echo "**Config merged — \`apply\` is pending a manual dispatch.**"
+            echo
+            echo "- Merge commit: [\`${COMMIT_SHA:0:7}\`](${SERVER_URL}/${REPO}/commit/${COMMIT_SHA})"
+            if [ -n "${PR_NUMBER}" ]; then
+              echo "- Pull request: [#${PR_NUMBER}](${SERVER_URL}/${REPO}/pull/${PR_NUMBER})"
+            fi
+            echo
+            echo "Dispatch it — **Actions -> Apply -> Run workflow**, or:"
+            echo
+            echo '```sh'
+            echo "gh workflow run apply.yml --repo ${REPO}"
+            echo '```'
+            echo
+            echo "_Nothing is written to live \`${ORG_GITHUB_ID}\` until that run completes: on this repo the dispatch is the approval gate (vig-os/org-config#202)._"
+          } > reminder-body.md
+          jq -Rs '{body: .}' reminder-body.md > reminder-payload.json
+          gh api --method POST "repos/${REPO}/issues/${TRACKER_ISSUE}/comments" --input reminder-payload.json >/dev/null
+          echo "reminder posted on tracker #${TRACKER_ISSUE}"
+
+      # At-a-glance state on the tracker. Tolerant by design: adding a label that
+      # is already present is a no-op, and a repo that never created the label
+      # gets a WARNING — the reminder comment (the part that actually notifies)
+      # has already been posted, so failing here would turn a cosmetic gap into a
+      # red check on every merge.
+      - name: Flag the tracker pending-apply
+        if: steps.context.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TRACKER_ISSUE: ${{ inputs.tracker_issue }}
+        run: |
+          set -euo pipefail
+          if gh api --method POST "repos/${REPO}/issues/${TRACKER_ISSUE}/labels" \
+              -f "labels[]=pending-apply" >/dev/null; then
+            echo "pending-apply is set on tracker #${TRACKER_ISSUE}"
+          else
+            echo "::warning::could not add the \`pending-apply\` label to tracker #${TRACKER_ISSUE} — create it once in this repo (Settings -> Labels, or \`gh label create pending-apply\`). The reminder comment was posted regardless."
+          fi

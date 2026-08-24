@@ -29,11 +29,21 @@ contains:
 
 1. Open a PR to `main`. The **plan** caller runs a read-only `otterdog plan` against
    the live org and posts the diff as a PR comment — nothing is applied.
-2. On merge to `main`, the **apply** caller (once enabled) runs `otterdog apply` in a
-   required-reviewer `production` environment, so every mutation pauses for human
-   approval.
+2. On merge to `main`, the **apply** caller (once enabled) runs `otterdog apply`.
+   How it is gated depends on what this repo can enforce:
+   - **Private repo below Enterprise (dispatch-only).** Environment required
+     reviewers are unavailable here (HTTP 422), so apply has **no merge trigger**:
+     a human dispatches it (**Actions -> Apply -> Run workflow**) and **that
+     dispatch is the approval gate**. The **apply-reminder** caller comments each
+     pending apply onto the pinned **Apply dispatch tracker** issue — whose
+     assignees get the mail — so a merge is never silently left unapplied, and the
+     apply posts the "applied" confirmation on the same thread.
+   - **Public repo or Enterprise org (apply-on-merge).** Apply runs on merge inside
+     a required-reviewer `production` environment, so every mutation pauses for
+     human approval.
 3. The **drift** caller runs on a schedule, opening deduplicated issues for any
-   divergence between the committed config and live org state (ADR-0002).
+   divergence between the committed config and live org state (ADR-0002) — the
+   backstop that catches an apply nobody ever dispatched.
 
 This repo is **org-admin-equivalent** — it holds the App credentials and the config
 that rewrites org settings. Every admin-critical path is gated by CODEOWNERS.
