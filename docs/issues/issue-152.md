@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-08-20T18:57:12Z
+updated: 2026-08-24T09:31:48Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-08-21T03:04:49.579Z
+synced: 2026-08-24T09:37:27.638Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
@@ -24,13 +24,11 @@ This issue lists Renovate updates and detected dependencies. Read the [Dependenc
 
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
- - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update dependency ruff to v0.16.4
  - [ ] <!-- unschedule-branch=renovate/lock-file-maintenance -->build(pip): lock file maintenance
- - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
 
 ## Detected Dependencies
 
-<details><summary>github-actions (22)</summary>
+<details><summary>github-actions (24)</summary>
 <blockquote>
 
 <details><summary>.github/actions/setup-devkit-toolchain/action.yml</summary>
@@ -43,10 +41,17 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 </details>
 
-<details><summary>.github/workflows/apply.yml (4)</summary>
+<details><summary>.github/workflows/apply-reminder.yml (1)</summary>
+
+ - `ubuntu 24.04`
+
+</details>
+
+<details><summary>.github/workflows/apply.yml (5)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
  - `astral-sh/setup-uv v10.0.1@20cfd1bf945f4377ade1205e4dbc17946fc9a30d`
+ - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `ubuntu 24.04`
 
@@ -144,6 +149,12 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 </details>
 
+<details><summary>template/.github/workflows/apply-reminder.yml (1)</summary>
+
+ - `vig-os/org-config vX.Y.Z`
+
+</details>
+
 <details><summary>template/.github/workflows/apply.yml (1)</summary>
 
  - `vig-os/org-config vX.Y.Z`
@@ -182,7 +193,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
  - `pytest ==9.1.1`
  - `pytest-cov ==7.1.0`
- - `ruff ==0.16.3` → [Updates: `==0.16.4`]
+ - `ruff ==0.16.4`
 
 </details>
 
