@@ -104,6 +104,7 @@ def test_load_controls_parses_every_declared_key(controls_path: Path) -> None:
         "fork-pr-approval",
         "sha-pinning",
         "secret-scanning-validity-checks",
+        "main-required-checks",
         "two-factor-requirement",
     ]
 
@@ -127,6 +128,13 @@ def test_load_controls_parses_every_declared_key(controls_path: Path) -> None:
     scoped = _by_key(config, "secret-scanning-validity-checks", scope="repo")
     assert scoped.repository == "devkit"
     assert scoped.path == "security_and_analysis.secret_scanning_validity_checks.status"
+
+    listed = _by_key(config, "main-required-checks", scope="repo")
+    assert listed.compare == "set"
+    assert listed.expect == ["CI Summary", "Check Summary"]
+    assert listed.path == (
+        "[type=required_status_checks].parameters.required_status_checks[].context"
+    )
 
     unassertable = _by_key(config, "two-factor-requirement")
     assert unassertable.kind == "unassertable"
@@ -584,6 +592,299 @@ def test_org_secret_families_need_the_committed_config_text() -> None:
     result = evaluate_controls(config, client, org=ORG, config_jsonnet_text=None)
     assert result.outcomes == []
     assert client.requested == []
+
+
+# --- list addressing: match and projection segments (issue #205) ---------------
+
+# The real shape the grammar exists for: `GET /repos/{o}/{r}/rules/branches/main`
+# answers with a LIST of rules, each keyed by `type`, and the required checks are
+# a list of dicts inside one of them. Nothing here is dict-addressable.
+BRANCH_RULES = [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {"type": "pull_request", "parameters": {"required_approving_review_count": 1}},
+    {
+        "type": "required_status_checks",
+        "parameters": {
+            "strict_required_status_checks_policy": True,
+            "do_not_enforce_on_create": False,
+            "required_status_checks": [
+                {"context": "CI Summary"},
+                {"context": "Check Summary", "integration_id": 15368},
+            ],
+        },
+    },
+]
+
+BRANCH_RULES_ENDPOINT = "/repos/vig-os/devkit/rules/branches/main"
+
+
+def test_select_path_matches_the_unique_element_of_a_root_list() -> None:
+    assert (
+        select_path(
+            BRANCH_RULES,
+            "[type=required_status_checks].parameters.strict_required_status_checks_policy",
+        )
+        is True
+    )
+
+
+def test_select_path_matches_the_unique_element_of_a_named_list() -> None:
+    # The by-id ruleset endpoint nests the same array under `rules`.
+    document = {"name": "Main protection", "rules": BRANCH_RULES}
+    assert select_path(document, "rules[type=deletion].type") == "deletion"
+
+
+def test_select_path_zero_matches_is_missing() -> None:
+    # Never guess: a rule that is simply not configured must degrade the row
+    # rather than be read as a neighbouring rule's value.
+    assert select_path(BRANCH_RULES, "[type=required_signatures].parameters") is MISSING
+
+
+def test_select_path_several_matches_is_missing() -> None:
+    # Two rulesets can both contribute a rule of the same type to one branch;
+    # which one the row meant is unknowable, so the row degrades.
+    ambiguous = BRANCH_RULES + [{"type": "required_status_checks", "parameters": {}}]
+    assert select_path(ambiguous, "[type=required_status_checks].parameters") is MISSING
+
+
+def test_select_path_match_literal_is_compared_as_a_string_only() -> None:
+    # No coercion, for the same reason `_equal` refuses it: `1` is not `"1"` and
+    # `true` is not `"true"`, so a numeric field is never matched by a literal.
+    assert select_path([{"id": 1, "x": "a"}], "[id=1].x") is MISSING
+    assert select_path([{"on": True, "x": "a"}], "[on=True].x") is MISSING
+    assert select_path([{"id": "1", "x": "a"}], "[id=1].x") == "a"
+
+
+def test_select_path_match_on_a_non_list_is_missing() -> None:
+    assert select_path({"rules": {"type": "deletion"}}, "rules[type=deletion].type") is MISSING
+    assert select_path({"rules": BRANCH_RULES}, "nope[type=deletion]") is MISSING
+
+
+def test_select_path_projects_a_field_out_of_every_element() -> None:
+    assert select_path(
+        BRANCH_RULES,
+        "[type=required_status_checks].parameters.required_status_checks[].context",
+    ) == ["CI Summary", "Check Summary"]
+
+
+def test_select_path_projection_with_no_remaining_path_yields_the_elements() -> None:
+    document = {"conditions": {"ref_name": {"include": ["refs/heads/main"]}}}
+    assert select_path(document, "conditions.ref_name.include[]") == ["refs/heads/main"]
+
+
+def test_select_path_projection_is_all_or_nothing() -> None:
+    # A partial projection would silently compare a SHORTER set and read as
+    # drift (or, worse, as clean) — so one element missing the field degrades
+    # the whole row.
+    document = {"checks": [{"context": "CI Summary"}, {"integration_id": 15368}]}
+    assert select_path(document, "checks[].context") is MISSING
+
+
+def test_select_path_projection_over_a_non_list_is_missing() -> None:
+    assert select_path({"checks": {"context": "CI"}}, "checks[].context") is MISSING
+
+
+def test_select_path_projection_over_an_empty_list_is_an_empty_list() -> None:
+    # "this ruleset requires no status checks" is a legitimate live answer and
+    # an assertable one — not an absence.
+    assert select_path({"checks": []}, "checks[].context") == []
+
+
+def test_select_path_bracket_values_may_contain_dots_and_spaces() -> None:
+    # Status-check contexts are free text: `CodeQL Analysis (python)`,
+    # `build.test`. Splitting the path on `.` inside brackets would break them.
+    document = {"checks": [{"context": "CodeQL Analysis (python)"}, {"context": "build.test"}]}
+    assert select_path(document, "checks[context=build.test].context") == "build.test"
+    assert (
+        select_path(document, "checks[context=CodeQL Analysis (python)].context")
+        == "CodeQL Analysis (python)"
+    )
+
+
+def test_select_path_malformed_paths_are_missing() -> None:
+    # Defence in depth: load_controls drops these rows, but a hand-built Control
+    # must degrade rather than assert something the author did not write.
+    for path in ("rules[type=x", "rules]", "rules[]extra", "rules[=x]", "rules[type]", "[]."):
+        assert select_path({"rules": BRANCH_RULES}, path) is MISSING, path
+
+
+def test_select_path_still_reads_a_plain_dotted_path() -> None:
+    document = {"security_and_analysis": {"secret_scanning": {"status": "enabled"}}}
+    assert select_path(document, "security_and_analysis.secret_scanning.status") == "enabled"
+
+
+# --- set-valued assertions (issue #205) ----------------------------------------
+
+
+def _checks_control(**overrides: object) -> Control:
+    return _control(
+        key="main-required-checks",
+        scope="repo",
+        repository="devkit",
+        title="Required status checks on devkit main",
+        endpoint="/repos/{org}/{repo}/rules/branches/main",
+        path="[type=required_status_checks].parameters.required_status_checks[].context",
+        compare="set",
+        expect=["CI Summary", "Check Summary"],
+        **overrides,
+    )
+
+
+def test_set_comparison_ignores_order_and_duplicates() -> None:
+    # GitHub returns the check list in no guaranteed order, so an ordered
+    # comparison would report drift every time the UI reshuffled it.
+    control = _checks_control(expect=["Check Summary", "CI Summary"])
+    result, _ = _evaluate(control, {BRANCH_RULES_ENDPOINT: BRANCH_RULES})
+    assert result.records == []
+    assert [o.status for o in result.outcomes] == [OK]
+
+
+def test_set_comparison_reports_both_directions_of_a_mismatch() -> None:
+    control = _checks_control(expect=["CI Summary", "Docs Summary"])
+    result, _ = _evaluate(control, {BRANCH_RULES_ENDPOINT: BRANCH_RULES})
+    (record,) = result.records
+    # A dropped required check and an unexpected extra one are different
+    # incidents; the body must name which is which without a re-read.
+    assert "Docs Summary" in record.detail
+    assert "Check Summary" in record.detail
+    assert "missing" in record.detail
+    assert "unexpected" in record.detail
+
+
+def test_set_comparison_does_not_conflate_booleans_with_integers() -> None:
+    control = _checks_control(path="values[]", expect=[1], endpoint="/repos/{org}/{repo}")
+    result, _ = _evaluate(control, {"/repos/vig-os/devkit": {"values": [True]}})
+    assert [o.status for o in result.outcomes] == [DRIFT]
+
+
+def test_set_comparison_of_a_non_list_live_value_degrades() -> None:
+    # A schema change from a list to a scalar is not drift, it is a row that no
+    # longer means what it says.
+    control = _checks_control(path="values[]", endpoint="/repos/{org}/{repo}")
+    result, _ = _evaluate(control, {"/repos/vig-os/devkit": {"values": "CI Summary"}})
+    assert result.records == []
+    assert [o.status for o in result.outcomes] == [UNRESOLVED]
+    assert result.clean_fingerprints == set()
+
+
+def test_set_comparison_of_unnormalized_elements_degrades() -> None:
+    # The live value is a list of DICTS: the row forgot its `[].context`
+    # projection. Comparing raw dicts would report a permanent false drift, so
+    # the row degrades and says so.
+    control = _checks_control(
+        path="[type=required_status_checks].parameters.required_status_checks"
+    )
+    result, _ = _evaluate(control, {BRANCH_RULES_ENDPOINT: BRANCH_RULES})
+    assert result.records == []
+    assert [o.status for o in result.outcomes] == [UNRESOLVED]
+    assert any("main-required-checks" in note for note in result.notes)
+
+
+def test_set_comparison_honours_a_tolerated_value() -> None:
+    control = _checks_control(
+        expect=["CI Summary", "Check Summary", "CodeQL Analysis (python)"],
+        tolerated=["CI Summary", "Check Summary"],
+    )
+    result, _ = _evaluate(control, {BRANCH_RULES_ENDPOINT: BRANCH_RULES})
+    assert result.records == []
+    assert [o.status for o in result.outcomes] == [TOLERATED]
+    assert result.clean_fingerprints == {_fingerprint(control)}
+
+
+def test_set_comparison_renders_both_sides_sorted() -> None:
+    control = _checks_control(expect=["Check Summary", "CI Summary"])
+    result, _ = _evaluate(control, {BRANCH_RULES_ENDPOINT: BRANCH_RULES})
+    (outcome,) = result.outcomes
+    assert outcome.expected == "['CI Summary', 'Check Summary']"
+    assert outcome.actual == "['CI Summary', 'Check Summary']"
+
+
+def test_the_two_ruleset_criteria_assert_independently() -> None:
+    # Issue #205's acceptance: the check SET and the strict-policy flag are two
+    # rows over one memoized read, and they fail apart.
+    checks = _checks_control()
+    strict = _control(
+        key="main-strict-checks",
+        scope="repo",
+        repository="devkit",
+        endpoint="/repos/{org}/{repo}/rules/branches/main",
+        path="[type=required_status_checks].parameters.strict_required_status_checks_policy",
+        expect=True,
+    )
+    drifted = [
+        rule
+        if rule["type"] != "required_status_checks"
+        else {
+            **rule,
+            "parameters": {
+                "strict_required_status_checks_policy": False,
+                "required_status_checks": [{"context": "CI Summary"}, {"context": "Check Summary"}],
+            },
+        }
+        for rule in BRANCH_RULES
+    ]
+    client = FakeApiClient({BRANCH_RULES_ENDPOINT: drifted})
+    result = evaluate_controls(ControlsConfig(controls=[checks, strict]), client, org=ORG)
+    assert client.requested == [BRANCH_RULES_ENDPOINT]  # one read, two rows
+    assert result.clean_fingerprints == {_fingerprint(checks)}
+    (record,) = result.records
+    assert record.resource == f"{RESOURCE_PREFIX}:devkit:main-strict-checks"
+
+
+def test_an_ambiguous_ruleset_match_degrades_rather_than_guessing() -> None:
+    # Two rulesets contributing required_status_checks to the same branch: the
+    # row cannot know which was meant, so it degrades — never picks one.
+    ambiguous = BRANCH_RULES + [{"type": "required_status_checks", "parameters": {}}]
+    control = _checks_control()
+    result, _ = _evaluate(control, {BRANCH_RULES_ENDPOINT: ambiguous})
+    assert result.records == []
+    assert result.unresolved_fingerprints == {_fingerprint(control)}
+    assert [o.status for o in result.outcomes] == [UNRESOLVED]
+
+
+# --- load-time validation of the new row fields (issue #205) -------------------
+
+
+def _one_row(tmp_path: Path, body: str) -> list[Control]:
+    path = tmp_path / "controls.toml"
+    path.write_text('[[control]]\nkey = "row"\nscope = "org"\n' + body)
+    return load_controls(path).controls
+
+
+def test_load_controls_defaults_to_exact_comparison(tmp_path: Path) -> None:
+    (control,) = _one_row(tmp_path, 'endpoint = "/orgs/{org}"\npath = "x"\nexpect = true\n')
+    assert control.compare == "exact"
+
+
+def test_load_controls_rejects_an_unknown_compare_mode(tmp_path: Path) -> None:
+    body = 'endpoint = "/orgs/{org}"\npath = "x"\nexpect = true\ncompare = "subset"\n'
+    assert _one_row(tmp_path, body) == []
+
+
+def test_load_controls_rejects_a_set_row_whose_declared_value_is_not_a_list(
+    tmp_path: Path,
+) -> None:
+    scalar_expect = 'endpoint = "/orgs/{org}"\npath = "x[]"\nexpect = "CI"\ncompare = "set"\n'
+    assert _one_row(tmp_path, scalar_expect) == []
+    scalar_tolerated = (
+        'endpoint = "/orgs/{org}"\npath = "x[]"\nexpect = ["CI"]\n'
+        'tolerated = "CI"\ncompare = "set"\n'
+    )
+    assert _one_row(tmp_path, scalar_tolerated) == []
+
+
+def test_load_controls_rejects_a_set_row_with_non_primitive_elements(tmp_path: Path) -> None:
+    # `expect = [{context = "CI"}]` cannot be set-compared; the row must project
+    # `[].context` instead of shipping an assertion that can never pass.
+    body = 'endpoint = "/orgs/{org}"\npath = "x[]"\ncompare = "set"\nexpect = [{context = "CI"}]\n'
+    assert _one_row(tmp_path, body) == []
+
+
+def test_load_controls_rejects_a_malformed_path(tmp_path: Path) -> None:
+    for bad in ("rules[type=x", "rules[type]", "rules[=x]", "", "a..b"):
+        body = 'endpoint = "/orgs/{org}"\npath = "' + bad + '"\nexpect = true\n'
+        assert _one_row(tmp_path, body) == [], bad
 
 
 # --- guard against the real shipped table --------------------------------------
