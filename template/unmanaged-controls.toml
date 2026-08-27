@@ -20,11 +20,55 @@
 #   repository  = "some-repo"        # required iff scope = "repo"
 #   title       = "SHA-pinned actions required on some-repo"
 #   endpoint    = "/repos/{org}/{repo}/actions/permissions"  # {org}/{repo} templated
-#   path        = "sha_pinning_required"   # dotted key path into the JSON (not jq)
+#   path        = "sha_pinning_required"   # key path into the JSON (not jq)
 #   expect      = true                     # the DESIRED value, always
 #   tolerated   = false                    # optional: a known, tracked divergence
+#   compare     = "exact"                  # or "set" (see below)
 #   refs        = ["#1"]
 #   reason      = """why this matters and why otterdog cannot model it"""
+#
+# A dot in `path` descends into an object. Two more forms reach into JSON LISTS:
+# `rules[type=required_status_checks]` selects the ONE element whose field equals
+# the literal, and `checks[].context` projects a field out of every element. An
+# empty key applies either to the response itself, for endpoints answering with a
+# list at the root. A path matching zero or several elements degrades the row to
+# UNRESOLVED rather than picking one.
+#
+# `compare = "set"` compares two lists order- and duplicate-insensitively, for
+# collections GitHub returns in no guaranteed order. `expect`/`tolerated` are
+# then arrays of plain values, so the path must project down to bare values.
+#
+# REPOSITORY RULESETS are the reason those forms exist. Otterdog cannot read live
+# rulesets on a private repo below Enterprise, so on a private Team-plan org they
+# are precisely the controls with no other detector — and their internals are all
+# list-shaped. The two rows worth holding for a protected branch:
+#
+#   [[control]]
+#   key        = "main-required-checks"
+#   scope      = "repo"
+#   repository = "some-repo"
+#   title      = "Required status checks on some-repo main"
+#   endpoint   = "/repos/{org}/{repo}/rules/branches/main"
+#   path       = "[type=required_status_checks].parameters.required_status_checks[].context"
+#   compare    = "set"
+#   expect     = ["CI Summary", "Check Summary"]
+#   reason     = """a dropped required check silently un-gates every merge"""
+#
+#   [[control]]
+#   key        = "main-strict-checks"
+#   scope      = "repo"
+#   repository = "some-repo"
+#   title      = "Required checks must be up to date on some-repo main"
+#   endpoint   = "/repos/{org}/{repo}/rules/branches/main"
+#   path       = "[type=required_status_checks].parameters.strict_required_status_checks_policy"
+#   expect     = true
+#   reason     = """a stale-branch merge can land a red main with green checks"""
+#
+# `/rules/branches/{branch}` rather than `/rulesets/{id}`: no ruleset id to
+# hard-code, readable with repo read access, and it asserts what actually
+# protects the branch whichever ruleset carries it. If two rulesets both
+# contribute a required_status_checks rule the row degrades to UNRESOLVED — it
+# cannot know which one you meant, and will not guess.
 #
 # ALWAYS assert the desired value. If reality currently differs for a known,
 # tracked reason, add `tolerated` instead of weakening `expect`: live == expect

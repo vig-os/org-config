@@ -1,6 +1,7 @@
 # Test unmanaged-controls table (mirrors the real unmanaged-controls.toml
 # format). One plain row, one tolerated row, one repo-scoped nested-path row, one
-# unassertable row, plus the generated org-secret family.
+# list-addressing set-valued row, one unassertable row, plus the generated
+# org-secret family.
 
 [[control]]
 key = "fork-pr-approval"
@@ -32,6 +33,17 @@ path = "security_and_analysis.secret_scanning_validity_checks.status"
 expect = "enabled"
 tolerated = "disabled"
 reason = "repo-scoped row reaching a nested field through a dotted path"
+
+[[control]]
+key = "main-required-checks"
+scope = "repo"
+repository = "devkit"
+title = "Required status checks on devkit main"
+endpoint = "/repos/{org}/{repo}/rules/branches/main"
+path = "[type=required_status_checks].parameters.required_status_checks[].context"
+compare = "set"
+expect = ["CI Summary", "Check Summary"]
+reason = "list-addressing row: a unique match, a projection and a set comparison"
 
 [[control]]
 key = "two-factor-requirement"
