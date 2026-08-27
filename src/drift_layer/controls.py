@@ -13,7 +13,12 @@ Pure core (ADR-0007 L1): loading, endpoint templating and field selection are
 offline; the evaluation leg takes an injected client and never opens a socket of
 its own. Each row addresses its field with a **dotted key path** into the decoded
 JSON, deliberately not a jq expression — jq would be a runtime dependency this
-stdlib-only, ``uvx``-light tool does not have (ADR-0005).
+stdlib-only, ``uvx``-light tool does not have (ADR-0005). Two segment forms reach
+into JSON *lists* (issue #205), because the controls that matter most live there:
+``rules[type=required_status_checks]`` selects the one element carrying a field,
+and ``required_status_checks[].context`` projects a field out of every element,
+which a row then asserts as an unordered set with ``compare = "set"``. Both
+degrade rather than guess — see :func:`select_path`.
 
 Row identity is the TOML ``key`` (plus the scope), never the live value, so the
 fingerprint of a finding is stable across runs and the reconciler's
@@ -52,6 +57,14 @@ _SCOPES = (_ORG_SCOPE, _REPO_SCOPE)
 
 ASSERT_KIND = "assert"
 UNASSERTABLE_KIND = "unassertable"
+
+# How a row's live value is compared with its declared one. ``exact`` is the
+# literal comparison every row used before #205; ``set`` compares two lists
+# order- and duplicate-insensitively, for live collections GitHub returns in no
+# guaranteed order (a ruleset's required status checks).
+COMPARE_EXACT = "exact"
+COMPARE_SET = "set"
+_COMPARE_MODES = (COMPARE_EXACT, COMPARE_SET)
 
 # Per-row verdicts, reported by `--controls-report` and the workflow summary.
 OK = "OK"
@@ -92,6 +105,11 @@ class Control:
     value for a known, tracked divergence — so the table records what SHOULD be
     true even where reality is currently allowed to differ, and the row goes
     green by itself once the divergence is fixed. Any third value is drift.
+
+    ``compare = "set"`` makes both declared values unordered sets rather than
+    literals: GitHub returns a ruleset's required status checks in no guaranteed
+    order, so an exact comparison would report drift every time the UI
+    reshuffled them.
     """
 
     key: str
@@ -102,6 +120,7 @@ class Control:
     expect: object = UNSET
     repository: str | None = None
     tolerated: object = UNSET
+    compare: str = COMPARE_EXACT
     kind: str = ASSERT_KIND
     reason: str = ""
     refs: tuple[str, ...] = ()
@@ -224,20 +243,194 @@ def control_fingerprint(control: Control, *, org: str) -> str:
     ).fingerprint
 
 
-def select_path(document: object, path: str) -> object:
-    """Read a dotted key path out of a decoded JSON document.
+_MATCH = "match"
+_PROJECT = "project"
 
-    Returns :data:`MISSING` when any segment is absent or the walk hits a
-    non-mapping — never a guess. ``False`` and ``None`` are returned verbatim:
-    they are legitimate live values, and conflating either with absence would
-    turn a schema change into a fabricated drift finding.
+
+@dataclass(frozen=True)
+class _Segment:
+    """One parsed path step: a key, optionally with a list operator."""
+
+    key: str
+    op: str = ""
+    match_key: str = ""
+    match_value: str = ""
+
+
+def select_path(document: object, path: str) -> object:
+    """Read a path out of a decoded JSON document.
+
+    Three segment forms, all jq-free (ADR-0005):
+
+    ``key``
+        Descend into a mapping, as every row did before #205.
+    ``key[field=literal]``
+        Descend into a **list** and select the one element whose ``field``
+        equals ``literal`` — how GitHub keys the members of a collection
+        (a ruleset's ``rules`` by ``type``, a ruleset by ``name``).
+    ``key[]``
+        Project the remaining path over every element of a list, yielding a
+        list of the values — how a set-valued row normalises
+        ``required_status_checks`` to bare contexts.
+
+    An empty key applies the operator to the document itself, for the endpoints
+    that answer with a list at the root (``/repos/{o}/{r}/rules/branches/main``).
+
+    Returns :data:`MISSING` for anything the path does not address **uniquely**:
+    an absent segment, a walk through a non-mapping, a malformed path, a match
+    with zero or several hits, a projection over a non-list, and a projection
+    that any single element cannot satisfy. Never a guess — two rulesets can
+    contribute a rule of the same type to one branch, and picking either would
+    fabricate or hide a security finding, while a partial projection would
+    compare as a shorter set and read as drift or, worse, as clean.
+
+    ``False`` and ``None`` are returned verbatim: they are legitimate live
+    values, and conflating either with absence would turn a schema change into a
+    fabricated drift finding.
     """
-    current = document
-    for segment in path.split("."):
-        if not isinstance(current, dict) or segment not in current:
-            return MISSING
-        current = current[segment]
+    segments = _parse_path(path)
+    if segments is None:
+        return MISSING
+    return _walk(document, segments)
+
+
+def _parse_path(path: str) -> tuple[_Segment, ...] | None:
+    """Parse a path into segments, or ``None`` if it is malformed."""
+    raws = _split_outside_brackets(path)
+    if raws is None:
+        return None
+    segments = []
+    for raw in raws:
+        segment = _parse_segment(raw)
+        if segment is None:
+            return None
+        segments.append(segment)
+    return tuple(segments)
+
+
+def _split_outside_brackets(path: str) -> list[str] | None:
+    """Split on ``.``, but never inside brackets.
+
+    Status-check contexts are free text — ``CodeQL Analysis (python)``,
+    ``build.test`` — so a naive ``path.split(".")`` would tear a match literal
+    in half and silently address something else.
+    """
+    if not path:
+        return None
+    parts: list[str] = []
+    current: list[str] = []
+    depth = 0
+    for char in path:
+        if char == "[":
+            depth += 1
+        elif char == "]":
+            depth -= 1
+            if depth < 0:
+                return None
+        elif char == "." and depth == 0:
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(char)
+    if depth != 0:
+        return None
+    parts.append("".join(current))
+    return parts
+
+
+def _parse_segment(raw: str) -> _Segment | None:
+    open_at = raw.find("[")
+    if open_at < 0:
+        return _Segment(key=raw) if raw and "]" not in raw else None
+    if not raw.endswith("]"):
+        return None
+    key, inner = raw[:open_at], raw[open_at + 1 : -1]
+    if "[" in inner or "]" in inner:
+        return None
+    if not inner:
+        return _Segment(key=key, op=_PROJECT)
+    match_key, separator, match_value = inner.partition("=")
+    if not separator or not match_key:
+        return None
+    return _Segment(key=key, op=_MATCH, match_key=match_key, match_value=match_value)
+
+
+def _walk(current: object, segments: tuple[_Segment, ...]) -> object:
+    for index, segment in enumerate(segments):
+        if segment.key:
+            if not isinstance(current, dict) or segment.key not in current:
+                return MISSING
+            current = current[segment.key]
+        if segment.op == _MATCH:
+            current = _unique_match(current, segment)
+            if current is MISSING:
+                return MISSING
+        elif segment.op == _PROJECT:
+            return _project(current, segments[index + 1 :])
     return current
+
+
+def _unique_match(current: object, segment: _Segment) -> object:
+    if not isinstance(current, list):
+        return MISSING
+    matches = [
+        element
+        for element in current
+        if isinstance(element, dict)
+        and _matches_literal(element.get(segment.match_key), segment.match_value)
+    ]
+    return matches[0] if len(matches) == 1 else MISSING
+
+
+def _matches_literal(value: object, literal: str) -> bool:
+    """Match a path literal against a live **string** only.
+
+    Coercing would make ``[id=1]`` match a live ``true`` — the same conflation
+    :func:`_equal` refuses on the value side.
+    """
+    return isinstance(value, str) and value == literal
+
+
+def _project(current: object, rest: tuple[_Segment, ...]) -> object:
+    if not isinstance(current, list):
+        return MISSING
+    projected = []
+    for element in current:
+        value = _walk(element, rest)
+        if value is MISSING:
+            return MISSING  # all-or-nothing; see select_path
+        projected.append(value)
+    return projected
+
+
+def _as_comparable_set(value: object) -> frozenset[tuple[str, object]] | None:
+    """Normalise a list of primitives into an order-insensitive set.
+
+    Elements are tagged by type so the set keeps :func:`_equal`'s discipline:
+    ``true`` and ``1`` are different members, never the same one. Returns
+    ``None`` — "not comparable as a set" — for a non-list, or for a list holding
+    anything a row cannot have declared in TOML as a bare value (a dict, most
+    often a row that forgot its ``[].context`` projection).
+    """
+    if not isinstance(value, list):
+        return None
+    items: set[tuple[str, object]] = set()
+    for element in value:
+        tagged = _tag(element)
+        if tagged is None:
+            return None
+        items.add(tagged)
+    return frozenset(items)
+
+
+def _tag(element: object) -> tuple[str, object] | None:
+    if isinstance(element, bool):
+        return ("bool", element)
+    if isinstance(element, int | float):
+        return ("number", element)
+    if isinstance(element, str):
+        return ("str", element)
+    return None
 
 
 @dataclass(frozen=True)
@@ -306,7 +499,8 @@ def _evaluate_control(
     endpoint = resolve_endpoint(control, org=org)
     fingerprint = control_fingerprint(control, org=org)
     scope = _scope_label(control)
-    expected = _render(control.expect)
+    as_set = control.compare == COMPARE_SET
+    expected = _render(control.expect, as_set=as_set)
 
     if endpoint not in cache:
         try:
@@ -345,8 +539,36 @@ def _evaluate_control(
         )
         return
 
-    rendered = _render(actual)
-    if _equal(actual, control.expect):
+    if as_set:
+        live = _as_comparable_set(actual)
+        if live is None:
+            # The path resolved, but not to something a set can be built from:
+            # the row is addressing raw objects (a forgotten `[].context`) or the
+            # field stopped being a list. Comparing either would report a
+            # permanent false drift, so the row degrades and says which.
+            result.unresolved_fingerprints.add(fingerprint)
+            result.notes.append(
+                f"{control.key}: `{control.path}` on {endpoint} is not a list of comparable "
+                f'values — a `compare = "set"` row needs a projection such as `[].context`'
+            )
+            result.outcomes.append(
+                ControlOutcome(
+                    key=control.key,
+                    scope=scope,
+                    status=UNRESOLVED,
+                    expected=expected,
+                    actual="not a set",
+                )
+            )
+            return
+        matches_expect = live == _as_comparable_set(control.expect)
+        matches_tolerated = control.has_tolerated and live == _as_comparable_set(control.tolerated)
+    else:
+        matches_expect = _equal(actual, control.expect)
+        matches_tolerated = control.has_tolerated and _equal(actual, control.tolerated)
+
+    rendered = _render(actual, as_set=as_set)
+    if matches_expect:
         result.clean_fingerprints.add(fingerprint)
         result.outcomes.append(
             ControlOutcome(
@@ -355,7 +577,7 @@ def _evaluate_control(
         )
         return
 
-    if control.has_tolerated and _equal(actual, control.tolerated):
+    if matches_tolerated:
         # Known, tracked divergence: clean (no issue), but never silent.
         result.clean_fingerprints.add(fingerprint)
         result.notes.append(
@@ -573,14 +795,22 @@ def _record(control: Control, *, org: str, endpoint: str, actual: object) -> Dri
 
 
 def _control_detail(control: Control, *, endpoint: str, actual: object) -> str:
+    as_set = control.compare == COMPARE_SET
     lines = [
         f"endpoint:  GET {endpoint}",
         f"path:      {control.path}",
-        f"expected:  {_render(control.expect)}",
+        f"expected:  {_render(control.expect, as_set=as_set)}",
     ]
     if control.has_tolerated:
-        lines.append(f"tolerated: {_render(control.tolerated)}")
-    lines.append(f"actual:    {_render(actual)}")
+        lines.append(f"tolerated: {_render(control.tolerated, as_set=as_set)}")
+    lines.append(f"actual:    {_render(actual, as_set=as_set)}")
+    if as_set:
+        # A dropped required check and an unexpected extra one are different
+        # incidents; naming which is which saves the triager a re-read.
+        live = _as_comparable_set(actual) or frozenset()
+        wanted = _as_comparable_set(control.expect) or frozenset()
+        lines.append(f"missing:    {_render_members(wanted - live)}")
+        lines.append(f"unexpected: {_render_members(live - wanted)}")
     if control.reason:
         lines += ["", control.reason.strip()]
     if control.refs:
@@ -609,8 +839,21 @@ def _equal(actual: object, expected: object) -> bool:
     return actual == expected
 
 
-def _render(value: object) -> str:
-    return "absent" if value is MISSING or value is UNSET else repr(value)
+def _render(value: object, *, as_set: bool = False) -> str:
+    if value is MISSING or value is UNSET:
+        return "absent"
+    if as_set and isinstance(value, list):
+        return repr(sorted(value, key=_sort_key))
+    return repr(value)
+
+
+def _render_members(members: frozenset[tuple[str, object]]) -> str:
+    return repr(sorted((value for _, value in members), key=_sort_key))
+
+
+def _sort_key(element: object) -> tuple[str, str]:
+    """Total order over mixed primitives, so rendering never raises."""
+    return (type(element).__name__, str(element))
 
 
 def _parse_control(raw: object) -> Control | None:
@@ -628,8 +871,22 @@ def _parse_control(raw: object) -> Control | None:
     endpoint = raw.get("endpoint", "")
     field_path = raw.get("path", "")
     expect = raw.get("expect", UNSET)
-    if kind == ASSERT_KIND and (not endpoint or not field_path or expect is UNSET):
+    tolerated = raw.get("tolerated", UNSET)
+    compare = raw.get("compare", COMPARE_EXACT)
+    if compare not in _COMPARE_MODES:
         return None
+    if kind == ASSERT_KIND:
+        if not endpoint or not field_path or expect is UNSET:
+            return None
+        if _parse_path(field_path) is None:
+            return None
+        if compare == COMPARE_SET:
+            # A declared value that cannot be a set would make the row assert
+            # something that can never pass — drop it rather than ship it.
+            if _as_comparable_set(expect) is None:
+                return None
+            if tolerated is not UNSET and _as_comparable_set(tolerated) is None:
+                return None
 
     return Control(
         key=key,
@@ -639,7 +896,8 @@ def _parse_control(raw: object) -> Control | None:
         path=field_path,
         expect=expect,
         repository=repository if scope == _REPO_SCOPE else None,
-        tolerated=raw.get("tolerated", UNSET),
+        tolerated=tolerated,
+        compare=compare,
         kind=kind,
         reason=raw.get("reason", ""),
         refs=tuple(raw.get("refs", ())),

@@ -705,7 +705,17 @@ def test_select_path_bracket_values_may_contain_dots_and_spaces() -> None:
 def test_select_path_malformed_paths_are_missing() -> None:
     # Defence in depth: load_controls drops these rows, but a hand-built Control
     # must degrade rather than assert something the author did not write.
-    for path in ("rules[type=x", "rules]", "rules[]extra", "rules[=x]", "rules[type]", "[]."):
+    malformed = (
+        "rules[type=x",
+        "rules]",
+        "rules[]extra",
+        "rules[=x]",
+        "rules[type]",
+        "[].",
+        "rules[a[b]=c]",
+        "",
+    )
+    for path in malformed:
         assert select_path({"rules": BRANCH_RULES}, path) is MISSING, path
 
 
@@ -718,17 +728,18 @@ def test_select_path_still_reads_a_plain_dotted_path() -> None:
 
 
 def _checks_control(**overrides: object) -> Control:
-    return _control(
-        key="main-required-checks",
-        scope="repo",
-        repository="devkit",
-        title="Required status checks on devkit main",
-        endpoint="/repos/{org}/{repo}/rules/branches/main",
-        path="[type=required_status_checks].parameters.required_status_checks[].context",
-        compare="set",
-        expect=["CI Summary", "Check Summary"],
-        **overrides,
-    )
+    fields: dict[str, object] = {
+        "key": "main-required-checks",
+        "scope": "repo",
+        "repository": "devkit",
+        "title": "Required status checks on devkit main",
+        "endpoint": "/repos/{org}/{repo}/rules/branches/main",
+        "path": "[type=required_status_checks].parameters.required_status_checks[].context",
+        "compare": "set",
+        "expect": ["CI Summary", "Check Summary"],
+    }
+    fields.update(overrides)
+    return _control(**fields)
 
 
 def test_set_comparison_ignores_order_and_duplicates() -> None:
