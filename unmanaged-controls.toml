@@ -15,7 +15,20 @@
 #               abandons its open issue and opens a fresh one
 #   scope       "org", or "repo" plus a `repository`
 #   endpoint    `{org}` / `{repo}` are templated at run time
-#   path        dotted key path into the decoded JSON response (not jq)
+#   path        key path into the decoded JSON response (not jq). A dot descends
+#               into an object; `rules[type=required_status_checks]` selects the
+#               ONE element of a list whose field equals the literal; and
+#               `required_status_checks[].context` projects a field out of every
+#               element of a list. An empty key applies either operator to the
+#               response itself, for endpoints answering with a list at the root.
+#               A path that matches zero or several elements, or a projection one
+#               element cannot satisfy, degrades the row to UNRESOLVED — it never
+#               picks one. Match literals compare against strings only.
+#   compare     "exact" (default) or "set": an unordered, duplicate-insensitive
+#               comparison of two lists, for collections GitHub returns in no
+#               guaranteed order. `expect`/`tolerated` are then TOML arrays of
+#               plain values, so the path must project down to bare values
+#               (`[].context`, not the raw objects).
 #   expect      the DESIRED value, always — never today's value if they differ
 #   tolerated   optional second accepted value for a known, tracked divergence:
 #               live == expect is clean, live == tolerated is clean-but-noted
@@ -247,6 +260,34 @@ offender. `assert_no_undeclared` is on because a live org secret with no
 committed declaration is an unreviewed credential: nothing records who created
 it, what reads it, or when it should be rotated.
 """
+
+# --- Repository ruleset internals ----------------------------------------------
+#
+# The list-addressing forms above exist for repository rulesets (#205), and this
+# org deliberately declares no row for them. Every vig-os repo but one is PUBLIC,
+# where otterdog models rulesets and the plan already diffs them — a row here
+# would duplicate a modelled control, which is exactly what this table is not
+# for. The exception, `qms`, is private on a Free-plan org, where BOTH ruleset
+# endpoints answer 403 "Upgrade to GitHub Pro" and nothing can read them at all.
+# The capability is therefore held for downstream orgs on Team/Enterprise, whose
+# private repos otterdog cannot read (#107, eclipse-csi/otterdog#729) while REST
+# can. The shape a downstream row takes, verified live:
+#
+#   [[control]]
+#   key        = "main-required-checks"
+#   scope      = "repo"
+#   repository = "some-repo"
+#   title      = "Required status checks on some-repo main"
+#   endpoint   = "/repos/{org}/{repo}/rules/branches/main"
+#   path       = "[type=required_status_checks].parameters.required_status_checks[].context"
+#   compare    = "set"
+#   expect     = ["CI Summary", "Check Summary"]
+#
+# `/rules/branches/{branch}` rather than `/rulesets/{id}`: it needs no ruleset id
+# in the table, it is readable with repo read access, and it asserts what
+# actually protects the branch whichever ruleset carries it. If two rulesets both
+# contribute a required_status_checks rule the row degrades to UNRESOLVED, which
+# is the honest answer — the row cannot know which one it meant.
 
 # --- Unassertable controls -----------------------------------------------------
 #
