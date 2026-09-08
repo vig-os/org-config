@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-09-07T00:58:42Z
+updated: 2026-09-07T13:49:44Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,24 +13,18 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-07T07:06:23.466Z
+synced: 2026-09-08T07:01:00.482Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
 
 This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.<br>[View this repository on the Mend.io Web Portal](https://developer.mend.io/github/vig-os/org-config).
 
-## Other Branches
+## Awaiting Schedule
 
-The following updates are pending. To force the creation of a PR, click on a checkbox below.
+The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
- - [ ] <!-- other-branch=renovate/lock-file-maintenance -->build(pip): lock file maintenance
-
-## Open
-
-The following updates have all been created. To force a retry/rebase of any, click on a checkbox below.
-
- - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update dependency ruff to v0.16.6](../pull/212)
+ - [ ] <!-- unschedule-branch=renovate/lock-file-maintenance -->build(pip): lock file maintenance
 
 ## Detected Dependencies
 
@@ -199,7 +193,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
  - `pytest ==9.1.1`
  - `pytest-cov ==7.1.0`
- - `ruff ==0.16.5` → [Updates: `==0.16.6`]
+ - `ruff ==0.16.6`
 
 </details>
 
