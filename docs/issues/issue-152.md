@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-09-10T20:11:28Z
+updated: 2026-09-14T05:53:06Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,21 +13,18 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-11T07:06:10.445Z
+synced: 2026-09-14T07:40:25.867Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
 
 This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.<br>[View this repository on the Mend.io Web Portal](https://developer.mend.io/github/vig-os/org-config).
 
-## Awaiting Schedule
+## Other Branches
 
-The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
+The following updates are pending. To force the creation of a PR, click on a checkbox below.
 
- - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update dependency ruff to v0.16.7
- - [ ] <!-- unschedule-branch=renovate/github-actions-(minor-and-patch) -->ci(actions): update astral-sh/setup-uv action to v10.1.0
- - [ ] <!-- unschedule-branch=renovate/lock-file-maintenance -->build(pip): lock file maintenance
- - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
+ - [ ] <!-- other-branch=renovate/lock-file-maintenance -->build(pip): lock file maintenance
 
 ## Detected Dependencies
 
@@ -53,7 +50,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>.github/workflows/apply.yml (5)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
- - `astral-sh/setup-uv v10.0.1@20cfd1bf945f4377ade1205e4dbc17946fc9a30d` → [Updates: `v10.1.0`]
+ - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `ubuntu 24.04`
@@ -78,7 +75,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>.github/workflows/drift.yml (6)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
- - `astral-sh/setup-uv v10.0.1@20cfd1bf945f4377ade1205e4dbc17946fc9a30d` → [Updates: `v10.1.0`]
+ - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
@@ -89,7 +86,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>.github/workflows/plan.yml (4)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
- - `astral-sh/setup-uv v10.0.1@20cfd1bf945f4377ade1205e4dbc17946fc9a30d` → [Updates: `v10.1.0`]
+ - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `ubuntu 24.04`
 
@@ -145,7 +142,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>.github/workflows/testbed-e2e.yml (5)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
- - `astral-sh/setup-uv v10.0.1@20cfd1bf945f4377ade1205e4dbc17946fc9a30d` → [Updates: `v10.1.0`]
+ - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `ubuntu 24.04`
@@ -173,7 +170,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>template/.github/workflows/import.yml (5)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
- - `astral-sh/setup-uv v10.0.1@20cfd1bf945f4377ade1205e4dbc17946fc9a30d` → [Updates: `v10.1.0`]
+ - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
  - `ubuntu 24.04`
@@ -196,7 +193,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
  - `pytest ==9.1.1`
  - `pytest-cov ==7.1.0`
- - `ruff ==0.16.6` → [Updates: `==0.16.7`]
+ - `ruff ==0.16.7`
 
 </details>
 
