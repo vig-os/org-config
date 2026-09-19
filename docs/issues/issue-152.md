@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-09-16T17:09:00Z
+updated: 2026-09-18T21:04:33Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-17T07:18:27.887Z
+synced: 2026-09-19T07:07:58.540Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
@@ -25,6 +25,7 @@ This issue lists Renovate updates and detected dependencies. Read the [Dependenc
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
  - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update dependency ruff to v0.16.8
+ - [ ] <!-- unschedule-branch=renovate/ubuntu-26.x -->ci(actions): update dependency ubuntu to v26
  - [ ] <!-- unschedule-branch=renovate/lock-file-maintenance -->build(pip): lock file maintenance
  - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
 
@@ -45,7 +46,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 <details><summary>.github/workflows/apply-reminder.yml (1)</summary>
 
- - `ubuntu 24.04`
+ - `ubuntu 24.04` → [Updates: `26.04`]
 
 </details>
 
@@ -55,7 +56,7 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
- - `ubuntu 24.04`
+ - `ubuntu 24.04` → [Updates: `26.04`]
 
 </details>
 
@@ -81,7 +82,7 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
- - `ubuntu 24.04`
+ - `ubuntu 24.04` → [Updates: `26.04`]
 
 </details>
 
@@ -90,13 +91,13 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
  - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
- - `ubuntu 24.04`
+ - `ubuntu 24.04` → [Updates: `26.04`]
 
 </details>
 
 <details><summary>.github/workflows/prepare-release-extension.yml (1)</summary>
 
- - `ubuntu 24.04`
+ - `ubuntu 24.04` → [Updates: `26.04`]
 
 </details>
 
@@ -117,7 +118,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 <details><summary>.github/workflows/release-extension.yml (1)</summary>
 
- - `ubuntu 24.04`
+ - `ubuntu 24.04` → [Updates: `26.04`]
 
 </details>
 
@@ -147,7 +148,7 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
- - `ubuntu 24.04`
+ - `ubuntu 24.04` → [Updates: `26.04`]
 
 </details>
 
@@ -175,7 +176,7 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
- - `ubuntu 24.04`
+ - `ubuntu 24.04` → [Updates: `26.04`]
 
 </details>
 
