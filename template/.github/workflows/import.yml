@@ -43,7 +43,7 @@ permissions: {}
 jobs:
   import:
     name: Import ${{ inputs.org_github_id }} config from live org
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: read          # read the committed otterdog.json + vendor tree

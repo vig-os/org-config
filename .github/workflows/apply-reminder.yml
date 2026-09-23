@@ -83,7 +83,7 @@ jobs:
     # this asserts that as belt-and-braces so a fork can never comment-spam the
     # tracker. Generalized to the caller's own `<org>/<config_repo>`.
     if: github.repository == format('{0}/{1}', inputs.org_github_id || 'vig-os', inputs.config_repo || 'org-config')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       issues: write           # comment on the tracker issue and label it pending-apply
