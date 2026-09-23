@@ -111,12 +111,17 @@ on:  # yamllint disable-line rule:truthy
         default: org-config
       otterdog_version:
         description: >-
-          Otterdog version to run. Downstream callers MUST pass their own pin
-          (kept in the caller workflow beside the engine SHA pin, issue #56);
-          when empty — this repo's own events — the pin is read from
-          `justfile.project` (ADR-0005 SSoT).
+          Otterdog version to run. Defaults to the engine's OWN pin (#228), so a
+          caller inherits the otterdog version together with the engine ref it
+          already pins, and needs no literal of its own — nothing propagated the
+          old hand-mirrored one (issue #56 assumed Renovate would; it never
+          matched a bare `with:` string). This literal duplicates
+          `justfile.project`'s `otterdog_version`, the ADR-0005 SSoT, and
+          `tests/test_otterdog_pin.py` fails if the two ever diverge. Pass a
+          value to override; pass an explicitly EMPTY string to resolve the pin
+          from a `justfile.project` in the checkout instead.
         type: string
-        default: ''
+        default: '1.5.0'
     # Secret names MATCH this repo's bootstrap Actions secrets (github-app.md), so
     # the credential references below are byte-identical whether reached on this
     # repo's own schedule (repo secrets) or via `workflow_call` (caller-passed). A
@@ -176,10 +181,13 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4  # v10.1.0
 
-      # Otterdog version pin: on this repo's own events, justfile.project
-      # (`otterdog_version`) is the single source of truth (ADR-0005). Downstream
-      # callers check out THEIR repo (no justfile.project — template/ ships none,
-      # issue #56), so they pass the pin as the `otterdog_version` input instead.
+      # Otterdog version pin. The `workflow_call` default supplies it to every
+      # caller since #228 — a downstream checks out THEIR repo, which has no
+      # `justfile.project` (template/ ships none, issue #56), so the input is the
+      # only thing it can resolve from. The `elif` is the ADR-0005 SSoT path: it
+      # serves this repo's own events, where `inputs` is empty, and
+      # `apply-engine.yml`, which passes an explicit `otterdog_version: ''` to
+      # keep `justfile.project` the resolver for the engine's own runs.
       - name: Resolve otterdog version pin
         env:
           OTTERDOG_VERSION_INPUT: ${{ inputs.otterdog_version || '' }}
@@ -190,7 +198,7 @@ jobs:
           elif [ -f justfile.project ]; then
             version="$(grep -oP 'otterdog_version\s*:=\s*"\K[^"]+' justfile.project)"
           else
-            echo "::error::no otterdog_version input and no justfile.project in the checkout (downstream callers must pass the input — issue #56)"
+            echo "::error::no otterdog_version input and no justfile.project in the checkout — unreachable unless a caller passed an explicitly empty otterdog_version (#228)"
             exit 1
           fi
           if [ -z "${version}" ]; then

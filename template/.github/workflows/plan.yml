@@ -20,10 +20,12 @@ on:  # yamllint disable-line rule:truthy
       - otterdog.json
       - otterdog/**
       # Covers the otterdog pin too, so this filter needs no `justfile.project`
-      # line even though the engine's own plan.yml has one (#230): downstream the
-      # pin is the `otterdog_version:` input literal a few lines below, IN this
-      # caller — and `template/` ships no `justfile.project` at all (#56). Adding
-      # one here by symmetry with upstream would watch a file that does not exist.
+      # line even though the engine's own plan.yml has one (#230): since #228 the
+      # pin rides the `uses:` engine ref a few lines below, which lives IN this
+      # caller and is therefore already matched by the entry above — a Renovate
+      # engine bump moves the otterdog version and gets a plan run for it. And
+      # `template/` ships no `justfile.project` at all (#56), so adding one here
+      # by symmetry with upstream would watch a file that does not exist.
       - .github/workflows/plan.yml
   workflow_dispatch:
 
@@ -36,11 +38,6 @@ jobs:
     with:
       org_github_id: YOUR_ORG      # TODO: this org's GitHub login (e.g. exo-pet)
       config_repo: org-config      # TODO: this repo's name, if different
-      # Keep in lockstep with the engine's justfile.project otterdog pin (#56).
-      # BY HAND: Renovate bumps the `uses:` ref above, but this is a plain input
-      # string no manager matches, so it does NOT propagate with the engine pin
-      # or with an engine release — edit it here (#225).
-      otterdog_version: "1.5.0"
     secrets:
       ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
       ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}

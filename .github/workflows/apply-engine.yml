@@ -105,14 +105,26 @@ jobs:
       # permission cap; inert on push — the comment step is PR-event-gated.
       pull-requests: write
     uses: ./.github/workflows/plan.yml
+    # EXPLICITLY EMPTY (#228): plan.yml's `otterdog_version` default is no longer
+    # `''` but the pin literal itself, and this file reaches plan.yml through
+    # `workflow_call` like any downstream caller — so omitting `with:` would make
+    # the engine's own preview resolve the pin from a workflow literal instead of
+    # `justfile.project`. The empty string keeps the ADR-0005 SSoT the resolver
+    # here. `org_github_id` / `config_repo` still ride their `vig-os` /
+    # `org-config` defaults.
+    with:
+      otterdog_version: ''
     secrets:
       ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
       ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
 
-  # No `with:` — apply.yml's input defaults (`vig-os` / `org-config`, empty
-  # otterdog pin so justfile.project stays the SSoT) reproduce the previous
-  # own-push semantics exactly. No `name:` either, so the job renders as
-  # `apply / <apply.yml's job name>`.
+  # `with:` carries one key only — the explicitly empty otterdog pin (#228, same
+  # reasoning as `preview` above): apply.yml's default is now the pin literal, so
+  # the empty string is what keeps `justfile.project` the SSoT on the engine's
+  # own runs. `org_github_id` / `config_repo` keep riding their `vig-os` /
+  # `org-config` defaults, and `tracker_issue` its empty one, which together
+  # reproduce the previous own-push semantics exactly. No `name:` either, so the
+  # job renders as `apply / <apply.yml's job name>`.
   #
   # SOPS_AGE_KEY MUST be passed: `secrets/vig-os.yaml` exists in this repo, so
   # apply.yml's `hashFiles('secrets/*.yaml')`-gated decrypt step DOES run, and a
@@ -124,6 +136,8 @@ jobs:
     permissions:
       contents: read          # read the committed otterdog config
     uses: ./.github/workflows/apply.yml
+    with:
+      otterdog_version: ''
     secrets:
       ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
       ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}

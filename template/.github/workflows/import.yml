@@ -28,7 +28,12 @@ on:  # yamllint disable-line rule:truthy
         type: string
       otterdog_version:
         description: >-
-          Otterdog version to run — keep in lockstep with the engine pin (#56).
+          Otterdog version to run. This bootstrap is a standalone
+          `workflow_dispatch`, not a caller of a reusable workflow, so it carries
+          the pin itself instead of inheriting it from the engine ref the plan /
+          apply / drift callers pin (#228). The literal mirrors the engine's
+          `justfile.project` pin and the engine's CI asserts the two are equal —
+          the 1.4.0 bump missed exactly this one (#164 item 7).
         required: false
         type: string
         default: "1.5.0"
