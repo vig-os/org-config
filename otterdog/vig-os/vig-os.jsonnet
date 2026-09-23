@@ -908,8 +908,18 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
         orgs.newBranchProtectionRule('main') {
           required_approving_review_count: null,
+          // `main`'s CI produces only `Dependency Review` and `CI Summary`
+          // (the latter aggregates the former), so the `nix flake check` this
+          // required until #226 could never report and every `main` PR needed
+          // an admin merge. The real flake-check gate lives on `dev` and moves
+          // here at the first alpha cut.
+          // Un-prefixed = bound to the `github-actions` app, as in the `dev`
+          // rule above. A numeric `15368:` prefix is RULESET syntax: in a
+          // classic branch protection rule otterdog resolves the prefix as an
+          // app slug (`GET /apps/{slug}`) with no numeric branch, so it would
+          // 404 at apply while plan stayed green.
           required_status_checks: [
-            'any:nix flake check',
+            'CI Summary',
           ],
           requires_pull_request: false,
           requires_strict_status_checks: true,
