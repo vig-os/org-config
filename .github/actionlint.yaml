@@ -13,3 +13,13 @@ paths:
   .github/workflows/drift.yml:
     ignore:
       - 'property "workflow_sha" is not defined in object type'
+
+self-hosted-runner:
+  labels:
+    # Hosted runners actionlint's built-in list predates. actionlint 1.7.12 is
+    # the latest upstream release (2026-03-30) and the ubuntu-26.04 images
+    # shipped after it, so no pin bump recognises these. Fold of the devkit
+    # 1.16.0 template baseline (vig-os/devkit#1660) into this preserved config.
+    # DELETE BOTH once an actionlint release knows them.
+    - ubuntu-26.04
+    - ubuntu-26.04-arm
