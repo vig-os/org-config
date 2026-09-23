@@ -19,6 +19,12 @@ project := "org_config"
 # and `npm`, and this is a bare literal in a justfile that none of them match. A
 # bump implies re-checking the dev-shell path AND the four `template/` literals
 # (#56) — nothing propagates them for you.
+#
+# Editing this line DOES get a plan run: `plan.yml` lists this file in its
+# `pull_request` `paths:` filter precisely because the pin selects the binary
+# that produces the diff (#230). So the empty plan that a bump needs as its
+# acceptance evidence now arrives on the PR by itself — before #230 a pure pin
+# bump matched no path and the evidence had to be dispatched by hand (#229).
 otterdog_version := "1.5.0"
 # ===============================================================================
 # INFO
