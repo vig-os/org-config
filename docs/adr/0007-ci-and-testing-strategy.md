@@ -38,7 +38,7 @@ engine (workflows, defaults library, drift action) is a versioned artifact downs
 
 ## Alternatives considered
 
-Mandatory. Three independent axes were evaluated.
+Mandatory. Four independent axes were evaluated (Axis D was decided later, in #236).
 
 ### Axis A — where config-specific CI checks live
 
@@ -62,6 +62,16 @@ Mandatory. Three independent axes were evaluated.
 | `org-config-testbed` repo in `vig-os` | Real API, disposable, declared | No org-level singletons | **Chosen** |
 | `vig-os-sandbox` org | Covers org-level apply | Extra org; unneeded for v1 repo scope | Deferred (see triggers) |
 | Mutate production settings | Zero setup | Destructive against live governance | Rejected: unacceptable risk |
+
+### Axis D — enforcement status of the L2 plan check (added 2026-09-23, #236)
+
+| Option | Pros | Cons | Verdict |
+|---|---|---|---|
+| Advisory check + comment | Plan stays a judgement artifact (ADR-0002); no false gate on runner/auth health | A red plan does not block a merge | **Chosen** |
+| Require the check as-is | One-line ruleset change | A path-filtered workflow's check stays `Pending` forever, blocking every non-config PR | Rejected: unavailable |
+| Job-level skip shim + static summary job | Requirable — a job skipped by an `if:` conditional reports *Success*, so a broad trigger plus a job-level gate costs ~10 s and no live API call on a non-config PR | Green means three things (clean / skipped / fork PR); needs a paths-filter step, two extra jobs, the templated job name made static, a new ruleset context; propagates to `template/` and every consumer org | Rejected for now (see triggers) |
+| Require only where it runs | Would be exactly right | Not expressible in a GitHub ruleset | Rejected: unavailable |
+| Fail `plan` on a non-empty diff | A real gate | Inverts ADR-0002 — a diff is a judgement call, not a failure | Rejected |
 
 ## Decision
 
@@ -91,7 +101,18 @@ devkit pipeline for downstream pins (ADR-0006).
   fixture-format stability.
 - **L2 — live read-only `otterdog plan`** against `vig-os` on same-repo PRs that touch the config, the plan workflow,
   or the otterdog pin (`plan.yml`'s `paths:` filter — see the 2026-09-23 correction below): plan is non-mutating, so
-  this is free E2E read-path coverage.
+  this is free E2E read-path coverage. **L2 is advisory by decision, not by accident (#236, Axis D):** `Plan` is not
+  and will not be a required status check — `Main protection` requires exactly one context, `CI Summary`. Three
+  facts make enforcement the wrong control rather than merely an unavailable one. First, `plan` exits **0** on a
+  non-empty diff — a nonzero exit means invalid config, auth, or a harness failure, never drift — so requiring it
+  would gate merges on App-credential and API health, conditions of the runner rather than properties of the PR.
+  Second, the config-validity half of that signal is *already* behind the required check: `otterdog validate
+  --local` runs as an L0 hook via `just precommit` in the `Lint & Format` job, offline and credential-free, on
+  every PR including forks. Third, the diff itself — the thing enforcement is reached for — is explicitly not a
+  failure under ADR-0002, and the plan comment says so in as many words. The enforcing control sits at the
+  **mutation** boundary instead, where it belongs: the `production` environment reviewer pauses every apply with
+  the exact tree's plan in the same run's job summary (#105, #176), backed by a tip-of-branch supersession guard
+  (#99). A merge in this repo is not a mutation.
 - **L3 — scheduled mutation E2E** on the disposable `org-config-testbed` repo (issue #23); **never per-PR**.
 - **Org-level settings** are per-org singletons no dummy repo can cover — v1 accepts **plan-only** coverage there.
 
@@ -115,6 +136,17 @@ read-only live plan) and confines the one expensive/destructive layer (L3) to a 
 - Org-level configuration changes ship with plan-only assurance until a sandbox org exists; treat org-singleton apply
   as a manual, reviewed operation.
 - Downstream orgs pin the engine by tag/SHA; a breaking workflow change is a tagged release, not a silent `dev` merge.
+- A PR proposing an unintended live diff **can merge on green CI**, and this is accepted (#236): the diff is visible
+  in the plan comment, the drift run would raise it as a `drift`+`critical` issue (ADR-0002), and nothing reaches
+  the live org until a human approves the `production` deployment with that same plan in front of them. The blast
+  radius of merging a bad config is a commit, not an applied org.
+- `Main protection` deliberately gains **no** second required context. `org-config` is solo-maintained with an
+  unconditional `#OrganizationAdmin` bypass and `required_approving_review_count: 0`; a gate the only maintainer
+  routinely clicks past is the #115 / #167 / #195 / #226 pathology this repo has repeatedly removed.
+- The Axis D decision propagates downstream unchanged: `template/`'s plan caller keeps its `paths:` filter, and a
+  consumer org wires no plan context into its ruleset. On a private consumer below Enterprise, where environment
+  required reviewers return HTTP 422, the human gate is the `workflow_dispatch` that runs apply (template Mode B) —
+  a different mechanism for the same property: no mutation without a human who has read a plan.
 
 ## Corrections
 
@@ -147,10 +179,15 @@ Entries are added here only if an assumption above is later found wrong, preserv
 - An Otterdog upgrade that breaks the recorded plan-fixture format invalidates the L1 stability assumption and forces
   a fixture refresh (and possibly a pin policy revisit).
 - If read-only `plan` ever mutates state, the L2 "free E2E" premise collapses and L2 must move behind the apply gate.
-- **Whether `Plan` should ever be an enforcing check** is open in #236. A path-filtered workflow cannot be a
-  required status context — a required check that never runs leaves the PR pending forever — so one option there is
-  dropping the `paths:` filter for an always-running skip-job shim. Adopting it supersedes the L2 trigger set above
-  and the 2026-09-23 correction that records it; both must be re-stated, not quietly left behind.
+- **The Axis D "stay advisory" verdict (#236) has three revisit triggers.** (a) A merged-but-unintended config
+  change that the `production` approval failed to catch would promote the skip-shim from rejected to scheduled —
+  as of #236 there is no such incident, and `plan.yml` has never once concluded `failure` (57 runs). (b) A
+  multi-maintainer `org-config` removes the "always-bypassed gate" objection: with a second reviewer, the merge
+  boundary becomes a real checkpoint and a required `Plan` becomes worth its cost. (c) GitHub making a required
+  check conditional on the paths a PR touches would make "require only where it runs" real, free of the
+  skip-shim's green-means-three-things defect; adopt it if it ships. Adopting the skip-shim supersedes the L2
+  trigger set above and the 2026-09-23 correction that records it; both must be re-stated, not quietly left
+  behind.
 
 ## References
 
