@@ -155,7 +155,7 @@ jobs:
     # repo's own events — same truth value), so a downstream caller asserts its
     # OWN repo identity.
     if: github.repository == format('{0}/{1}', inputs.org_github_id || 'vig-os', inputs.config_repo || 'org-config')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     # `contents: read`, not `{}` (issue #173): every downstream caller is a
     # PRIVATE repo (ADR-0006), and a zero-scope GITHUB_TOKEN cannot even read

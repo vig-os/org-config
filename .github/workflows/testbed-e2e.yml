@@ -107,7 +107,7 @@ jobs:
     # ADR-0007 BINDING: runs only on this repo (scheduled/manual events do not
     # originate from forks); explicit for clarity.
     if: github.repository == 'vig-os/org-config'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     permissions: {}
     steps:
