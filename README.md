@@ -130,7 +130,10 @@ Downstream orgs do **not** fork this repo (ADR-0006). Each org gets its own
 **private** `org-config` repo, created from this repo's template, holding only
 its config data, its SOPS ciphertext, and thin caller workflows that `uses:` the
 reusable workflows here — pinned to an exact release tag or commit SHA, never a
-floating major. Renovate proposes the pin bumps.
+floating major. Renovate proposes the pin bumps, and that one pin also carries
+the otterdog version a consumer runs, since the reusable workflows default
+`otterdog_version` to this repo's own pin
+([#228](https://github.com/vig-os/org-config/issues/228)).
 
 [`template/`](template/) is that skeleton, and
 [`template/README.md`](template/README.md) is the onboarding runbook (create the

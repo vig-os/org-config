@@ -18,7 +18,9 @@ placeholders.
   always public and drags the engine's history (ADR-0006).
 - Caller workflows pinned to a released tag of `vig-os/org-config`; **no floating
   major tags**. SHA-pinning is recommended for medtech orgs (e.g. `exo-pet`).
-- Bumps to those pins are proposed by **Renovate** (`renovate.json`).
+- Bumps to those pins are proposed by **Renovate** (`renovate.json`). The engine
+  pin also selects the **otterdog version** your runs use, so one bump moves both
+  (see [Keeping the pins current](#keeping-the-pins-current)).
 
 ## Prerequisites
 
@@ -66,6 +68,15 @@ placeholders.
    tag pins to digests fleet-wide, add `"helpers:pinGitHubActionDigests"` to its
    `extends` (see the `_sha_pinning_note` key in `renovate.json`). **Never** use a
    floating major tag.
+
+   **Minimum engine version: `v1.4.0`.** The `plan`, `apply` and `drift` callers
+   shipped here deliberately pass **no** `otterdog_version`, which needs an engine
+   whose reusable workflows default that input to their own otterdog pin
+   ([#228](https://github.com/vig-os/org-config/issues/228)). Pinned to anything
+   older, the input arrives empty, your checkout has no `justfile.project` to fall
+   back to, and every run fails at "Resolve otterdog version pin". If you must
+   onboard against an older tag, add `otterdog_version: "<version>"` back to each
+   caller's `with:` block and delete it once you bump.
 
 ## Step 2 — Install the GitHub App
 
@@ -190,6 +201,34 @@ to the `vig-os/org-config` reusable-workflow pin. Review each bump like any
 dependency update — a bump changes the engine that can rewrite this org's
 settings. For SHA pins, keep the `# vX.Y.Z` comment beside the digest so the
 human-readable version stays visible.
+
+**One pin, two things.** Since engine
+[#228](https://github.com/vig-os/org-config/issues/228) the reusable workflows
+default `otterdog_version` to the engine's own pin, so the `uses:` ref selects
+both the workflow code **and the otterdog release your plan and apply run**.
+That is the intent — it is what keeps a consumer off a stale otterdog nobody
+remembered to bump — but it means an engine bump can change what the plan
+*sees*: engine `v1.4.0` moved otterdog to 1.5.0, which made previously
+unreadable private-repo rulesets visible and could turn a plan into proposed
+deletions ([#225](https://github.com/vig-os/org-config/issues/225)). Read the
+engine release notes, and read the `plan` output on the Renovate PR before
+merging it — that plan is the backstop, and it runs because the caller workflow
+is in its own `paths:` filter.
+
+**Overriding is still possible.** To hold or advance otterdog independently of
+the engine, put the version back in the caller's `with:` block — an explicit
+`otterdog_version: "1.4.3"` beats the default. Treat it as temporary and drop it
+when the engine catches up; it is the unmaintained mirror #228 removed.
+
+**Migration, if this repo still carries `otterdog_version` literals** (every org
+onboarded before engine `v1.4.0` does): **bump the engine pin first, then delete
+the literals** — in that order, ideally in two steps. A literal left in place
+after the bump is harmless, it simply wins over the new default. A literal
+deleted while still pinned to a pre-`v1.4.0` engine leaves the input empty with
+no `justfile.project` to fall back to, and every run fails at "Resolve otterdog
+version pin". `.github/workflows/import.yml` is **not** part of this: it is a
+standalone `workflow_dispatch` bootstrap, not a caller, and keeps its own
+`otterdog_version` default.
 
 ## License
 

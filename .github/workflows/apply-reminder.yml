@@ -51,8 +51,9 @@ on:  # yamllint disable-line rule:truthy
           Number of the caller's pinned "Apply dispatch tracker" issue. Empty —
           the default — makes every run a logged no-op, which is what a
           template-faithful org gets until it creates the tracker. Typed
-          `string`, not `number`, per the established optional-input idiom
-          (`otterdog_version`): `number` has no empty sentinel.
+          `string`, not `number`, precisely so that empty default exists:
+          `number` has no empty sentinel, and `0` would read as a real issue
+          number rather than "leg switched off".
         type: string
         default: ''
       org_github_id:

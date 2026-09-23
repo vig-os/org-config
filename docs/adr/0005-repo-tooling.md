@@ -139,6 +139,30 @@ verbatim for audit:
 > `plan.txt` that the drift layer parses. The defaults pin stays at v0.13.1 by
 > decision, not by omission.
 
+> **2026-09-23 (#228):** the Rationale's *"A single source of truth for 'which otterdog'
+> avoids a class of drift between what CI runs and what the tests were recorded against"*
+> still holds, but it is no longer maintained by **uniqueness**, and that is a deliberate
+> change rather than an erosion. `justfile.project`'s `otterdog_version` remains the SSoT;
+> the pin is now also MIRRORED into the `workflow_call` defaults of
+> `.github/workflows/{plan,apply,drift}.yml`, joining the pre-existing
+> `template/.github/workflows/import.yml` literal. The alternative was worse: a downstream
+> caller checks out ITS repo, which ships no `justfile.project`, so every consumer carried
+> a hand-written `otterdog_version:` literal that nothing ever bumped — org-config#56
+> assumed Renovate would keep it in lockstep with the engine ref, and the `github-actions`
+> manager does not match a bare `with:` string (the same misplaced confidence the first
+> 2026-09-23 entry above records). The trade is **N unchecked mirrors in other orgs for
+> four checked mirrors in this one**: `tests/test_otterdog_pin.py` asserts each default
+> equals the justfile literal, so a bump that misses one fails this repo's own CI instead
+> of silently pinning a consumer to a stale otterdog. Two consequences follow. A
+> downstream now inherits the otterdog version from the engine ref it already pins, so a
+> Renovate engine bump is also an otterdog bump (org-config#ADR-0006). And because
+> `apply-engine.yml` reaches `plan.yml` / `apply.yml` through `workflow_call` exactly like
+> a downstream caller, both of its jobs pass an explicit `otterdog_version: ''` — without
+> it the engine's own apply path would have started resolving the pin from a workflow
+> literal. `justfile.project` is therefore still the **effective resolver** for every run
+> this repo triggers itself; the mirrors exist only for callers, and a test, not a
+> convention, keeps them honest.
+
 ## Open questions / supersession triggers
 
 - **otterdog stops shipping to PyPI, or gains a native dep `uvx` cannot resolve on a

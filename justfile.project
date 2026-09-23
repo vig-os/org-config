@@ -17,8 +17,12 @@ project := "org_config"
 # repo's Nix flake; the pin also anchors the L1 plan-fixture format (ADR-0007).
 # Bumped BY HAND (#225): `renovate.json` enables only `github-actions`, `pep621`
 # and `npm`, and this is a bare literal in a justfile that none of them match. A
-# bump implies re-checking the dev-shell path AND the four `template/` literals
-# (#56) — nothing propagates them for you.
+# bump implies re-checking the dev-shell path AND the four in-repo mirrors of
+# this literal: the `workflow_call` defaults of `.github/workflows/{plan,apply,
+# drift}.yml` plus `template/.github/workflows/import.yml` (#228). Nothing
+# propagates them for you either, but `tests/test_otterdog_pin.py` fails the
+# build if a bump misses one — which is the trade #228 made for dropping the
+# unchecked literal every downstream caller used to carry (#56).
 #
 # Editing this line DOES get a plan run: `plan.yml` lists this file in its
 # `pull_request` `paths:` filter precisely because the pin selects the binary
