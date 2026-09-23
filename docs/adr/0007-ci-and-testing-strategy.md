@@ -89,8 +89,9 @@ devkit pipeline for downstream pins (ADR-0006).
 - **L1 — unit tests** of the drift layer over **recorded `otterdog plan` fixtures**, TDD; a pure-function core with an
   injected GitHub client so logic is testable without the network. The pinned Otterdog version doubles as
   fixture-format stability.
-- **L2 — live read-only `otterdog plan`** against `vig-os` on every same-repo PR: plan is non-mutating, so this is
-  free E2E read-path coverage.
+- **L2 — live read-only `otterdog plan`** against `vig-os` on same-repo PRs that touch the config, the plan workflow,
+  or the otterdog pin (`plan.yml`'s `paths:` filter — see the 2026-09-23 correction below): plan is non-mutating, so
+  this is free E2E read-path coverage.
 - **L3 — scheduled mutation E2E** on the disposable `org-config-testbed` repo (issue #23); **never per-PR**.
 - **Org-level settings** are per-org singletons no dummy repo can cover — v1 accepts **plan-only** coverage there.
 
@@ -117,7 +118,24 @@ read-only live plan) and confines the one expensive/destructive layer (L3) to a 
 
 ## Corrections
 
-_None yet._
+Entries are added here only if an assumption above is later found wrong, preserved verbatim for audit:
+
+> **2026-09-23 (#235):** the L2 bullet above claimed the live read-only plan runs *"against `vig-os` on every
+> same-repo PR"*. It never has. `plan.yml` carried a `pull_request` `paths:` filter in its very first commit
+> (`f101cc6`, 2026-07-17 — the day this ADR was accepted), so L2 fires only on a same-repo PR into `main` that
+> touches `otterdog.json`, `otterdog/**`, `.github/workflows/plan.yml` or — since #230 — `justfile.project`, which
+> holds the ADR-0005 `otterdog_version` pin the workflow greps at run time. A PR that changes the engine, the
+> tests, the docs or the release train gets no plan at all, by design: a plan is a live-API round trip against the
+> org on a full App installation token (ADR-0004 Corrections), and running one on a README typo diffs the same
+> committed config against the same live org for no new signal. The filter is why L2 is cheap, not an oversight —
+> but it is a real coverage boundary, and #230 is what a wrong boundary costs: #229's pure pin bump touched no
+> config path, so the empty plan that was its acceptance evidence had to be produced by hand (`workflow_dispatch`
+> run 35844030809). The same harness also runs on `workflow_dispatch` and, via `workflow_call`, as
+> `apply-engine.yml`'s pre-approval preview on a trunk push (#105) — neither is per-PR coverage. Corrected above.
+>
+> Unaffected: the binding credential rule in the Decision — plan runs **only** on same-repo PRs — is an upper bound
+> on who may reach the App token, never a promise that every such PR is planned, and L3's "never per-PR" stands.
+> `README.md`'s testing summary already said "`plan` on every config PR" and needs no change.
 
 ## Open questions / supersession triggers
 
@@ -129,6 +147,10 @@ _None yet._
 - An Otterdog upgrade that breaks the recorded plan-fixture format invalidates the L1 stability assumption and forces
   a fixture refresh (and possibly a pin policy revisit).
 - If read-only `plan` ever mutates state, the L2 "free E2E" premise collapses and L2 must move behind the apply gate.
+- **Whether `Plan` should ever be an enforcing check** is open in #236. A path-filtered workflow cannot be a
+  required status context — a required check that never runs leaves the PR pending forever — so one option there is
+  dropping the `paths:` filter for an always-running skip-job shim. Adopting it supersedes the L2 trigger set above
+  and the 2026-09-23 correction that records it; both must be re-stated, not quietly left behind.
 
 ## References
 
