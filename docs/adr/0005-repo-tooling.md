@@ -90,16 +90,18 @@ stable (org-config#ADR-0007).
 
 ## Consequences
 
-- **Renovate owns the pin.** The exact `uvx otterdog` version is bumped by Renovate,
-  keeping the tool current without hand edits.
+- **The pin is bumped by hand, deliberately.** See the 2026-09-23 correction below:
+  Renovate cannot see it. A bump is therefore an authored change — which suits a pin
+  that doubles as the fixture-format anchor, since the bump PR is where the plan output
+  is re-checked against live.
 - **A pin bump that breaks fixture parsing is an early-warning signal, not a nuisance.**
-  Because the same pin anchors the L1 plan fixtures, a Renovate bump that makes fixture
-  parsing fail is the first, cheap indication that upstream otterdog changed its plan
-  output format — caught in a PR against recorded fixtures rather than in a live drift
-  run. The bump PR is the place to re-record fixtures deliberately.
+  Because the same pin anchors the L1 plan fixtures, a bump that makes fixture parsing
+  fail is the first, cheap indication that upstream otterdog changed its plan output
+  format — caught in a PR against recorded fixtures rather than in a live drift run.
+  The bump PR is the place to re-record fixtures deliberately.
 - **Two otterdog entry points must stay coherent.** The dev-shell path (`uvx` inside the
   shell) and the CI path (pinned `uvx`) must not silently diverge in major version;
-  Renovate bumping one implies re-checking the other.
+  bumping one implies re-checking the other.
 - **`flake.nix` is edited, `ci.yml` is not.** Adding `sops`/`age`/`jsonnet` is a project
   `extraPackages` edit (the block `flake.nix` reserves as "yours"); the pinned `uvx`
   invocation lives in repo-owned plan/apply/drift workflows, never in managed `ci.yml`
@@ -109,10 +111,33 @@ stable (org-config#ADR-0007).
 
 ## Corrections
 
-None to date. Entries are added here only if an assumption above is later found wrong,
-preserved verbatim for audit:
+Entries are added here only if an assumption above is later found wrong, preserved
+verbatim for audit:
 
-> **YYYY-MM-DD:** original claimed X; source Y showed Z. Updated above.
+> **2026-09-23 (#225):** Consequences claimed *"Renovate owns the pin. The exact `uvx
+> otterdog` version is bumped by Renovate, keeping the tool current without hand
+> edits."* It never did. `renovate.json` sets `enabledManagers` to
+> `["github-actions", "pep621", "npm"]`, and the pin is a bare Just variable
+> (`otterdog_version := "…"` in `justfile.project`) that no Renovate manager matches —
+> there is no `customManagers` regex either here or in `template/renovate.json`. The
+> same false claim sat at `justfile.project:18` and in the three `template/` callers
+> ("Renovate can bump this alongside the engine SHA pin"). Confirmed by the otterdog
+> 1.5.0 bump, which had to be authored by hand across **five** literals: this repo's
+> `justfile.project` plus `template/.github/workflows/{plan,apply,drift,import}.yml`.
+> The 1.4.0 bump (`818e1f8`) missed one of them, logged as #164 item 7. Updated above;
+> the consequence is now that a bump is a deliberate authored change, which is the
+> honest state and a better fit for a pin that anchors the L1 fixture format.
+
+> **2026-09-23 (#225):** related, and recorded here because it constrains future pin
+> bumps: the otterdog version pin and the `otterdog.json` `base_template` pin
+> (`otterdog-defaults`) are **not** in lockstep and must not be moved together by
+> reflex. otterdog reads only the keys its base template defines, so a newer otterdog
+> against older defaults simply leaves new fields unmanaged. Moving
+> `otterdog-defaults` v0.13.1 → v0.14.x alongside otterdog 1.5.0 would have introduced
+> `max_cache_size_gb`, whose `/orgs/{org}/actions/cache/storage-limit` endpoint answers
+> `402` on this org's Free plan, writing a permanent `WARNING` line into every
+> `plan.txt` that the drift layer parses. The defaults pin stays at v0.13.1 by
+> decision, not by omission.
 
 ## Open questions / supersession triggers
 
