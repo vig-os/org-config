@@ -61,6 +61,22 @@ on:  # yamllint disable-line rule:truthy
       - otterdog.json
       - otterdog/**
       - .github/workflows/plan.yml
+      # `justfile.project` is here for one reason (#230): it holds
+      # `otterdog_version`, the ADR-0005 single source of truth that the "Resolve
+      # otterdog version pin" step below greps at run time. It therefore selects
+      # the BINARY that produces the diff — the highest-leverage input to plan
+      # behaviour in the repo, and ADR-0007's whole argument for pinning is that
+      # a version change can move that behaviour. A pure pin bump touches no
+      # config path, so without this line it gets no plan run at all: #229
+      # (1.4.0 -> 1.5.0) had to produce its empty-plan evidence by hand
+      # (`workflow_dispatch`, run 35844030809), while #145 (1.3.4 -> 1.4.0) was
+      # covered only incidentally because it also edited `otterdog/vig-os/`.
+      # Relying on that coincidence is luck, not coverage. Yes, the file also
+      # carries unrelated recipes, so some plan runs will diff nothing — it has
+      # moved 8 times in this repo's life (no Renovate manager matches it, and
+      # devkit upgrades preserve it), so the cost is a handful of read-only runs
+      # against a pin bump silently losing its evidence.
+      - justfile.project
   workflow_dispatch:
   workflow_call:
     inputs:

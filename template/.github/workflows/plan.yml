@@ -19,6 +19,11 @@ on:  # yamllint disable-line rule:truthy
     paths:
       - otterdog.json
       - otterdog/**
+      # Covers the otterdog pin too, so this filter needs no `justfile.project`
+      # line even though the engine's own plan.yml has one (#230): downstream the
+      # pin is the `otterdog_version:` input literal a few lines below, IN this
+      # caller — and `template/` ships no `justfile.project` at all (#56). Adding
+      # one here by symmetry with upstream would watch a file that does not exist.
       - .github/workflows/plan.yml
   workflow_dispatch:
 

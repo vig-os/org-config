@@ -58,6 +58,18 @@ on:  # yamllint disable-line rule:truthy
     # workflow edits carry no config delta, so they are deliberately NOT in
     # `paths:` — editing this file does not trigger an apply. `workflow_dispatch`
     # covers manual reruns.
+    #
+    # DELIBERATE ASYMMETRY WITH `plan.yml` (#230): `justfile.project` — the
+    # ADR-0005 `otterdog_version` pin both workflows grep — IS in plan.yml's
+    # `paths:` and is deliberately absent here. The two filters answer different
+    # questions. Plan must PROVE, before merge, that the newly pinned engine
+    # produces no diff, and a pure pin bump touches no config path, so plan has
+    # to watch the pin or it never runs on exactly the change ADR-0007 pins
+    # against. Apply must not MUTATE the live org off an engine-version edit
+    # that carries no config delta: the pre-merge plan already established it is
+    # a no-op, so an apply here would be a 30-minute run through the production
+    # gate to write nothing. If a pin bump ever does need applying, that is a
+    # `workflow_dispatch`, made deliberately by a human who read the plan.
     paths:
       - otterdog.json
       - otterdog/**
