@@ -53,7 +53,7 @@ Mandatory. Four independent axes were evaluated (Axis D was decided later, in #2
 | Option | Pros | Cons | Verdict |
 |---|---|---|---|
 | Apply config from `main` | Single release train | Governance fixes queue behind engine releases | Rejected: too slow |
-| Config from `dev`; engine to tags | Config live on merge; engine still pinnable | Two cadences | **Chosen** |
+| Config from trunk; engine to tags | Config live on merge; engine still pinnable | Two cadences | **Chosen** (trunk was `dev`; `main` since #63) |
 
 ### Axis C — mutation-test target
 
@@ -87,11 +87,12 @@ least-privilege GitHub App tokens minted for exactly the scope that job needs.
 - `plan` runs only on **same-repo PRs** (`github.event.pull_request.head.repo.full_name == github.repository`); forks
   get L0 static checks only, never plan.
 - **Never** use `pull_request_target` with a PR-head checkout (OWASP CICD-SEC-4 / Poisoned Pipeline Execution).
-- `apply` is **environment-gated** (required reviewer) and runs only from trunk (`dev`).
+- `apply` is **environment-gated** (required reviewer) and runs only from trunk (`main` since #63 — see the
+  2026-09-23 trunk correction below).
 - All mutations are **concurrency-serialized** — a reconciler racing itself manufactures phantom drift.
 
-**Split cadence:** config **applies from `dev` on merge**; the engine **releases to `main` + version tags** through the
-devkit pipeline for downstream pins (ADR-0006).
+**Split cadence:** config **applies from trunk (`main`) on merge**; the engine **releases as version tags** through
+the devkit pipeline for downstream pins (ADR-0006).
 
 **Test pyramid:**
 
@@ -135,7 +136,8 @@ read-only live plan) and confines the one expensive/destructive layer (L3) to a 
   is trusted (implementation: issues #15 L0, #18 plan-on-PR, #19 apply-on-merge, #23 testbed/L3).
 - Org-level configuration changes ship with plan-only assurance until a sandbox org exists; treat org-singleton apply
   as a manual, reviewed operation.
-- Downstream orgs pin the engine by tag/SHA; a breaking workflow change is a tagged release, not a silent `dev` merge.
+- Downstream orgs pin the engine by tag/SHA; a breaking workflow change is a tagged release, not a silent trunk
+  merge.
 - A PR proposing an unintended live diff **can merge on green CI**, and this is accepted (#236): the diff is visible
   in the plan comment, the drift run would raise it as a `drift`+`critical` issue (ADR-0002), and nothing reaches
   the live org until a human approves the `production` deployment with that same plan in front of them. The blast
@@ -168,6 +170,18 @@ Entries are added here only if an assumption above is later found wrong, preserv
 > Unaffected: the binding credential rule in the Decision — plan runs **only** on same-repo PRs — is an upper bound
 > on who may reach the App token, never a promise that every such PR is planned, and L3's "never per-PR" stands.
 > `README.md`'s testing summary already said "`plan` on every config PR" and needs no change.
+
+> **2026-09-23 (#237):** four statements above still described the pre-#63 branch topology, where `dev` was the
+> trunk and `main` a separate release branch. The binding credential rule said apply *"runs only from trunk
+> (`dev`)"*, the split cadence said config *"applies from `dev` on merge"* while the engine *"releases to `main` +
+> version tags"*, Axis B's chosen option read *"Config from `dev`; engine to tags"*, and a Consequences bullet
+> contrasted a tagged release with *"a silent `dev` merge"*. #63 retired `dev`: `main` is the single trunk and
+> applied-state branch (PRs target it, `apply-engine.yml` runs on pushes to it), and the engine releases as
+> version tags cut by the devkit release train, not by promotion to a separate branch. The decisions themselves
+> survive unchanged — apply is still trunk-only and environment-gated, and the split cadence
+> (config-on-merge vs engine-by-tag) is intact; only the branch names were stale. The credential-rule staleness is
+> the one that mattered: a reader auditing where the write token can run was told a branch that no longer exists.
+> Corrected above.
 
 ## Open questions / supersession triggers
 
