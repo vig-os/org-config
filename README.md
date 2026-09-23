@@ -154,17 +154,30 @@ nothing here calls it.
 
 ## Known limitations
 
-- **Repository rulesets are not readable on a private repo below Enterprise.**
-  The pinned otterdog's `github_organization.py` loads live repo rulesets only
-  when the repository is public or the org is on the `enterprise` plan —
-  stricter than the GitHub API, which supports repo rulesets on **Team**
-  ([#107](https://github.com/vig-os/org-config/issues/107),
-  [upstream #729](https://github.com/eclipse-csi/otterdog/issues/729)). A
-  private downstream org on Team (`exo-pet`) that declares a repo ruleset
-  therefore sees a permanent phantom `add` in every plan, and an apply would
-  `POST` a ruleset that already exists. Those rulesets are managed by hand via
-  `gh api`, with the declaration left out of the jsonnet until a fixed otterdog
-  release is pinned.
+- **Organization-level rulesets are unusable below Enterprise.**
+  `GitHubOrganization.validate()` raises an `ERROR` — *"use of organization
+  rulesets requires an 'enterprise' plan"* — whenever a config declares any, so
+  an org ruleset cannot be declared here at all. Upstream
+  [#731](https://github.com/eclipse-csi/otterdog/pull/731) removed the plan gate
+  from the org ruleset *read* path but left this *validate* gate in place; filed
+  as [upstream #763](https://github.com/eclipse-csi/otterdog/issues/763).
+  Anything org-wide stays hand-managed. **Repository** rulesets are no longer
+  affected: the otterdog 1.5.0 pin ungated their read path on private repos of
+  any plan, closing
+  [#107](https://github.com/vig-os/org-config/issues/107) /
+  [upstream #729](https://github.com/eclipse-csi/otterdog/issues/729)
+  ([#225](https://github.com/vig-os/org-config/issues/225)).
+
+- **Creating a repository costs two apply dispatches when Code Security is
+  unavailable.** The post-create `PATCH /repos/{org}/{repo}/code-scanning/default-setup`
+  returns `403` even when otterdog is asking to turn code scanning *off*, so the
+  first `apply` of a new repo exits non-zero although the repository and every
+  declared setting were applied; an immediate re-dispatch is a clean no-op. The
+  read path already tolerates exactly this condition, the write path does not.
+  Unfixed at the 1.5.0 pin — `_update_code_scanning_config` is byte-identical to
+  1.4.0 and still raises unconditionally
+  ([#209](https://github.com/vig-os/org-config/issues/209),
+  [upstream #738](https://github.com/eclipse-csi/otterdog/issues/738)).
 
 ## Working in this repo
 

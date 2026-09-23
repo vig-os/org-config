@@ -28,9 +28,11 @@ jobs:
     with:
       org_github_id: YOUR_ORG      # TODO: this org's GitHub login (e.g. exo-pet)
       config_repo: org-config      # TODO: this repo's name, if different
-      # Keep in lockstep with the engine's justfile.project otterdog pin (#56);
-      # Renovate can bump this alongside the engine SHA pin above.
-      otterdog_version: "1.4.0"
+      # Keep in lockstep with the engine's justfile.project otterdog pin (#56).
+      # BY HAND: Renovate bumps the `uses:` ref above, but this is a plain input
+      # string no manager matches, so it does NOT propagate with the engine pin
+      # or with an engine release — edit it here (#225).
+      otterdog_version: "1.5.0"
     secrets:
       ORG_CONFIG_APP_CLIENT_ID: ${{ secrets.ORG_CONFIG_APP_CLIENT_ID }}
       ORG_CONFIG_APP_PRIVATE_KEY: ${{ secrets.ORG_CONFIG_APP_PRIVATE_KEY }}
