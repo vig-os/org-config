@@ -876,6 +876,12 @@ orgs.newOrg('vig-os', 'vig-os') {
       allow_rebase_merge: true,
       allow_squash_merge: true,
       allow_update_branch: false,
+      // The only vig-os repo not defaulting to `main`, and deliberately so
+      // (tessera#383): `main` is release-only with no release cut yet
+      // (0.1.0-alpha.1 held), while every open PR, Dependabot branch and the
+      // last 500+ commits live on `dev`. Flip back to the vendored `main`
+      // default at the first alpha.
+      default_branch: 'dev',
       delete_branch_on_merge: false,
       description: 'FAIR Data on HDF5 — self-describing, FAIR-principled data format for scientific data products',
       private_vulnerability_reporting_enabled: true,

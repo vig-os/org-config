@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`tessera` declares `dev` as its default branch, adopting a documented upstream decision** ([#215](https://github.com/vig-os/org-config/issues/215)): the repo block carried no `default_branch`, so it inherited the vendored `main` and the daily drift run had reported `dev -> main` every day since 2026-09-08. The live value is neither an accident nor an incident — it is documented in the repo it governs ([tessera#383](https://github.com/vig-os/tessera/pull/383), *"point the default branch to dev until the first alpha"*): `main` is release-only with no release cut yet (`0.1.0-alpha.1` is held), while `dev` carries all five open PRs, every Dependabot branch, and 516 commits `main` does not have. Reverting — the other half of the [ADR-0002](docs/adr/0002-drift-semantics.md) choice the issue exists to force — would have pointed every fresh clone and default PR base at a branch untouched since 2026-06-30, and would have silently undone a maintainer decision, which is precisely what issue-only drift reporting is designed to prevent. Adopted in config rather than silenced in `drift-allowlist.toml`: `default_branch` is a first-class Otterdog field, and the allow-list is for divergence the schema *cannot* express. `tessera` is the only vig-os repo not on `main` (the other nine all are), so the deviation is declared explicitly and carries its expiry — *until the first alpha* — as a comment, making the eventual flip back a one-line change rather than a re-investigation. Config-only: nothing live is touched, the plan for that repo simply goes empty and #215 closes itself on the next scheduled drift run.
+
 ### Deprecated
 
 ### Removed
