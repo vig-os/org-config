@@ -76,6 +76,10 @@ Team (#6) before its config repo gets an apply-capable App install.
 
 **Versioning.** `DEVKIT_TAG_PREFIX=v` → releases tag as **`v1.0.0`** (SemVer, devkit convention). **No floating major tags**
 (no `v1`); downstream callers pin an **exact tag or SHA** (SHA recommended for `exo-pet`), bumped by **Renovate**.
+Since org-config#228 that one pin also selects the **otterdog version** a consumer runs — the reusable workflows
+default `otterdog_version` to the engine's own pin (ADR-0005) instead of making each org mirror it — so a
+pin bump moves the engine and the tool together, which raises the stakes on the release notes for a bump: they are
+what makes a changed plan expected rather than alarming.
 
 ## Rationale
 
