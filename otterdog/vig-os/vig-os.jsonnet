@@ -57,7 +57,12 @@ orgs.newOrg('vig-os', 'vig-os') {
     // The five devkit-scaffolded repos authenticating with the client-ID form,
     // plus h5v and scitadel PRE-SEEDED ahead of their re-scaffold off the
     // legacy numeric form (#112) so the migration lands with a working
-    // credential on day one and without another list edit (#123).
+    // credential on day one and without another list edit (#123). tessera
+    // joins from its devkit 1.16.0 scaffold (#252, tessera#364) and is the
+    // first repo here on the client-ID form FROM DAY ONE — its
+    // `sync-issues.yml` reads `client-id:` with no numeric fallback, so it is
+    // deliberately absent from COMMIT_APP_ID below and leaves nothing for
+    // #112 to retire.
     orgs.newOrgSecret('COMMIT_APP_CLIENT_ID') {
       selected_repositories+: [
         'commit-action',
@@ -67,6 +72,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'org-config',
         'scitadel',
         'sync-issues-action',
+        'tessera',
       ],
       value: '********',
       visibility: 'selected',
@@ -101,6 +107,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'org-config',
         'scitadel',
         'sync-issues-action',
+        'tessera',
       ],
       value: '********',
       visibility: 'selected',
@@ -109,7 +116,11 @@ orgs.newOrg('vig-os', 'vig-os') {
     // DEVKIT_UPGRADE_APP_ID -> _CLIENT_ID rename: devkit-smoke-test and
     // org-config reference it today. commit-action and sync-issues-action keep
     // their pre-seeded entries for their own 1.7 adoption; h5v and scitadel
-    // are pre-seeded ahead of their re-scaffold (#112, #123).
+    // are pre-seeded ahead of their re-scaffold (#112, #123). tessera consumes
+    // it directly from its devkit 1.16.0 scaffold (#252, tessera#364): that
+    // workflow takes the numeric DEVKIT_UPGRADE_APP_ID only as a legacy
+    // fallback, so the client-ID entry alone is sufficient and no numeric one
+    // is added.
     orgs.newOrgSecret('DEVKIT_UPGRADE_APP_CLIENT_ID') {
       selected_repositories+: [
         'commit-action',
@@ -118,6 +129,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'org-config',
         'scitadel',
         'sync-issues-action',
+        'tessera',
       ],
       value: '********',
       visibility: 'selected',
@@ -153,6 +165,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'org-config',
         'scitadel',
         'sync-issues-action',
+        'tessera',
       ],
       value: '********',
       visibility: 'selected',
