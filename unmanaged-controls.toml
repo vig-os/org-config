@@ -264,14 +264,19 @@ it, what reads it, or when it should be rotated.
 # --- Repository ruleset internals ----------------------------------------------
 #
 # The list-addressing forms above exist for repository rulesets (#205), and this
-# org deliberately declares no row for them. Every vig-os repo but one is PUBLIC,
-# where otterdog models rulesets and the plan already diffs them — a row here
-# would duplicate a modelled control, which is exactly what this table is not
-# for. The exception, `qms`, is private on a Free-plan org, where BOTH ruleset
-# endpoints answer 403 "Upgrade to GitHub Pro" and nothing can read them at all.
-# The capability is therefore held for downstream orgs on Team/Enterprise, whose
-# private repos otterdog cannot read (#107, eclipse-csi/otterdog#729) while REST
-# can. The shape a downstream row takes, verified live:
+# org deliberately declares no row for them. Be precise about why, because the
+# reason is narrower than "otterdog models rulesets": otterdog models the ruleset
+# OBJECT and the rule parameters its schema knows about, so on a PUBLIC repo —
+# every vig-os repo but one — the plan already diffs those, and a row asserting
+# one would duplicate a modelled control, which is exactly what this table is not
+# for. It does NOT follow that every parameter inside a rule is modelled. Some are
+# invisible to both legs at once: not in the plan (no model field, so no diff) and
+# deliberately not asserted here either (see below). The exception, `qms`, is
+# private on a Free-plan org, where BOTH ruleset endpoints answer 403 "Upgrade to
+# GitHub Pro" and nothing can read them at all. The capability is therefore held
+# for downstream orgs on Team/Enterprise, whose private repos otterdog cannot read
+# (#107, eclipse-csi/otterdog#729) while REST can. The shape a downstream row
+# takes, verified live:
 #
 #   [[control]]
 #   key        = "main-required-checks"
@@ -288,6 +293,35 @@ it, what reads it, or when it should be rotated.
 # actually protects the branch whichever ruleset carries it. If two rulesets both
 # contribute a required_status_checks rule the row degrades to UNRESOLVED, which
 # is the honest answer — the row cannot know which one it meant.
+#
+# UNMODELLED RULE PARAMETERS, and why they still get no row (#246). Otterdog
+# (every version through 1.6.0, the current pin included) does not model the
+# `allowed_merge_methods` parameter of a ruleset's `pull_request` rule: plan never
+# diffs it, and apply PUTs the rule WITHOUT it, so GitHub's default-on-omit — all
+# three merge methods — is restored on every apply that touches the ruleset. That
+# is not hypothetical: on 2026-08-08 one routine apply reverted a hand-set
+# `["merge"]` on ten rulesets across four repos, provable version by version
+# through `GET /repos/{org}/{repo}/rulesets/{id}/history/{version}`. Upstream:
+# eclipse-csi/otterdog#768.
+#
+# The decision (2026-09-24) is that REPO MERGE SETTINGS own the merge-method
+# policy: `allow_merge_commit` / `allow_squash_merge` / `allow_rebase_merge` ARE
+# modelled, are declared once in `otterdog/vig-os/house-defaults.libsonnet`
+# (`houseMergePolicy`, merge commits only), and are therefore plan-diffed on every
+# config PR and drift-guarded daily. The ruleset-level parameter stays at the
+# platform default BY DECISION until otterdog models it. A row asserting
+# `["merge"]` here is deliberately NOT added: it would be correct and would open
+# an issue every time this engine's own apply re-widened the value — self-inflicted
+# drift noise over a second source of truth for one policy, with the table
+# asserting a state the tool actively fights. This table is for what the engine
+# cannot touch, not for re-litigating what the engine overwrites. Exit criterion:
+# when the ADR-0005 otterdog pin reaches a version fixing #768, declare
+# `allowed_merge_methods` in the jsonnet as ordinary config — no row, either way.
+#
+# `require_extra_approval_for_unattributed_changes` is equally unmodelled and
+# needs no action: GitHub's default-on-omit is evidently `true` (it reads `true`
+# in every version above, human- and bot-written alike), which is the value we
+# want.
 
 # --- Unassertable controls -----------------------------------------------------
 #
