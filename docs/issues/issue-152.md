@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-09-23T21:03:02Z
+updated: 2026-09-24T07:03:30Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-23T21:09:35.825Z
+synced: 2026-09-24T07:21:56.254Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
@@ -25,6 +25,7 @@ This issue lists Renovate updates and detected dependencies. Read the [Dependenc
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
  - [ ] <!-- unschedule-branch=renovate/github-actions-(minor-and-patch) -->ci(actions): update astral-sh/setup-uv action to v10.2.0
+ - [ ] <!-- unschedule-branch=renovate/otterdog-1.x -->ci(otterdog): update dependency otterdog to v1.6.0
  - [ ] <!-- unschedule-branch=renovate/lock-file-maintenance -->build(pip): lock file maintenance
  - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
 
@@ -196,6 +197,42 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `pytest ==9.1.1`
  - `pytest-cov ==7.1.0`
  - `ruff ==0.16.8`
+
+</details>
+
+</blockquote>
+</details>
+
+<details><summary>regex (5)</summary>
+<blockquote>
+
+<details><summary>.github/workflows/apply.yml (1)</summary>
+
+ - `otterdog 1.5.0` → [Updates: `1.6.0`]
+
+</details>
+
+<details><summary>.github/workflows/drift.yml (1)</summary>
+
+ - `otterdog 1.5.0` → [Updates: `1.6.0`]
+
+</details>
+
+<details><summary>.github/workflows/plan.yml (1)</summary>
+
+ - `otterdog 1.5.0` → [Updates: `1.6.0`]
+
+</details>
+
+<details><summary>justfile.project (1)</summary>
+
+ - `otterdog 1.5.0` → [Updates: `1.6.0`]
+
+</details>
+
+<details><summary>template/.github/workflows/import.yml (1)</summary>
+
+ - `otterdog 1.5.0` → [Updates: `1.6.0`]
 
 </details>
 
