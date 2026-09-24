@@ -90,10 +90,11 @@ stable (org-config#ADR-0007).
 
 ## Consequences
 
-- **The pin is bumped by hand, deliberately.** See the 2026-09-23 correction below:
-  Renovate cannot see it. A bump is therefore an authored change — which suits a pin
-  that doubles as the fixture-format anchor, since the bump PR is where the plan output
-  is re-checked against live.
+- **The pin is proposed by Renovate and adopted by a human.** See the two 2026-09-23
+  corrections and the 2026-09-24 one below: Renovate could not see the pin at all until
+  a `custom.regex` manager was added for it. The *edit* is now mechanical across all
+  five literals; the *decision* stays authored, because the bump PR is where the plan
+  output is re-checked against live and the fixture format is re-confirmed.
 - **A pin bump that breaks fixture parsing is an early-warning signal, not a nuisance.**
   Because the same pin anchors the L1 plan fixtures, a bump that makes fixture parsing
   fail is the first, cheap indication that upstream otterdog changed its plan output
@@ -162,6 +163,25 @@ verbatim for audit:
 > literal. `justfile.project` is therefore still the **effective resolver** for every run
 > this repo triggers itself; the mirrors exist only for callers, and a test, not a
 > convention, keeps them honest.
+
+> **2026-09-24 (#250):** the first 2026-09-23 entry above is now itself partly
+> superseded, and is left standing because the diagnosis in it was right. Renovate
+> genuinely could not see the pin — but the conclusion drawn from that, *"a bump is
+> therefore an authored change"*, conflated two things a `customManagers` entry
+> separates. `renovate.json` now enables `custom.regex` and defines one manager that
+> reads a `# renovate: datasource=pypi depName=otterdog` marker placed above each of the
+> five literals, so all five move together in a single Renovate PR. What stays authored
+> is the **adoption**, not the editing: the rule sets `automerge: false` and requests
+> review, `plan` runs on the PR since #230 put `justfile.project` in its paths filter,
+> and the reviewer reads that plan before merging. Stated precisely, because it would be
+> easy to over-read: this is a **requested** review, not an enforced one. `Main
+> protection` grants `OrganizationAdmin` an `always` bypass and
+> `required_approving_review_count` is 0 by decision (#167, a sole maintainer cannot
+> self-approve), so no ruleset configuration can gate the maintainer's own merge — the
+> gate is a convention backed by a review request, and `tests/test_otterdog_pin.py` is
+> the only mechanical guard, asserting that every site keeps its marker and its value.
+> The `otterdog-defaults` pin is excluded from the manager's file patterns, preserving
+> the second 2026-09-23 entry's decision rather than quietly automating past it.
 
 ## Open questions / supersession triggers
 

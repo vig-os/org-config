@@ -33,9 +33,15 @@ on:  # yamllint disable-line rule:truthy
           the pin itself instead of inheriting it from the engine ref the plan /
           apply / drift callers pin (#228). The literal mirrors the engine's
           `justfile.project` pin and the engine's CI asserts the two are equal —
-          the 1.4.0 bump missed exactly this one (#164 item 7).
+          the 1.4.0 bump missed exactly this one (#164 item 7). The `# renovate:`
+          marker below is read by the ENGINE repo's Renovate (#250), which bumps
+          this file there; in an instantiated downstream repo it is inert, and
+          deliberately so — this bootstrap is dispatched once at onboarding, so a
+          pin that ages afterwards costs nothing, and shipping a custom manager
+          into every consumer config would not.
         required: false
         type: string
+        # renovate: datasource=pypi depName=otterdog
         default: "1.5.0"
 
 permissions: {}

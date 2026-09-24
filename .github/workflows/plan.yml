@@ -104,6 +104,7 @@ on:  # yamllint disable-line rule:truthy
           value to override; pass an explicitly EMPTY string to resolve the pin
           from a `justfile.project` in the checkout instead.
         type: string
+        # renovate: datasource=pypi depName=otterdog
         default: '1.5.0'
     # Secret names MATCH this repo's bootstrap Actions secrets (github-app.md), so
     # the credential references below are byte-identical whether reached on this

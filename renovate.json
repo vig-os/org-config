@@ -3,5 +3,32 @@
   "extends": [
     "github>vig-os/org-config//.github/renovate-default"
   ],
-  "enabledManagers": ["github-actions", "pep621", "npm"]
+  "enabledManagers": ["github-actions", "pep621", "npm", "custom.regex"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "ADR-0005 otterdog pin (#250): the justfile.project single source of truth plus its four in-repo mirrors, each carrying a `# renovate:` marker on the line above the literal. All five share one depName, so Renovate raises ONE pull request covering them; tests/test_otterdog_pin.py fails the build if a site loses its marker or drifts from the SSoT. Deliberately excludes otterdog.json's `otterdog-defaults` base_template pin, which is held at v0.13.1 by decision (402 on a Free plan) and is not in lockstep with this pin.",
+      "managerFilePatterns": [
+        "/^justfile\\.project$/",
+        "/^\\.github/workflows/(plan|apply|drift)\\.yml$/",
+        "/^template/\\.github/workflows/import\\.yml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+(?:otterdog_version\\s*:=|default:)\\s*['\"](?<currentValue>[^'\"]+)['\"]"
+      ],
+      "versioningTemplate": "pep440"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "The otterdog pin is proposed by Renovate and adopted by a human (#250). The engine ref selects the binary that produces every plan, so the PR requests review and never automerges. `Plan` does run on it (#230 added justfile.project to the paths filter) but is advisory, not a required check (ADR-0007 Axis D, #236), so the review is where the empty-plan evidence is actually read. Note this is a requested review, not an enforced one: the `Main protection` ruleset grants OrganizationAdmin an `always` bypass, so no ruleset setting can gate the maintainer's own merge.",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["otterdog"],
+      "reviewers": ["c-vigo"],
+      "automerge": false,
+      "addLabels": ["area:ci"],
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "otterdog"
+    }
+  ]
 }
