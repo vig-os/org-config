@@ -38,10 +38,17 @@
 # collections GitHub returns in no guaranteed order. `expect`/`tolerated` are
 # then arrays of plain values, so the path must project down to bare values.
 #
-# REPOSITORY RULESETS are the reason those forms exist. Otterdog cannot read live
-# rulesets on a private repo below Enterprise, so on a private Team-plan org they
-# are precisely the controls with no other detector — and their internals are all
-# list-shaped. The two rows worth holding for a protected branch:
+# REPOSITORY RULESETS are the reason those forms exist — their internals are all
+# list-shaped. Be precise about when a row is warranted: since engine v1.4.0
+# (otterdog 1.5.0, eclipse-csi/otterdog#731) otterdog reads live repository
+# rulesets on every plan tier and both repo visibilities, so the fields its
+# schema models are already diffed by the plan and a row asserting one would
+# duplicate a modelled control — which is what this table is not for. Hold a row
+# for what the plan cannot show: a rule parameter otterdog does not model, or a
+# ruleset deliberately kept out of the config. ORG-level rulesets are the
+# stronger case — otterdog reads them but still refuses to declare any below
+# Enterprise (eclipse-csi/otterdog#763), so they stay hand-managed and a row here
+# is their only detector. The shape such a row takes on a protected branch:
 #
 #   [[control]]
 #   key        = "main-required-checks"

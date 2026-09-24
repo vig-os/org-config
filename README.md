@@ -70,8 +70,8 @@ lifecycle under an `unmanaged-control` label. Field paths reach into JSON
 **lists** as well as objects — `[type=required_status_checks]` selects one
 element of a list, `[].context` projects a field out of every element, and
 `compare = "set"` asserts the result as an unordered set — so a repository
-ruleset's internals are assertable, which matters most on a private repo where
-Otterdog cannot read rulesets at all. The leg degrades **per row** — a control
+ruleset's internals are assertable, including the rule parameters Otterdog's
+schema does not model. The leg degrades **per row** — a control
 that cannot be read, or a path matching zero or several elements, leaves its own
 issue untouched rather than being reported as drift or silently resolved. Check any row against live state without
 writing an issue:

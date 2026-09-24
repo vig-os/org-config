@@ -274,9 +274,12 @@ it, what reads it, or when it should be rotated.
 # deliberately not asserted here either (see below). The exception, `qms`, is
 # private on a Free-plan org, where BOTH ruleset endpoints answer 403 "Upgrade to
 # GitHub Pro" and nothing can read them at all. The capability is therefore held
-# for downstream orgs on Team/Enterprise, whose private repos otterdog cannot read
-# (#107, eclipse-csi/otterdog#729) while REST can. The shape a downstream row
-# takes, verified live:
+# for the rule parameters no plan diffs (below), for org-level rulesets otterdog
+# still refuses to declare below Enterprise (eclipse-csi/otterdog#763), and for a
+# downstream org that deliberately keeps a ruleset out of its config. The
+# private-repo READ gate that originally motivated it is gone: otterdog 1.5.0
+# reads repository rulesets on every plan tier and both visibilities (#107, #225,
+# eclipse-csi/otterdog#729). The shape a downstream row takes, verified live:
 #
 #   [[control]]
 #   key        = "main-required-checks"
