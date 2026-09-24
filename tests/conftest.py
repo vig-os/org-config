@@ -55,6 +55,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "org-config",
             "scitadel",
             "sync-issues-action",
+            "tessera",
         ),
     ),
     "COMMIT_APP_ID": ("selected", ("commit-action", "h5v", "scitadel", "sync-issues-action")),
@@ -68,6 +69,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "org-config",
             "scitadel",
             "sync-issues-action",
+            "tessera",
         ),
     ),
     "DEVKIT_UPGRADE_APP_CLIENT_ID": (
@@ -79,6 +81,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "org-config",
             "scitadel",
             "sync-issues-action",
+            "tessera",
         ),
     ),
     "DEVKIT_UPGRADE_APP_ID": (
@@ -94,6 +97,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "org-config",
             "scitadel",
             "sync-issues-action",
+            "tessera",
         ),
     ),
     "ORG_CONFIG_CANARY": ("selected", ("org-config",)),
