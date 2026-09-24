@@ -53,9 +53,18 @@ label.
 
 A third leg asserts the controls Otterdog **cannot model** — Actions SHA-pinning,
 the fork-PR approval policy, the new-repository security defaults, org-secret
-visibility and reader lists. These have no field in its schema, so they appear
-in no plan diff: without an assertion they can be flipped in the UI and nothing
-notices. [`unmanaged-controls.toml`](unmanaged-controls.toml) declares each one
+visibility and reader lists, and the parameters inside a repository ruleset's
+`pull_request` rule (`allowed_merge_methods`,
+`require_extra_approval_for_unattributed_changes`): Otterdog models the ruleset
+*object*, not every rule parameter in it. These have no field in its schema, so
+they appear in no plan diff: without an assertion they can be flipped in the UI
+and nothing notices — and an unmodelled *rule* parameter is worse than merely
+invisible, because apply re-sends the rule without it and GitHub restores its
+default ([upstream #768](https://github.com/eclipse-csi/otterdog/issues/768),
+which silently re-widened ten rulesets here on 2026-08-08). Not every such
+control gets a row: merge methods are owned by the modelled repo settings
+instead, and [`unmanaged-controls.toml`](unmanaged-controls.toml) records that
+decision where a row would otherwise go. [`unmanaged-controls.toml`](unmanaged-controls.toml) declares each one
 as an endpoint, a field path and the expected value; findings join the same
 lifecycle under an `unmanaged-control` label. Field paths reach into JSON
 **lists** as well as objects — `[type=required_status_checks]` selects one
