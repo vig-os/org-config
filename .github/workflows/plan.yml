@@ -50,6 +50,29 @@
 # `secrets.<alias> || secrets.<REPO_SECRET>` resolves to this repo's own
 # bootstrap secret (the caller-passed alias is empty). Callers pass the App
 # credentials as `secrets:` (callable cross-org because this repo is public).
+#
+# DOWNSTREAM MERGE GATE — FAIL-SOFT IS BINDING (#268): a caller may make this
+# job's check a REQUIRED status context on its own `main`, and a caller that
+# does ships no `paths:` filter (a filtered skip leaves a required context
+# Pending forever, so the two are one decision). Assume a caller has: every
+# step below then sits on another org's merge gate, for every pull request,
+# including ones that touch no config. Two classes of step, and only the first
+# may redden:
+#   * THE VERDICT SPINE — checkout, uv, `Resolve otterdog version pin`, the
+#     token mint, `Run otterdog plan`, `Fail on plan error`. These redden BY
+#     DESIGN, and that is exactly the contract a consumer states for the check:
+#     it reddens on invalid config, auth, or a harness error, never on a diff.
+#   * EVERYTHING AUXILIARY — anything not needed to produce that verdict. It
+#     MUST be fail-soft: a guard, `continue-on-error`, and an `if:` on the
+#     guard's output, so it degrades to "not checked" instead of reddening
+#     someone else's gate. The App-slug steps below are the worked example
+#     (#259 / #274).
+# Two shipped auxiliary steps do NOT meet that rule yet — `Build plan report`
+# and `Upsert plan comment on the PR`, both `if: always()` with
+# `set -euo pipefail` and `gh api` writes, so a 422/5xx on a cosmetic comment
+# reddens the gate. Tracked in #276; they are the known exceptions, not
+# precedent. ADR-0007's Axis D "advisory" verdict (#236) is about THIS repo
+# only — its 2026-09-25 correction carries the downstream evidence.
 name: Plan
 
 on:  # yamllint disable-line rule:truthy
@@ -323,10 +346,12 @@ jobs:
       # declared nowhere needs a live ruleset read and is not covered.
       #
       # ADVISORY, BINDING (ADR-0007 Axis D, #236): `Plan` is not a required
-      # check, so these findings live in the report body and the job summary and
-      # NEVER in an exit code. This step cannot fail and does not touch
-      # `steps.plan.outputs.rc`, so `Fail on plan error` keeps its contract
-      # ("nonzero means config/auth/harness, never drift").
+      # check in THIS repository, and downstream this job's own context is a
+      # required one (#268), so in both directions these findings live in the
+      # report body and the job summary and NEVER in an exit code. This step
+      # cannot fail and does not touch `steps.plan.outputs.rc`, so `Fail on
+      # plan error` keeps its contract ("nonzero means config/auth/harness,
+      # never drift").
       - name: Check declared App slugs against this job's token
         id: app-actors
         # Belt and braces with the `exit 0`s below (#268): the mode itself

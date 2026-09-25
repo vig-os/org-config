@@ -102,10 +102,12 @@ the devkit pipeline for downstream pins (ADR-0006).
   fixture-format stability.
 - **L2 — live read-only `otterdog plan`** against `vig-os` on same-repo PRs that touch the config, the plan workflow,
   or the otterdog pin (`plan.yml`'s `paths:` filter — see the 2026-09-23 correction below): plan is non-mutating, so
-  this is free E2E read-path coverage. **L2 is advisory by decision, not by accident (#236, Axis D):** `Plan` is not
-  and will not be a required status check — `Main protection` requires exactly one context, `CI Summary`. Three
-  facts make enforcement the wrong control rather than merely an unavailable one. First, `plan` exits **0** on a
-  non-empty diff — a nonzero exit means invalid config, auth, or a harness failure, never drift — so requiring it
+  this is free E2E read-path coverage. **L2 is advisory by decision, not by accident (#236, Axis D):** in **this
+  repository** `Plan` is not and will not be a required status check — `vig-os`'s `Main protection` requires exactly
+  one context, `CI Summary`; a consumer org decides that for itself, and the only one decided the other way (see the
+  2026-09-25 correction below).
+  Three facts make enforcement the wrong control rather than merely an unavailable one. First, `plan` exits **0** on
+  a non-empty diff — a nonzero exit means invalid config, auth, or a harness failure, never drift — so requiring it
   would gate merges on App-credential and API health, conditions of the runner rather than properties of the PR.
   Second, the config-validity half of that signal is *already* behind the required check: `otterdog validate
   --local` runs as an L0 hook via `just precommit` in the `Lint & Format` job, offline and credential-free, on
@@ -145,10 +147,24 @@ read-only live plan) and confines the one expensive/destructive layer (L3) to a 
 - `Main protection` deliberately gains **no** second required context. `org-config` is solo-maintained with an
   unconditional `#OrganizationAdmin` bypass and `required_approving_review_count: 0`; a gate the only maintainer
   routinely clicks past is the #115 / #167 / #195 / #226 pathology this repo has repeatedly removed.
-- The Axis D decision propagates downstream unchanged: `template/`'s plan caller keeps its `paths:` filter, and a
-  consumer org wires no plan context into its ruleset. On a private consumer below Enterprise, where environment
-  required reviewers return HTTP 422, the human gate is the `workflow_dispatch` that runs apply (template Mode B) —
-  a different mechanism for the same property: no mutation without a human who has read a plan.
+- **The Axis D decision is `vig-os`-local — it does not propagate** (corrected 2026-09-25, #268). A consumer org
+  decides the enforcement status of its own plan context, and the only one decided the other way:
+  `exo-pet/org-config`'s `Main protection` requires exactly one status context and it is `plan / Plan committed
+  config against live exo-pet`, so its caller deliberately ships **no** `paths:` filter. Those are one decision, not
+  two — a path-filtered skip leaves a required context `Pending` forever, the same unavailability that rejected
+  "require the check as-is" in Axis D. Two things follow here. First, `plan.yml` is a `workflow_call` workflow, so
+  **every step added to it is a step on a downstream merge gate, on every PR including ones that touch no config**:
+  a new step must be fail-soft — a guard, `continue-on-error`, and an `if:` on the guard's output — or a transient
+  GitHub blip reddens another org's merge gate, and no consumer PR merges there without the org-admin bypass
+  (`Main protection` there carries an `#OrganizationAdmin` actor at `bypass_mode: pull_request` with
+  `required_approving_review_count: 0` — i.e. the pathology the bullet above rejects, arrived at by accident rather
+  than chosen). That rule is restated in `plan.yml`'s own header, where the author of the next step will read it.
+  Second, `template/`'s shipped `paths:` filter is the default for an org that has
+  not made that choice yet — a Free-plan org cannot enforce a context on a private repo at all — not a prediction
+  about adopters; the template annotates it to be deleted if the plan context is ever made required. On a private
+  consumer below Enterprise, where environment required reviewers return HTTP 422, the human gate on *mutation* is
+  still the `workflow_dispatch` that runs apply (template Mode B) — a different mechanism for the same property: no
+  mutation without a human who has read a plan.
 
 ## Corrections
 
@@ -183,6 +199,43 @@ Entries are added here only if an assumption above is later found wrong, preserv
 > the one that mattered: a reader auditing where the write token can run was told a branch that no longer exists.
 > Corrected above.
 
+> **2026-09-25 (#268):** the last Consequences bullet claimed that *"The Axis D decision propagates downstream
+> unchanged: `template/`'s plan caller keeps its `paths:` filter, and a consumer org wires no plan context into its
+> ruleset."* Both halves are false of the only consumer, and were already false a month before this bullet was
+> written (`868d4f5`, 2026-09-23). `exo-pet/org-config` deleted its caller's `paths:` filter and made the plan
+> context required on the **same morning, 2026-08-24, under its own #35** (issue closed 07:56Z): the filter goes in
+> `04d8645` at 07:52Z — *"run plan on every PR as the required main status check"* — and ruleset `20545163` gains
+> its `required_status_checks` rule at 07:53Z, history version `47427003` (the live version is `47427597`, 08:02Z
+> the same day). Its own **#62** is a month later still — closed 2026-09-24, a day *after* this bullet — and did
+> something narrower: it imported that hand-managed ruleset into the committed jsonnet. So this is not the third
+> stale statement in this list; it was untrue on the day it was written, and the two halves are one decision rather
+> than two. `exo-pet/org-config`'s `Main protection` requires **exactly one** status context, and it is the plan
+> context. Evaluated from the committed jsonnet with the ADR-0005 pin's own `jsonnet_evaluate_file`
+> (`uvx --from otterdog==1.5.0`) — projected to the fields that matter here, not verbatim tool output —
+> and the live ruleset (`GET /repos/exo-pet/org-config/rules/branches/main`, ruleset `20545163`) agrees:
+>
+> ```text
+> org-config | Main protection | {'status_checks': ['plan / Plan committed config against live exo-pet'],
+>                                'strict': False}
+> ```
+>
+> The consumer's caller says the same in prose and has deliberately deleted the filter this repo's `template/`
+> ships: *"No `paths` filter: this check is ruleset-required on main (#35), so it must produce a run on every PR or
+> non-config PRs could never merge."* What the wrong model costs is concrete: #259 was designed against it and
+> drafted an unguarded engine checkout into the reusable `plan.yml` — an unguarded network step on another org's
+> merge gate, for every PR — and its README text called the finding advisory without scoping the claim; it shipped
+> fail-soft and scoped instead (#274). Corrected above, and the engineering consequence now also lives in
+> `plan.yml`'s header and in `template/`'s caller, where a workflow author and an onboarding org respectively will
+> meet it. The header states the rule as two classes — the verdict spine reddens by design, everything auxiliary
+> must be fail-soft — and names the two shipped auxiliary steps that do not meet it yet (`Build plan report`,
+> `Upsert plan comment on the PR`; #276), so the rule is not read as a description of the file's current state.
+>
+> Unaffected: the preceding bullet — `Main protection` here gains **no** second required context — is a statement
+> about **this** repository and stands, as does the #236 Axis D verdict behind it (`vig-os`'s own gate requires only
+> `CI Summary`, #230) and every binding credential rule in the Decision, which bound who may reach the App token and
+> never who may require the check. Only the claim that the decision propagates was wrong; the L2 bullet's identical
+> "not a required status check" sentence has been scoped to this repository in place, for the same reason.
+
 ## Open questions / supersession triggers
 
 - **`vig-os-sandbox` org** is revisited if either trigger fires: (a) an **org-level apply escape** — a need to
@@ -193,6 +246,11 @@ Entries are added here only if an assumption above is later found wrong, preserv
 - An Otterdog upgrade that breaks the recorded plan-fixture format invalidates the L1 stability assumption and forces
   a fixture refresh (and possibly a pin policy revisit).
 - If read-only `plan` ever mutates state, the L2 "free E2E" premise collapses and L2 must move behind the apply gate.
+- **`template/`'s shipped `paths:` filter is provisional (#268).** It was annotated rather than flipped on a sample
+  of one: the single adopter deleted it because it had made the plan context required. Re-check at the next
+  onboarding (`exoma-ch`, `MorePET`) whether they wire the context too; if they do, the template default is
+  backwards rather than merely over-general, and the caller should ship unfiltered with the filter as a documented
+  opt-in.
 - **The Axis D "stay advisory" verdict (#236) has three revisit triggers.** (a) A merged-but-unintended config
   change that the `production` approval failed to catch would promote the skip-shim from rejected to scheduled —
   as of #236 there is no such incident, and `plan.yml` has never once concluded `failure` (57 runs). (b) A

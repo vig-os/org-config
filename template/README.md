@@ -135,7 +135,11 @@ secret and is never committed (ADR-0003).
 Per ADR-0006, a **Free-plan** org runs **plan-first / read-only**:
 
 - Wire the **plan** caller (`.github/workflows/plan.yml`) immediately — it only
-  reads, and gives useful review-time coverage.
+  reads, and gives useful review-time coverage. A Free private repo cannot
+  enforce a status context at all, but once you are on Team and ever make this
+  check a **required** one on `main`, delete the caller's `paths:` filter in the
+  same change — a filtered skip leaves a required context `Pending` forever
+  ([vig-os/org-config#268](https://github.com/vig-os/org-config/issues/268)).
 - Wire the **drift** caller (`.github/workflows/drift.yml`) too — it is also
   read-only (it opens issues in this repo, never touches org state) and
   self-contained: the reconciler runs from a checkout of the public engine repo

@@ -16,6 +16,16 @@ on:  # yamllint disable-line rule:truthy
   pull_request:
     branches:
       - main
+    # DELETE THIS `paths:` BLOCK IF YOU MAKE THE PLAN CONTEXT REQUIRED
+    # (vig-os/org-config#268). A required status context that a path filter
+    # skips stays `Pending` forever, so a PR touching none of these paths could
+    # never merge: the two are one decision. Either this check is advisory and
+    # filtered (the default here — cheapest, and what a Free-plan read-only org
+    # wants, since it cannot enforce a context on a private repo anyway), or it
+    # is this repo's merge gate and must produce a run on EVERY pull request,
+    # with the filter gone. A non-config PR then just plans an empty diff —
+    # `otterdog plan` exits 0 on drift, so the check reddens only on invalid
+    # config, auth, or harness errors.
     paths:
       - otterdog.json
       - otterdog/**
