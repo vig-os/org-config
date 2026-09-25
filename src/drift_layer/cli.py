@@ -25,22 +25,36 @@ not be read has its issue withheld from reconciliation entirely, so a single
 ``--dry-run`` prints the plan of actions without touching GitHub;
 ``--controls-report`` evaluates the assertion table and prints the per-row
 outcomes without any issue write, which is how the table is authored and
-verified. The issues token is read from ``$GITHUB_TOKEN``
+verified. ``--app-actors-report`` is the third read-only mode (issue #259): it
+reads an EVALUATED otterdog config and asks the engine's own credential to
+resolve every App slug the write path would look up, printing the markdown
+fragment `plan.yml` folds into its report. It reconciles nothing, writes no
+issue, and **always exits 0** — the finding is advisory in this repository
+(`Plan` is not a required check here, ADR-0007 Axis D, #236) and downstream the
+plan context IS a required check on `main` (#268), so in both directions this
+read must never move a job's exit code; the mode catches everything and reports
+the failure in its own fragment. A slug documented as unresolvable by design in
+``drift-allowlist.toml`` (``[[app_actor]]``) is reported as known and
+suppressed, not as a finding. The issues token is read from ``$GITHUB_TOKEN``
 (issues:write-narrowed); the org/repo read token from ``$DRIFT_REPOS_TOKEN``
 (the full plan token) — when unset, both live-read legs are skipped and only
-plan drift is reconciled.
+plan drift is reconciled. ``--app-actors-report`` reads ``$DRIFT_REPOS_TOKEN``
+first for the same reason: `plan.yml` hands it the full installation token, and
+the narrowed name stays reserved for the narrowed credential.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .allowlist import apply_allowlist, load_allowlist
+from .allowlist import apply_allowlist, load_allowlist, load_app_actor_allowlist
+from .app_actors import check_app_slugs, render_degraded_markdown, render_json, render_markdown
 from .controls import (
     ControlOutcome,
     ControlsConfig,
@@ -256,6 +270,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="evaluate the assertion table and print each row's outcome; no issue writes",
     )
+    parser.add_argument(
+        "--app-actors-report",
+        action="store_true",
+        help="check every declared App slug against GET /apps/{slug}; prints markdown, exits 0",
+    )
+    parser.add_argument(
+        "--config-json",
+        default=None,
+        type=Path,
+        help="EVALUATED otterdog config (JSON) — the App-slug report's input",
+    )
+    parser.add_argument(
+        "--json-out",
+        default=None,
+        type=Path,
+        help="write the App-slug report's machine-readable JSON to this path",
+    )
     args = parser.parse_args(argv)
 
     now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
@@ -265,6 +296,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         config_path = Path(args.config_jsonnet)
         if config_path.exists():
             config_jsonnet_text = config_path.read_text()
+
+    if args.app_actors_report:
+        return _report_app_actors(args)
 
     if args.controls_report:
         return _report_controls(args, config_jsonnet_text)
@@ -332,6 +366,88 @@ def main(argv: Sequence[str] | None = None) -> int:
     for action in (*plan_actions, *inventory_actions, *control_actions):
         print(_format_action(action))
     return 0
+
+
+def _report_app_actors(args: argparse.Namespace) -> int:
+    """Check every declared App slug and print the plan-report fragment (#259).
+
+    **Returns 0 unconditionally**, and enforces that here rather than leaning on
+    the workflow's `if !` wrapper: `plan.yml`'s *Fail on plan error* step owns
+    the job's exit code, whose contract is "nonzero means config/auth/harness,
+    never drift", and downstream that job's context is a required check on
+    `main` (#268), so an unexpected traceback in an advisory read must not be
+    able to block a pull request. A missing token, an unreadable config, a
+    failed read or any unforeseen error is therefore reported IN the fragment —
+    visibly, because a silent omission reads exactly like a clean result — and
+    never as a status.
+    """
+    reason = _app_actors_precondition(args)
+    if reason is not None:
+        print(render_degraded_markdown(reason))
+        print(f"::warning::app-slug check skipped: {reason}", file=sys.stderr)
+        return 0
+
+    try:
+        token = os.environ.get("DRIFT_REPOS_TOKEN") or os.environ.get("GITHUB_TOKEN") or ""
+        config = json.loads(args.config_json.read_text())
+        report = check_app_slugs(
+            config,
+            RestGitHubClient(args.repo or "", token),
+            org=args.org,
+            allowlist=load_app_actor_allowlist(args.allowlist),
+        )
+        rendered = render_markdown(report)
+        if args.json_out is not None:
+            args.json_out.write_text(
+                json.dumps(render_json(report), indent=2, sort_keys=True) + "\n"
+            )
+    except Exception as exc:  # noqa: BLE001 - an advisory check reports, never raises
+        print(render_degraded_markdown(f"the check did not complete ({exc!r})"))
+        print(f"::warning::app-slug check could not run: {exc!r}", file=sys.stderr)
+        return 0
+
+    print(rendered)
+    _warn_app_actors(report)
+    return 0
+
+
+def _app_actors_precondition(args: argparse.Namespace) -> str | None:
+    """Why the check cannot run, or ``None`` when it can."""
+    if not (os.environ.get("DRIFT_REPOS_TOKEN") or os.environ.get("GITHUB_TOKEN")):
+        return "no token in `DRIFT_REPOS_TOKEN`/`GITHUB_TOKEN`"
+    if args.config_json is None:
+        return "no `--config-json` was given"
+    if not args.config_json.exists():
+        return f"the evaluated config `{args.config_json}` does not exist"
+    try:
+        json.loads(args.config_json.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        return f"the evaluated config `{args.config_json}` could not be read ({exc!s})"
+    return None
+
+
+def _warn_app_actors(report) -> None:  # noqa: ANN001 - AppSlugReport, kept import-light
+    """Annotate findings on the run without touching the exit code."""
+    for outcome in report.unresolvable:
+        print(
+            f"::warning::app-slug `{outcome.slug}` is unresolvable "
+            f"(HTTP {outcome.status}) — apply will not write it as declared",
+            file=sys.stderr,
+        )
+    for outcome in report.not_installed:
+        print(
+            f"::warning::app-slug `{outcome.slug}` is not installed on the org — "
+            f"otterdog's read path cannot map it back, so the diff never converges",
+            file=sys.stderr,
+        )
+    for outcome in report.suppressed:
+        print(
+            f"::notice::app-slug `{outcome.slug}` is unresolvable as expected and "
+            f"suppressed by `drift-allowlist.toml`: {outcome.allowlisted_reason}",
+            file=sys.stderr,
+        )
+    for note in report.notes:
+        print(f"::warning::app-slug: {note}", file=sys.stderr)
 
 
 def _report_controls(args: argparse.Namespace, config_jsonnet_text: str | None) -> int:

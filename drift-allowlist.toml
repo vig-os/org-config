@@ -1,4 +1,4 @@
-# Drift allow-list (ADR-0002) — two sections, both governance state: adding an
+# Drift allow-list (ADR-0002) — three sections, all governance state: adding an
 # entry goes through the normal PR flow, so "what is intentionally tolerated /
 # unmanaged" stays reviewable and versioned.
 #
@@ -16,9 +16,29 @@
 #     [[unmanaged]]
 #     repository = "some-repo"
 #     reason = "why it is intentionally not under declarative management"
+#
+# [[app_actor]] — App slugs the plan-time App-slug check (#259) must report as
+#   KNOWN rather than as a finding. The check asks `GET /apps/{slug}` with this
+#   job's installation token, because that is the call `apply` makes; a 403/404
+#   means `apply` cannot write the actor. Some of those are permanent by design
+#   — the canonical case is a private App owned by a sibling org, on a ruleset
+#   that is already live and correct and cannot be repaired until upstream
+#   eclipse-csi/otterdog#772 lands — and reporting one on every pull request is
+#   a red banner nobody can act on, i.e. exactly the standing noise that trains
+#   a reviewer to wave plans through (#262). An entry here moves the slug into
+#   the report's "known and suppressed" table, WITH its reason: the slug is
+#   still named on every run, so the suppression is visible, not silent.
+#   Empty today, and deliberately so: all three App slugs `vig-os` declares
+#   (`commit-action-bot`, `vig-os-release-app`, the implicit `github-actions`)
+#   resolve for this org's installation token. Add entries as:
+#     [[app_actor]]
+#     slug = "some-private-app"
+#     reason = "private App owned by <org>; unreadable to an installation token"
 
 # [[expected]] entries go here — none at present. The long-standing vs-dolt
 # code_scanning_default_languages entry was retired by #189: with CodeQL default
 # setup suppressed org-wide, the field otterdog could not round-trip is gone.
 
 # [[unmanaged]] entries go here — none at present.
+
+# [[app_actor]] entries go here — none at present (every declared slug resolves).

@@ -41,6 +41,54 @@ restricts deployments to `main`. Entering the environment pauses the run, so no
 write token touches the live org until a human approves that specific
 deployment. `plan` and `drift` never mutate org state.
 
+### The plan report also checks declared App slugs
+
+Otterdog's read and write paths resolve a GitHub App differently, so one class of
+config is green in the diff and red on apply. `apply` writes every App-shaped
+actor — ruleset `bypass_actors`, ruleset and branch-protection required status
+checks, environment reviewers — by resolving its slug through
+`GET /apps/{slug}`; the read path never makes that call, mapping a live
+`actor_id` back to a slug from `GET /orgs/{org}/installations` instead. The plan
+report therefore carries two checks the diff itself cannot make, run with the
+same installation token the job already minted
+([#259](https://github.com/vig-os/org-config/issues/259)):
+
+- **`GET /apps/{slug}` per declared slug.** A `403`/`404` means `apply` will
+  fail on any add or change of that resource — including one already live, since
+  a patch re-sends the whole list. Three of the four sites abort the patch; an
+  environment reviewer is instead dropped silently, leaving a protection that was
+  never written, so the report separates them.
+- **Membership of the org's App installations**, for the sites whose read path
+  needs it. A declared App the org has no installation for can never read back as
+  written — a ruleset bypass actor is dropped outright, a ruleset status check
+  reads back numeric — so `plan` proposes the same change forever and `apply`
+  never converges.
+
+The two are independent, and both read the **declared** config only: an actor
+that exists live but is declared nowhere needs a live ruleset read and is not
+covered. A read that fails for any other reason — a bad credential, a rate-limit
+`403` (told apart from a permission `403` by `x-ratelimit-remaining` /
+`retry-after`, which carry the only difference), a `5xx`, no answer at all — is
+reported as **not checked**, never as a finding: a false "`apply` will fail"
+costs more than a missing one.
+
+A slug that is unresolvable *by design* — the standard case is a private App
+owned by a sibling org, on a ruleset that is already live and correct — gets an
+`[[app_actor]]` entry in `drift-allowlist.toml` (slug + reason). The check still
+names it on every run, under **known and suppressed** with that reason, so the
+suppression is visible and reviewed rather than silent, and the finding list
+keeps meaning something. This org has no such entry: all three slugs it declares
+resolve.
+
+The finding is **advisory** — it lands in the PR comment and the job summary and
+never changes the job's exit code. `Plan` is not a required check *in this
+repository* (ADR-0007 Axis D); a caller may wire its plan context into its own
+ruleset, and one does, which is why every step of this check is fail-soft —
+guarded, `continue-on-error`, and degrading to "could not be checked" rather
+than to a red gate ([#268](https://github.com/vig-os/org-config/issues/268)).
+Downstream callers inherit it on their next engine pin bump with no change to
+their caller workflow.
+
 ### Drift is issue-only
 
 Per ADR-0002, drift is **never** auto-reverted. The drift layer
@@ -197,9 +245,12 @@ nothing here calls it.
   ruleset is untouched, but the merged config cannot be applied. The **read**
   path never calls that endpoint — it maps the live `actor_id` to a slug from
   `GET /orgs/{org}/installations` — so `plan` and `drift` render the actor
-  correctly, and this one class of change is green on review and red on apply
-  with nothing here to flag it yet
-  ([#259](https://github.com/vig-os/org-config/issues/259)).
+  correctly, and this one class of change is green on review and red on apply.
+  The plan report now flags exactly that, by making the write path's
+  `GET /apps/{slug}` call itself at review time
+  ([#259](https://github.com/vig-os/org-config/issues/259), *The plan report
+  also checks declared App slugs* above) — so the class is visible on the pull
+  request, though still not repairable there.
   **Workaround:** run the engine itself once with an org-owner PAT as
   `OTTERDOG_TOKEN` — an owner *can* read the slug, so a one-off `otterdog
   apply` resolves it through otterdog's own code path and writes the complete
@@ -229,11 +280,14 @@ nothing here calls it.
   `actor_id` is missing from it gets no `app_slug`, and
   `models/ruleset.py:541-548` then logs `fail to map integration actor '<id>',
   skipping` — to otterdog's log, not to `plan.txt` — and **drops the actor from
-  the model**. Both directions are wrong and neither reaches the pull request:
-  if the config declares the actor, every `plan` proposes to add it back and
-  `apply` never converges, because a ruleset patch re-sends the whole bypass
-  list; if the config does not declare it, a live bypass of a protected branch
-  or tag is never reported at all. Same root cause as
+  the model**. Both directions are wrong, and only one of them now reaches the
+  pull request: if the config declares the actor, every `plan` proposes to add
+  it back and `apply` never converges, because a ruleset patch re-sends the
+  whole bypass list — that half is reported by the plan report's App-slug check,
+  which compares each declared slug against the org's installations
+  ([#259](https://github.com/vig-os/org-config/issues/259)); if the config does
+  not declare it, a live bypass of a protected branch or tag is still never
+  reported at all, because catching it needs a live ruleset read. Same root cause as
   [upstream #732](https://github.com/eclipse-csi/otterdog/issues/732) — the
   same installation map, for required status checks — but a strictly worse
   symptom: a status check *falls back* to the numeric
