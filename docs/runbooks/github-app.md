@@ -63,8 +63,8 @@ permission to **No access**.
 | Repository   | Webhooks                  | Read & write | repo webhooks                                     |
 | Organization | Administration            | Read & write | org settings, Actions perms, installs, rulesets   |
 | Organization | Custom organization roles | Read         | `security_manager` role lookup on every plan      |
-| Organization | Custom properties         | Read & write | property schema (read at plan, write at apply)    |
-| Organization | Members                   | Read         | teams + team members — confirmed in #16           |
+| Organization | Custom properties         | Read & write | property schema (read); schema writes need Admin  |
+| Organization | Members                   | Read & write | teams + team members; creating a team needs write |
 | Organization | Secrets                   | Read & write | org Actions secrets (SOPS/age plaintext at apply) |
 | Organization | Variables                 | Read & write | org Actions variables — see narrowing gap below   |
 | Organization | Webhooks                  | Read & write | org webhooks                                      |
@@ -75,9 +75,19 @@ This is the **verified outcome of the #16 spike** (static enumeration of the ott
 
 - **Repository → Contents (Read)** — confirmed: `fetch-config` reads the committed config via the
   contents API.
-- **Organization → Members (Read)** — confirmed and widened in scope: Otterdog's own read path
-  requires it (teams, team members, and the teams assigned to the `security_manager` role), not
-  just the inventory sweep.
+- **Organization → Members (Read & write)** — the **read** level was confirmed and widened in scope
+  by #16: Otterdog's own read path requires it (teams, team members, and the teams assigned to the
+  `security_manager` role), not just the inventory sweep. The **write** level was confirmed by a
+  live `apply` on `exo-pet` (2026-09-25, `exo-pet/org-config#81`, run `36119473230`): the first
+  downstream org to declare a team got a green plan and then `POST /orgs/{org}/teams` →
+  `403 Resource not accessible by integration`, exiting 1 with nothing mutated — a clean failure,
+  not a partial one. **Read plans a team; only write creates one.** The same level covers
+  `PATCH` / `DELETE /orgs/{org}/teams/{team_slug}`,
+  `PUT` / `DELETE /orgs/{org}/teams/{team_slug}/memberships/{user}` and — easy to miss —
+  `PUT /orgs/{org}/organization-roles/teams/{team_slug}/{role_id}`, the call that assigns a
+  `security_manager` team, which GitHub lists under **Members**, not under Custom organization
+  roles. Granted on the App and approved on `exo-pet`'s installation, after which the identical
+  dispatch re-ran green (run `36120273830`, #257).
 - **Repository → Custom properties (Read & write)** — confirmed by the first live `apply` (run
   `29584038705`, verified 2026-07-17): setting a repo's custom-property **values** (the `type`
   property) 403'd with only the org-level grant. Organization → Custom properties covers the
@@ -96,6 +106,27 @@ This is the **verified outcome of the #16 spike** (static enumeration of the ott
   boundary; per-job narrowing is reserved for the drift layer's issue operations. The full-token
   decision and the manage-vs-exclude reasoning live in ADR-0004's Corrections log (#16).
 
+**Widening a permission after the App exists is a two-step change, and the second step is per
+org.** Editing the App's **Permissions & events** page updates the *App*, not its *installations*:
+every existing installation stays on the permission set it last accepted, and its tokens keep
+403'ing until an owner of that org approves the new request (GitHub mails the request and surfaces
+it on that org's **Settings → GitHub Apps → Configure** page). So a widening lands per org, not
+fleet-wide.
+
+**Approve it on the org that needs it, not on every org.** `Read & write` on Members is what the
+App *declares*; an installation should take it when that org *declares its first team*, and not
+before. An org whose config carries `teams: []` keeps its installation on **Read** as least
+privilege — `vig-os` itself does (`otterdog/vig-os/vig-os.jsonnet:55`) — because Members write is
+not confined to teams. The same level also grants `PUT /orgs/{org}/memberships/{username}`, which
+sets `role` and therefore can promote a member to **admin**, plus
+`DELETE /orgs/{org}/members/{username}` and `POST /orgs/{org}/invitations`: inviting, promoting and
+removing owners, none of which Organization → Administration write includes. So the App's blast
+radius on an org that approves this goes from *can reconfigure the org* to *can change who owns
+it*, which is worth paying only where a team is actually declared.
+`GET /orgs/{org}/installations` is the cheap confirmation of where it stands: the `permissions`
+object it reports per installation, **not** the App's own settings page, is what a token minted for
+that org can actually do.
+
 The #16 spike also confirmed the **web-UI-only settings surface**: 12 org settings (in otterdog's
 schema marked `"provider": "web"`, e.g. `default_branch_name`, `two_factor_requirement`,
 `has_discussions`) are reachable only via browser automation with a human account's
@@ -105,6 +136,42 @@ config; details and the manage-vs-exclude decision live in ADR-0004's Correction
 If a future change finds another managed setting that an installation token **cannot** reach,
 record it in ADR-0004's Corrections log and decide manage-vs-exclude there — do not silently widen
 this table.
+
+#### Read path vs apply path
+
+The #16 methodology enumerated otterdog's **read** path, so any permission whose write level is
+reached only by `apply` could be recorded one level too low — which is exactly what happened to
+Members. Every row above was therefore re-checked against otterdog 1.5.0's
+`providers/github/rest/*_client.py` write endpoints, mapped through the
+[permissions-required-for-github-apps] reference (#257). **The single Access column stands:** a
+GitHub App grant is one level per permission, so that column must always carry the *apply*-path
+level, and after the Members fix it does for every resource this fleet declares. Three apply-path
+levels are deliberately **not** granted, each because nothing declared today reaches them. Each is
+a 403 waiting for the first org that declares its trigger, so they are listed here rather than left
+to be rediscovered the way Members was:
+
+- **Organization → Custom properties is granted `Read & write`, but writing the property *schema*
+  needs `Admin`.** GitHub lists `PUT` / `DELETE /orgs/{org}/properties/schema/{name}` under the
+  **admin** level of that permission; `write` reaches only `PATCH /orgs/{org}/properties/values`.
+  Untriggered today because `vig-os`'s single property (`type`) already exists and matches the
+  config, so no schema write is ever attempted. The first org to declare a **new** org custom
+  property fails exactly as #257 did — raise this row to **Admin** then, and re-approve per install.
+- **Repository → Contents is granted `Read`, and renaming a branch needs `write`.** When a repo's
+  declared `default_branch` names a branch that does not exist, otterdog does not create it — it
+  **renames** the current default via `POST /repos/{org}/{repo}/branches/{branch}/rename`, which
+  GitHub lists under repository **Contents (write)** (renaming the *default* branch additionally
+  needs Administration write, which is held — Contents is the missing half). Pointing
+  `default_branch` at a branch that already exists is a plain `PATCH /repos/{org}/{repo}`
+  (Administration) and is unaffected. Not widened pre-emptively because Contents write is push
+  access to every file in every repo the installation covers — a large price for a rename.
+- **There is no Repository → Environments grant, and environment secrets/variables need one.** The
+  environment object itself is `PUT /repos/{org}/{repo}/environments/{name}` (Administration, held)
+  and is listed under Actions (Read, held). Its **secrets and variables** are a separate repository
+  permission, **Environments**. Otterdog reads or writes them only when the base template defines
+  `newEnvSecret` / `newEnvVariable`, and the pinned `otterdog-defaults` `v0.13.1` defines neither,
+  so the resource is invisible to `plan` and `apply` alike. That pin is held for an unrelated reason
+  (`max_cache_size_gb` answers `402` on a Free plan), so the coupling is accidental: a base-template
+  bump that introduces those functions needs **Environments: Read & write** in the same change.
 
 [permissions-required-for-github-apps]: https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps
 
