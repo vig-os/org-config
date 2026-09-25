@@ -30,7 +30,11 @@ project := "org_config"
 # A bump still implies re-checking the dev-shell path and the ADR-0007 L1
 # plan-fixture format. The `otterdog.json` `otterdog-defaults` pin is NOT
 # managed by that regex and is NOT in lockstep with this one (ADR-0005
-# Corrections, #225) — it stays at v0.13.1 by decision.
+# Corrections, #225) — it stays at v0.13.1 by decision. Bumping it past v0.13.1
+# is also an App change: the first release defining `newEnvSecret` /
+# `newEnvVariable` makes otterdog read and write environment secrets/variables,
+# which need Repository → Environments write — a permission the App does not
+# hold (#257, `docs/runbooks/github-app.md`, "Read path vs apply path").
 #
 # Editing this line DOES get a plan run: `plan.yml` lists this file in its
 # `pull_request` `paths:` filter precisely because the pin selects the binary
