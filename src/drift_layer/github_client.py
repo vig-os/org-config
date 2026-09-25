@@ -14,7 +14,11 @@ full org-wide token instead, so the CLI builds a second client for it.
 Every transport failure surfaces as an :class:`ApiError` carrying the HTTP
 status, because the unmanaged-controls leg (issue #116) must tell "the control
 is wrong" apart from "the control could not be read" — a 403 on one row has to
-degrade that row, never be reported as drift or silently resolve its issue.
+degrade that row, never be reported as drift or silently resolve its issue. The
+error carries the refusal's response headers for the same reason: a ``403`` from
+the rate limiter and a ``403`` from the permission boundary are indistinguishable
+by status and reason phrase, and only ``x-ratelimit-remaining`` / ``retry-after``
+separate them (issue #259).
 
 For the same reason :meth:`RestGitHubClient.get_json` refuses an INCOMPLETE
 answer (issue #258): it asks for the largest page GitHub serves and raises
@@ -37,7 +41,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Protocol
 
 from .models import Issue, IssueAction
@@ -57,11 +61,22 @@ class ApiError(Exception):
     ``status`` is the HTTP code (404 unassertable, 401/403 token scope, 5xx
     upstream) or ``0`` when the request never got an answer at all — DNS, TLS,
     connection or decode failure. Zero is still "unreadable", not "absent".
+
+    ``headers`` carries the refusal's response headers, lower-cased, because the
+    status alone does not say what a ``403`` means: GitHub answers ``403`` both
+    for "this credential may not read this resource" and for rate-limit
+    exhaustion, with the same reason phrase. ``x-ratelimit-remaining`` and
+    ``retry-after`` are the only signals that tell the two apart, so a caller
+    that reports a ``403`` as a verdict about the resource (issue #259) must be
+    able to see them. Empty when the request never got an answer.
     """
 
-    def __init__(self, status: int, message: str) -> None:
+    def __init__(self, status: int, message: str, headers: Mapping[str, str] | None = None) -> None:
         super().__init__(f"{status}: {message}" if status else message)
         self.status = status
+        self.headers: dict[str, str] = {
+            str(name).lower(): str(value) for name, value in (headers or {}).items()
+        }
 
 
 class TruncatedResponseError(ApiError):
@@ -142,7 +157,9 @@ class RestGitHubClient:
                 link = resp.headers.get("Link", "") or ""
             return (json.loads(raw) if raw else None), link
         except urllib.error.HTTPError as exc:
-            raise ApiError(exc.code, f"{method} {path}: {exc.reason}") from exc
+            raise ApiError(
+                exc.code, f"{method} {path}: {exc.reason}", dict(exc.headers.items())
+            ) from exc
         except (urllib.error.URLError, json.JSONDecodeError, OSError) as exc:
             raise ApiError(0, f"{method} {path}: {exc}") from exc
 

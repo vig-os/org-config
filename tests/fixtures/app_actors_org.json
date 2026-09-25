@@ -1,0 +1,75 @@
+{
+   "github_id": "fixture-org",
+   "project_name": "fixture",
+   "repositories": [
+      {
+         "branch_protection_rules": [
+            {
+               "pattern": "main",
+               "required_status_checks": [
+                  "CI Summary",
+                  "any:Lint",
+                  "bpr-app:Build",
+                  "15368:Nope"
+               ]
+            }
+         ],
+         "environments": [
+            {
+               "name": "production",
+               "reviewers": [
+                  "@c-vigo",
+                  "@fixture-org/reviewers",
+                  "reviewer-app"
+               ]
+            }
+         ],
+         "name": "alpha",
+         "rulesets": [
+            {
+               "bypass_actors": [
+                  "gated-app:pull_request",
+                  "#RepositoryAdmin:pull_request",
+                  "@fixture-org/reviewers",
+                  "15368"
+               ],
+               "name": "Main protection",
+               "required_status_checks": {
+                  "status_checks": [
+                     "15368:CI Summary",
+                     "any:Lint",
+                     "spaced prefix:Check",
+                     "plain check",
+                     "checks-app:Coverage"
+                  ]
+               }
+            },
+            {
+               "bypass_actors": [ ],
+               "name": "Signed commits",
+               "required_status_checks": null
+            }
+         ]
+      },
+      {
+         "branch_protection_rules": [ ],
+         "environments": [ ],
+         "name": "beta",
+         "rulesets": [ ]
+      }
+   ],
+   "rulesets": [
+      {
+         "bypass_actors": [
+            "org-bypass-app",
+            "#OrganizationAdmin"
+         ],
+         "name": "Org protection",
+         "required_status_checks": {
+            "status_checks": [
+               "org-check-app:Build"
+            ]
+         }
+      }
+   ]
+}

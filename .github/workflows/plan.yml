@@ -77,6 +77,19 @@ on:  # yamllint disable-line rule:truthy
       # devkit upgrades preserve it), so the cost is a handful of read-only runs
       # against a pin bump silently losing its evidence.
       - justfile.project
+      # The same argument, for the same reason, for the in-house drift layer
+      # (#259): the App-slug check below runs `drift-layer --app-actors-report`,
+      # so this repo's own `src/` now selects part of what the plan report says.
+      # Without these lines a change to the mode's classification, flags or
+      # report shape gets no plan run at all and ships with zero end-to-end
+      # signal — the #230 lesson ("relying on that coincidence is luck, not
+      # coverage") applied to the engine rather than the pin. `pyproject.toml`
+      # rides along because it declares the console script the step invokes.
+      - src/drift_layer/**
+      - pyproject.toml
+      # Governance state the check READS: an `[[app_actor]]` entry suppresses a
+      # known-unresolvable slug, so editing this file changes the plan report.
+      - drift-allowlist.toml
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -227,6 +240,157 @@ jobs:
           echo "otterdog plan exited ${rc}"
           cat plan.txt
 
+      # ENGINE CHECKOUT (downstream callers only, issue #169 — the same pattern
+      # drift.yml uses, for the same reason): the App-slug check below runs the
+      # in-house drift layer (`src/drift_layer/`), which lives in THIS engine
+      # repo; a downstream caller's config-data checkout has no `src/`,
+      # `pyproject.toml` or `uv.lock`. `job.workflow_sha` is the exact SHA the
+      # caller pins in `uses:`, so engine code and workflow can never skew and
+      # the caller's Renovate bump moves both atomically. Guard first: an empty
+      # SHA would silently check out the engine's default branch. Placed AFTER
+      # the plan leg so otterdog provably ran on an untouched caller tree; on
+      # this repo's own runs both steps are skipped, because the primary
+      # checkout already IS the engine tree.
+      #
+      # ONE DELIBERATE DIVERGENCE from drift.yml's guard: there an empty SHA is
+      # a hard `exit 1`, because the drift layer IS that job. Here it is a
+      # WARNING that skips the check, because the App-slug finding is advisory
+      # and `plan` is every downstream org's review gate — reddening it over a
+      # missing context property would cost more than the check is worth. The
+      # unpinned checkout is still refused either way, which is what #169 is
+      # about; the fragment below says the check did not run.
+      - name: Guard engine pin (downstream callers)
+        id: engine-pin
+        if: always() && github.repository != 'vig-os/org-config' && steps.plan.outcome != 'skipped'
+        # FAIL-SOFT, BINDING (#268): downstream this job's context is a REQUIRED
+        # check on `main` (`exo-pet/org-config`'s Main protection requires
+        # exactly `plan / Plan committed config against live <org>`, and its
+        # caller ships no `paths:` filter for that reason), so every step added
+        # here sits on another org's merge gate for every pull request,
+        # including ones that touch no config. An advisory read must not be able
+        # to convert a transient GitHub blip into "no PR can merge" — hence
+        # `continue-on-error` on all three new steps, each of which also has an
+        # `if:` on the guard's output so a failure degrades to "not checked"
+        # rather than to a half-run check.
+        continue-on-error: true
+        env:
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${JOB_WORKFLOW_SHA}" ]; then
+            echo "::warning::job.workflow_sha is empty on a downstream run; skipping the App-slug check rather than checking out an unpinned engine tree (issue #169)"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            {
+              echo '### Declared App slugs'
+              echo
+              echo '**The declared App slugs could not be checked** on this run: the engine checkout is unpinned (the job workflow SHA is empty), and an unpinned engine tree is refused. This is a harness gap, not a verdict — treat the slugs as unverified.'
+            } > app-actors.md
+            exit 0
+          fi
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+          echo "Engine checkout pinned to ${JOB_WORKFLOW_SHA}"
+
+      - name: Checkout engine repository (downstream callers)
+        if: always() && github.repository != 'vig-os/org-config' && steps.engine-pin.outputs.ok == 'true'
+        # Fail-soft for the reason above (#268): a checkout of another
+        # repository is a network operation on a downstream merge gate. If it
+        # fails, `.drift-engine` is absent, the check step's `uv run --project`
+        # fails, and that step writes its own "could not be checked" fragment —
+        # the plan itself already ran and is unaffected.
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: vig-os/org-config
+          ref: ${{ job.workflow_sha }}
+          path: .drift-engine
+          persist-credentials: false
+
+      # Ask this job's own credential the two questions otterdog will ask, and
+      # the plan above cannot (issue #259). They are INDEPENDENT:
+      #   1. `GET /apps/{slug}` — the WRITE-path resolution. otterdog never
+      #      calls it on read (it maps a live `actor_id` back to a slug from
+      #      `/orgs/{org}/installations`), so a declared App slug this
+      #      installation token cannot read renders perfectly in the plan above
+      #      and fails the mutating apply (#256). Three of the four write-path
+      #      sites abort the patch; the fourth, environment reviewers, drops the
+      #      actor silently and leaves a protection that was never written.
+      #   2. Membership of `/orgs/{org}/installations` — the READ-path
+      #      resolution, for the two sites that need it. A declared App the org
+      #      has no installation for is dropped outright as a bypass actor or
+      #      read back numeric as a status check, so plan proposes the same
+      #      change forever and apply never converges (#262's detection half).
+      # Both read the DECLARED config only; an actor that exists live but is
+      # declared nowhere needs a live ruleset read and is not covered.
+      #
+      # ADVISORY, BINDING (ADR-0007 Axis D, #236): `Plan` is not a required
+      # check, so these findings live in the report body and the job summary and
+      # NEVER in an exit code. This step cannot fail and does not touch
+      # `steps.plan.outputs.rc`, so `Fail on plan error` keeps its contract
+      # ("nonzero means config/auth/harness, never drift").
+      - name: Check declared App slugs against this job's token
+        id: app-actors
+        # Belt and braces with the `exit 0`s below (#268): the mode itself
+        # catches every exception and exits 0, and every shell branch here ends
+        # in `exit 0`, but a failure of the runner shell itself must not redden
+        # a downstream merge gate either.
+        continue-on-error: true
+        if: >-
+          always() && steps.plan.outcome != 'skipped'
+          && (github.repository == 'vig-os/org-config'
+              || steps.engine-pin.outputs.ok == 'true')
+        env:
+          # The one credentialed part of the check. Extraction is token-free.
+          # `DRIFT_REPOS_TOKEN`, not `GITHUB_TOKEN`: this repo reserves the
+          # latter name for the issues:write-NARROWED token (`drift.yml:348-349`,
+          # `cli.py`'s module docstring), and it is also the name every `gh`
+          # invocation picks up by default — handing an org-admin installation
+          # token over under it is a footgun for whoever next adds a `gh` call
+          # to this step.
+          DRIFT_REPOS_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Org selector, via env (never inline `${{ }}` in `run:`).
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
+          # Where the drift-layer PROJECT lives (#169): the engine sub-checkout
+          # on downstream runs, this very checkout on the engine's own.
+          DRIFT_PROJECT_DIR: ${{ github.repository != 'vig-os/org-config' && '.drift-engine' || '.' }}
+        run: |
+          # Deliberately no errexit: an advisory warning must never redden a
+          # read-only review gate. Each failure path writes its own fragment.
+          set -uo pipefail
+          ORG_FILE="otterdog/${ORG_GITHUB_ID}/${ORG_GITHUB_ID}.jsonnet"
+          # Token-free evaluation, through otterdog's OWN evaluator: this is the
+          # exact call `GitHubOrganization.load_from_file` makes
+          # (models/github_organization.py:536), so the document checked here is
+          # the document apply would write from — no second jsonnet toolchain,
+          # no extra pin, and provably identical to `jsonnet` on this config.
+          EVAL='import json,sys;from otterdog.utils import jsonnet_evaluate_file;json.dump(jsonnet_evaluate_file(sys.argv[1]),sys.stdout)'
+          if ! uvx --from "otterdog@${OTTERDOG_VERSION}" python -c "${EVAL}" "${ORG_FILE}" > org-evaluated.json; then
+            {
+              echo '### Declared App slugs'
+              echo
+              echo "**The declared App slugs could not be checked** on this run: \`${ORG_FILE}\` could not be evaluated. This is a harness gap, not a verdict — treat the slugs as unverified."
+            } > app-actors.md
+            cat app-actors.md
+            exit 0
+          fi
+          # `drift-allowlist.toml` is read from the CONFIG repo's root — this
+          # checkout, never the engine sub-checkout — so a downstream org
+          # documents its own known-unresolvable slugs (#259). A missing file is
+          # an empty allow-list, so a caller that has none is unaffected.
+          if ! uv run --project "${DRIFT_PROJECT_DIR}" drift-layer \
+              --app-actors-report \
+              --org "${ORG_GITHUB_ID}" \
+              --config-json org-evaluated.json \
+              --allowlist drift-allowlist.toml \
+              --json-out app-actors.json > app-actors.md; then
+            {
+              echo '### Declared App slugs'
+              echo
+              echo '**The declared App slugs could not be checked** on this run: the drift-layer check did not complete. This is a harness gap, not a verdict — treat the slugs as unverified.'
+            } > app-actors.md
+          fi
+          cat app-actors.md
+          exit 0
+
       - name: Build plan report (comment body + job summary)
         if: always() && steps.plan.outcome != 'skipped'
         env:
@@ -238,6 +402,13 @@ jobs:
           set -euo pipefail
           MARKER='<!-- otterdog-plan-report -->'
           [ -f plan.txt ] || echo "(no plan output was produced — the plan step did not run to completion)" > plan.txt
+          # The App-slug fragment (#259), folded into BOTH artefacts below
+          # rather than posted as a second comment: this step is the one place
+          # that assembles the marker-upserted body and the job summary, so a
+          # reviewer sees the finding beside the diff it is invisible in. A
+          # missing file means that step did not run; the plan report is
+          # unchanged in that case.
+          [ -f app-actors.md ] || : > app-actors.md
 
           if [ "${PLAN_RC:-1}" = "0" ]; then
             status="Plan completed. A non-empty diff is drift for the PR author to decide on, **not** a failure."
@@ -257,11 +428,32 @@ jobs:
             cat plan.txt
             echo '```'
             echo
+            if [ -s app-actors.md ]; then
+              cat app-actors.md
+              echo
+            fi
             echo "[Run log](${RUN_URL})"
           } >> "$GITHUB_STEP_SUMMARY"
 
           # --- PR comment body (65536-char cap: truncate the plan text safely) ---
-          MAX_PLAN_BYTES=55000
+          # The budget is shared, and the App-slug fragment is inside it (#259).
+          # An over-limit body makes the upsert's `gh api` return 422 under
+          # `set -euo pipefail`, failing this job — which downstream is a
+          # required check on `main` (#268), i.e. the one failure this whole
+          # design forbids. So: cap the fragment first, then give the plan text
+          # whatever is left. Measured today the fragment is ~0.7 KB clean and
+          # ~1.5 KB with seven failing rows, so the cap is headroom, not a limit
+          # anything reaches.
+          MAX_BODY_BYTES=55000
+          MAX_FRAGMENT_BYTES=8000
+          if [ "$(wc -c < app-actors.md)" -gt "${MAX_FRAGMENT_BYTES}" ]; then
+            head -c "${MAX_FRAGMENT_BYTES}" app-actors.md > app-actors.comment.md
+            printf '\n\n_App-slug fragment truncated for the comment; the full fragment is in the [job summary](%s)._\n' "${RUN_URL}" >> app-actors.comment.md
+          else
+            cp app-actors.md app-actors.comment.md
+          fi
+          fragment_bytes="$(wc -c < app-actors.comment.md)"
+          MAX_PLAN_BYTES=$(( MAX_BODY_BYTES - fragment_bytes ))
           plan_note=""
           if [ "$(wc -c < plan.txt)" -gt "${MAX_PLAN_BYTES}" ]; then
             head -c "${MAX_PLAN_BYTES}" plan.txt > plan.comment.txt
@@ -288,6 +480,10 @@ jobs:
             echo
             echo '</details>'
             echo
+            if [ -s app-actors.comment.md ]; then
+              cat app-actors.comment.md
+              echo
+            fi
             echo "[Run log](${RUN_URL}) · triggered by \`${EVENT_NAME}\`"
           } > comment-body.md
 
