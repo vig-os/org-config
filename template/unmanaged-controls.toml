@@ -51,7 +51,14 @@
 # ruleset deliberately kept out of the config. ORG-level rulesets are the
 # stronger case — otterdog reads them but still refuses to declare any below
 # Enterprise (eclipse-csi/otterdog#763), so they stay hand-managed and a row here
-# is their only detector. The shape such a row takes on a protected branch:
+# is their only detector. An App BYPASS ACTOR is the reverse case and still gets
+# no row: it is read and diffed normally, but `apply` is observed to write it
+# only for a public App, since the write path resolves the slug through
+# `GET /apps/{slug}` and the engine authenticates as an App installation
+# (eclipse-csi/otterdog#772). Such a ruleset is detected and not repaired; write
+# the actor out of band with a one-off `otterdog apply` run under an org-owner
+# PAT, which can read the slug, rather than hand-building a REST `PUT`. The
+# shape a row takes on a protected branch:
 #
 #   [[control]]
 #   key        = "main-required-checks"

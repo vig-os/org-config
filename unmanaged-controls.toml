@@ -335,6 +335,26 @@ it, what reads it, or when it should be rotated.
 # needs no action: GitHub's default-on-omit is evidently `true` (it reads `true`
 # in every version above, human- and bot-written alike), which is the value we
 # want.
+#
+# APP BYPASS ACTORS get no row either, for the opposite reason (#256). A ruleset
+# whose `bypass_actors` names a GitHub App IS fully modelled and fully read:
+# otterdog maps the live `actor_id` back to a slug from
+# `/orgs/{org}/installations`, so the plan diffs that field like any other and
+# drift detection over it is intact — except for an App that is not an
+# installation on the org at all, which is dropped on read and shows as a
+# permanent phantom diff (vig-os/org-config#262). What is not intact is REPAIR.
+# The write path resolves the declared slug through `GET /apps/{slug}`, which
+# the engine's installation token is observed to read only for a public App
+# (eclipse-csi/otterdog#772); against a non-public App every `apply` that
+# touches the ruleset fails atomically, because a ruleset patch re-sends the
+# whole bypass list. Both Apps this org names are public, so nothing here is
+# affected today — a downstream org naming a private App gets detection without
+# repair. No row, because a row would duplicate detection the plan already does
+# and could not restore a write path in any case; the fix for such a ruleset is
+# a one-off `otterdog apply` run with an org-owner PAT, which can read the slug
+# (preferred over a hand-built REST `PUT`, which is the very operation that lost
+# unmodelled fields above), and the exit criterion is an ADR-0005 pin that
+# includes the upstream fix.
 
 # --- Unassertable controls -----------------------------------------------------
 #
