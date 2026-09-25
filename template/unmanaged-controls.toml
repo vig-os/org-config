@@ -51,14 +51,24 @@
 # ruleset deliberately kept out of the config. ORG-level rulesets are the
 # stronger case — otterdog reads them but still refuses to declare any below
 # Enterprise (eclipse-csi/otterdog#763), so they stay hand-managed and a row here
-# is their only detector. An App BYPASS ACTOR is the reverse case and still gets
-# no row: it is read and diffed normally, but `apply` is observed to write it
-# only for a public App, since the write path resolves the slug through
-# `GET /apps/{slug}` and the engine authenticates as an App installation
-# (eclipse-csi/otterdog#772). Such a ruleset is detected and not repaired; write
-# the actor out of band with a one-off `otterdog apply` run under an org-owner
-# PAT, which can read the slug, rather than hand-building a REST `PUT`. The
-# shape a row takes on a protected branch:
+# is their only detector. An App BYPASS ACTOR is the reverse case and gets no
+# row for the WRITE-side gap: it is read and diffed normally, but `apply` is
+# observed to write it only for a public App, since the write path resolves the
+# slug through `GET /apps/{slug}` and the engine authenticates as an App
+# installation (eclipse-csi/otterdog#772). Such a ruleset is detected and not
+# repaired; write the actor out of band with a one-off `otterdog apply` run
+# under an org-owner PAT, which can read the slug, rather than hand-building a
+# REST `PUT`. It IS worth a row in one sub-case: an App that holds a live bypass
+# slot without being an installation on the ORG is dropped on otterdog's read
+# path — its id->slug map comes only from `/orgs/{org}/installations`, there is
+# no numeric fallback as there is for required status checks
+# (eclipse-csi/otterdog#732), and the skip is logged to otterdog's log, never to
+# the plan. That actor is invisible to both legs, so a row is its only detector;
+# it must name the ruleset directly
+# (`endpoint = "/repos/{org}/{repo}/rulesets/<id>"`, `path =
+# "bypass_actors[].actor_id"`, `compare = "set"`), since bypass actors do not
+# appear on `/rules/branches/{branch}`. The shape a row takes on a protected
+# branch:
 #
 #   [[control]]
 #   key        = "main-required-checks"
