@@ -94,7 +94,9 @@ stable (org-config#ADR-0007).
   corrections and the 2026-09-24 one below: Renovate could not see the pin at all until
   a `custom.regex` manager was added for it. The *edit* is now mechanical across all
   five literals; the *decision* stays authored, because the bump PR is where the plan
-  output is re-checked against live and the fixture format is re-confirmed.
+  output is re-checked against live and the fixture format is re-confirmed — and where
+  the upstream reads that no test here can make are repeated: the checklist above the pin
+  literal in `justfile.project` names them (org-config#269).
 - **A pin bump that breaks fixture parsing is an early-warning signal, not a nuisance.**
   Because the same pin anchors the L1 plan fixtures, a bump that makes fixture parsing
   fail is the first, cheap indication that upstream otterdog changed its plan output
