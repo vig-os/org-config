@@ -21,6 +21,15 @@ answer (issue #258): it asks for the largest page GitHub serves and raises
 :class:`TruncatedResponseError` when the response advertises a further one, so a
 row projecting over a list can never assert the first page of a longer
 collection as if it were the whole of it.
+
+The list methods resolve their collections instead of refusing them, through one
+shared page walk (:meth:`RestGitHubClient._paginate`) that reads the same
+header: it follows ``Link: rel="next"`` until GitHub stops sending one (issue
+#260). Deciding from the SIZE of a page — the walk this replaced — is an
+inference about GitHub's behaviour rather than a reading of what GitHub said,
+and it is wrong in both directions: an endpoint that filters after paginating
+returns a short page that is not the last, and a collection that ends exactly on
+a page boundary returns a full page that is.
 """
 
 from __future__ import annotations
@@ -28,6 +37,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
 from typing import Protocol
 
 from .models import Issue, IssueAction
@@ -36,7 +46,8 @@ _API_ROOT = "https://api.github.com"
 
 # The largest page GitHub serves. `get_json` asks for it so the one GET it makes
 # resolves collections up to this size completely; past it the read is refused
-# rather than truncated (issue #258).
+# rather than truncated (issue #258). The page walk asks for it too, to make the
+# fewest round trips — but never to decide where the collection ends (#260).
 _MAX_PAGE_SIZE = 100
 
 
@@ -69,7 +80,7 @@ class TruncatedResponseError(ApiError):
         super().__init__(
             200,
             f'GET {path}: one page of a longer collection (Link: rel="next") — '
-            f"the row cannot be asserted against a partial answer",
+            f"a partial answer cannot stand in for the whole collection",
         )
 
 
@@ -111,10 +122,11 @@ class RestGitHubClient:
     def _send(self, method: str, path: str, payload: dict | None = None) -> tuple[object, str]:
         """Send one request and return ``(document, Link header)``.
 
-        The pagination-aware sibling of :meth:`_request`: only ``get_json``
-        needs the ``Link`` header, and it needs it to refuse a partial answer
-        (#258). The dedicated list methods walk their pages by page number and
-        are deliberately unaffected.
+        The pagination-aware sibling of :meth:`_request`, and the only place the
+        response headers survive the ``urlopen`` block. Two readers need them:
+        ``get_json``, to refuse a partial answer (#258), and :meth:`_paginate`,
+        to know whether there is another page (#260). ``path`` may be a full URL,
+        which is what a ``rel="next"`` target is.
         """
         url = path if path.startswith("http") else f"{self._api_root}{path}"
         data = json.dumps(payload).encode() if payload is not None else None
@@ -134,14 +146,59 @@ class RestGitHubClient:
         except (urllib.error.URLError, json.JSONDecodeError, OSError) as exc:
             raise ApiError(0, f"{method} {path}: {exc}") from exc
 
+    def _paginate(self, path: str) -> Iterator[object]:
+        """Walk every page of ``path``, yielding one decoded document per page.
+
+        The stop condition is the ``Link`` header and nothing else (issue #260).
+        A page shorter than the one asked for is not evidence that it is the
+        last — an endpoint that filters after paginating returns short pages
+        routinely — and a full page is not evidence that another follows. Only
+        ``rel="next"`` says there is more, and its absence says there is not;
+        that is what GitHub documents, and it is the only signal that stays
+        correct as the fleet grows past one page.
+
+        The ``next`` target is followed **verbatim**, never rebuilt from a page
+        number: it carries the page size, the org's numeric id and — on the
+        cursor-paginated issues endpoint — an opaque ``after=`` that no composed
+        ``page=N`` reproduces. A ``next`` that cannot be followed raises
+        :class:`TruncatedResponseError` rather than ending the walk quietly,
+        because "there is more" must never be read as "that was all".
+
+        Following a URL rather than composing one costs the walk the ceiling a
+        page counter gave it for free, so it carries its own: a ``next`` target
+        already fetched is a cycle, and the walk raises instead of spinning on
+        it until the job's ``timeout-minutes`` burns the rate limit. Bounding it
+        here rather than with a page cap keeps the bound on the thing that
+        actually goes wrong — a server repeating itself — and never refuses a
+        genuinely long collection.
+
+        Whole documents are yielded rather than merged rows: GitHub answers a
+        list endpoint in two shapes — a root list (``/orgs/{org}/repos``) and an
+        envelope keyed per endpoint (``secrets``, ``repositories``) — and which
+        one it is belongs to the caller, not to the transport.
+        """
+        url = _with_max_page_size(path)
+        fetched: set[str] = set()
+        while url:
+            fetched.add(url)
+            document, link = self._send("GET", url)
+            yield document
+            following = _next_page_url(link)
+            if not following and _advertises_next_page(link):
+                raise TruncatedResponseError(url)
+            if following in fetched:
+                raise ApiError(
+                    200,
+                    f'GET {url}: the rel="next" target {following} was already fetched — '
+                    f"refusing to walk a pagination cycle",
+                )
+            url = following
+
     def list_open_drift_issues(self) -> list[Issue]:
         """List open issues labelled ``drift`` (the reconciler filters further)."""
         issues: list[Issue] = []
-        page = 1
-        while True:
-            path = f"/repos/{self._repo}/issues?state=open&labels=drift&per_page=100&page={page}"
-            batch = self._request("GET", path) or []
-            for raw in batch:
+        for document in self._paginate(f"/repos/{self._repo}/issues?state=open&labels=drift"):
+            for raw in document or []:
                 # The issues endpoint also returns PRs; skip them.
                 if "pull_request" in raw:
                     continue
@@ -158,27 +215,26 @@ class RestGitHubClient:
                         ),
                     )
                 )
-            if len(batch) < 100:
-                break
-            page += 1
         return issues
 
     def list_org_repos(self, org: str) -> list[str]:
         """List every repo name in ``org`` (``GET /orgs/{org}/repos``).
 
-        Paginated; the org endpoint defaults to ``type=all`` (public + private,
+        Paginated over :meth:`_paginate`, so the walk ends where GitHub says it
+        does; the org endpoint defaults to ``type=all`` (public + private,
         including archived), so the sweep sees the full live inventory. Needs an
         org-wide read token — the drift workflow's full plan token, not the
-        issues-narrowed one."""
+        issues-narrowed one.
+
+        Completeness is the contract here, not a nicety: this list is the
+        ``live`` side of the ADR-0002 inventory sweep, and a short one fails in
+        both directions at once — a repo past the cut never produces its
+        ``undeclared`` record (the shadow-repo finding goes silently missing),
+        and a declared repo past the cut produces a false ``absent`` one
+        (issue #260)."""
         names: list[str] = []
-        page = 1
-        while True:
-            path = f"/orgs/{org}/repos?per_page=100&page={page}"
-            batch = self._request("GET", path) or []
-            names.extend(raw["name"] for raw in batch)
-            if len(batch) < 100:
-                break
-            page += 1
+        for document in self._paginate(f"/orgs/{org}/repos"):
+            names.extend(raw["name"] for raw in document or [])
         return names
 
     def get_json(self, path: str) -> object:
@@ -209,29 +265,17 @@ class RestGitHubClient:
         Values are never returned by the API — only the metadata the
         org-secret assertion families compare against the committed config."""
         secrets: list[dict] = []
-        page = 1
-        while True:
-            path = f"/orgs/{org}/actions/secrets?per_page=100&page={page}"
-            document = self._request("GET", path) or {}
-            batch = document.get("secrets", []) if isinstance(document, dict) else []
-            secrets.extend(batch)
-            if len(batch) < 100:
-                break
-            page += 1
+        for document in self._paginate(f"/orgs/{org}/actions/secrets"):
+            if isinstance(document, dict):
+                secrets.extend(document.get("secrets", []))
         return secrets
 
     def list_org_secret_repositories(self, org: str, name: str) -> list[str]:
         """List the repos a ``selected``-visibility org secret is shared with."""
         names: list[str] = []
-        page = 1
-        while True:
-            path = f"/orgs/{org}/actions/secrets/{name}/repositories?per_page=100&page={page}"
-            document = self._request("GET", path) or {}
-            batch = document.get("repositories", []) if isinstance(document, dict) else []
-            names.extend(raw["name"] for raw in batch)
-            if len(batch) < 100:
-                break
-            page += 1
+        for document in self._paginate(f"/orgs/{org}/actions/secrets/{name}/repositories"):
+            if isinstance(document, dict):
+                names.extend(raw["name"] for raw in document.get("repositories", []))
         return names
 
     def create_issue(self, title: str, body: str, labels: tuple[str, ...]) -> int:
@@ -287,12 +331,44 @@ def _advertises_next_page(link: str) -> bool:
     ``rel=next`` is not mistaken for one, and accepts the unquoted RFC 8288
     spelling as well as the quoted form GitHub sends.
     """
+    return any(_names_next(params) for _, params in _link_entries(link))
+
+
+def _next_page_url(link: str) -> str:
+    """The ``rel="next"`` target of a ``Link`` header, or ``""`` if there is none.
+
+    Returned verbatim, because it is not reconstructible: GitHub's next URL
+    carries the page size, the org rewritten to its numeric id and, on a
+    cursor-paginated endpoint such as ``/repos/{owner}/{repo}/issues``, an
+    opaque ``after=`` cursor. Empty for an entry whose target is missing or
+    unbracketed — which is not a link at all (RFC 8288), and which
+    :meth:`RestGitHubClient._paginate` refuses rather than walks past.
+    """
+    for target, params in _link_entries(link):
+        if _names_next(params) and target:
+            return target
+    return ""
+
+
+def _link_entries(link: str) -> Iterator[tuple[str, str]]:
+    """Split a ``Link`` header into ``(target URL, parameters)`` pairs.
+
+    The target is returned only when it is bracketed as RFC 8288 requires, so
+    the two readers above agree on what counts as a link.
+    """
     for entry in link.split(","):
-        _, _, params = entry.partition(";")
-        for param in params.split(";"):
-            if param.strip().replace('"', "").replace("'", "").replace(" ", "") == "rel=next":
-                return True
-    return False
+        head, _, params = entry.partition(";")
+        before, bracketed, rest = head.strip().partition("<")
+        url, closed, _ = rest.partition(">")
+        yield (url if not before and bracketed and closed else ""), params
+
+
+def _names_next(params: str) -> bool:
+    """Whether a link's parameters include ``rel=next``, quoted or bare."""
+    return any(
+        param.strip().replace('"', "").replace("'", "").replace(" ", "") == "rel=next"
+        for param in params.split(";")
+    )
 
 
 def execute(actions: list[IssueAction], client: GitHubClient, labels: tuple[str, ...]) -> None:
