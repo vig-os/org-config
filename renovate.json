@@ -21,7 +21,7 @@
   ],
   "packageRules": [
     {
-      "description": "The otterdog pin is proposed by Renovate and adopted by a human (#250). The engine ref selects the binary that produces every plan, so the PR requests review and never automerges. `Plan` does run on it (#230 added justfile.project to the paths filter) but is advisory, not a required check (ADR-0007 Axis D, #236), so the review is where the empty-plan evidence is actually read. Note this is a requested review, not an enforced one: the `Main protection` ruleset grants OrganizationAdmin an `always` bypass, so no ruleset setting can gate the maintainer's own merge.",
+      "description": "The otterdog pin is proposed by Renovate and adopted by a human (#250). The engine ref selects the binary that produces every plan, so the PR requests review and never automerges. `Plan` does run on it (#230 added justfile.project to the paths filter) but is advisory, not a required check *in this repository* (ADR-0007 Axis D, #236; a consumer org decides that for itself and the only one made its plan context required — #268), so the review is where the empty-plan evidence is actually read. Note this is a requested review, not an enforced one: the `Main protection` ruleset grants OrganizationAdmin an `always` bypass, so no ruleset setting can gate the maintainer's own merge.",
       "matchManagers": ["custom.regex"],
       "matchDepNames": ["otterdog"],
       "reviewers": ["c-vigo"],
