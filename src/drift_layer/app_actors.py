@@ -443,8 +443,11 @@ def read_installations(client: GitHubClient, org: str) -> Installations:
     further page (#258) — and ``total_count`` is compared as well, because a
     partial list would make every absent slug look uninstalled. otterdog's own
     read does NOT paginate here (``org_client.py:484-491`` uses the non-paged
-    ``request_json``), so past 100 installations otterdog itself drops more
-    actors than this check can predict; that is reported, not mirrored.
+    ``request_json``, which also sends no ``per_page``), so otterdog itself
+    drops installations past GitHub's default page size of 30 — below this
+    check's own 100, so between 31 and 100 it drops actors this check cannot
+    predict and stays correct to say nothing (#269); that is reported, not
+    mirrored.
     """
     try:
         document = client.get_json(f"/orgs/{quote(org, safe='')}/installations")
