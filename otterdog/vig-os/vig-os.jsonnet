@@ -243,6 +243,18 @@ orgs.newOrg('vig-os', 'vig-os') {
         orgs.newRepoRuleset('Dev protection') {
           allows_creations: true,
           bypass_actors+: [
+            // Applies to every App bypass actor throughout this file. An App
+            // actor (no `#role` / `@team` prefix) is WRITTEN by resolving its
+            // slug through `GET /apps/<slug>`, which this engine's
+            // installation token is observed to read only for a PUBLIC App
+            // (#256, upstream #772). Both Apps named in this file are public,
+            // and keeping them public is load-bearing, not incidental: make
+            // one private and every ruleset below that names it becomes
+            // unrepairable. A non-public App has to be written out of band —
+            // a one-off `otterdog apply` with an org-owner PAT, which CAN
+            // read the slug; otterdog then reads the actor back from
+            // `/orgs/{org}/installations`, not `/apps/`, and plans clean, but
+            // can no longer repair that ruleset. See README, Known limitations.
             'commit-action-bot',
           ],
           include_refs+: [

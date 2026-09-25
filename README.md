@@ -181,6 +181,44 @@ nothing here calls it.
   [upstream #729](https://github.com/eclipse-csi/otterdog/issues/729)
   ([#225](https://github.com/vig-os/org-config/issues/225)).
 
+- **A GitHub App bypass actor on a ruleset is writable only while the engine's
+  own token can read the App.** Otterdog resolves an App bypass actor on the
+  **write** path through `GET /apps/{app_slug}`, and every otterdog job here
+  authenticates as an App *installation* (ADR-0004 Corrections). GitHub's
+  reference for that endpoint documents no authentication requirement at all,
+  so the boundary below is an **observation**, not a documented mechanism. As
+  probed on 2026-09-25, a **public** App answers `200` to any caller — both
+  Apps this org names in `bypass_actors` (`commit-action-bot`,
+  `vig-os-release-app`) do, and installation-token applies have written both —
+  while a **private** App answers `404` unauthenticated, `200` to an org-owner
+  PAT and `403` to an installation token, which is the status in the failing
+  traceback. `apply` then fails atomically with `failed retrieving app node
+  id: … (status=403, "Resource not accessible by integration")`: the live
+  ruleset is untouched, but the merged config cannot be applied. The **read**
+  path never calls that endpoint — it maps the live `actor_id` to a slug from
+  `GET /orgs/{org}/installations` — so `plan` and `drift` render the actor
+  correctly, and this one class of change is green on review and red on apply
+  with nothing here to flag it yet
+  ([#259](https://github.com/vig-os/org-config/issues/259)).
+  **Workaround:** run the engine itself once with an org-owner PAT as
+  `OTTERDOG_TOKEN` — an owner *can* read the slug, so a one-off `otterdog
+  apply` resolves it through otterdog's own code path and writes the complete
+  payload. Prefer that over hand-building a REST `PUT` of the ruleset: a
+  hand-assembled ruleset payload is precisely the operation that silently lost
+  unmodelled fields in
+  [#246](https://github.com/vig-os/org-config/issues/246). Once the actor is
+  live, the installation token's read path maps its `actor_id` back to the
+  slug, matches the declaration and plans clean, so the declaration still
+  detects drift. **Residual gap:** detection survives, repair does not —
+  `apply` re-sends the *whole* bypass list on any change to that ruleset, so
+  every later patch hits the same `403`, otterdog's own reconciliation of a
+  manual edit included. Repair stays manual until
+  [upstream #772](https://github.com/eclipse-csi/otterdog/issues/772) is fixed
+  ([#256](https://github.com/vig-os/org-config/issues/256)). Detection itself
+  has one hole, tracked separately: an App bypass actor whose App is *not* an
+  installation on the org is dropped on the read path, leaving a permanent
+  phantom plan diff ([#262](https://github.com/vig-os/org-config/issues/262)).
+
 - **Creating a repository costs two apply dispatches when Code Security is
   unavailable.** The post-create `PATCH /repos/{org}/{repo}/code-scanning/default-setup`
   returns `403` even when otterdog is asking to turn code scanning *off*, so the
