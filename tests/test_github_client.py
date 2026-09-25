@@ -353,3 +353,42 @@ def test_a_next_link_that_repeats_a_fetched_page_is_refused_rather_than_walked_f
     with pytest.raises(ApiError, match="pagination cycle"):
         client.list_org_repos(ORG)
     assert client.requested == [REPOS_PAGE_1, REPOS_PAGE_2]
+
+
+def test_an_api_error_carries_the_response_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 403 is ambiguous; only its headers say whether it was the limiter (#259).
+
+    The rate limiter and the permission boundary both answer `403 Forbidden`, so
+    a caller that renders a 403 as a verdict about the resource needs
+    `x-ratelimit-remaining` / `retry-after` — which means the error has to carry
+    them rather than discard the response.
+    """
+
+    def fake_urlopen(req, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        raise urllib.error.HTTPError(
+            req.full_url,
+            403,
+            "Forbidden",
+            {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1780000000"},
+            None,
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(ApiError) as excinfo:
+        _client().get_json("/apps/some-app")
+    assert excinfo.value.status == 403
+    # Lower-cased on the way in, so a caller never has to guess GitHub's casing.
+    assert excinfo.value.headers["x-ratelimit-remaining"] == "0"
+    assert excinfo.value.headers["x-ratelimit-reset"] == "1780000000"
+
+
+def test_a_statusless_api_error_carries_no_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No answer means no headers — and an empty mapping, never ``None``."""
+
+    def fake_urlopen(req, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        raise urllib.error.URLError("connection reset")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(ApiError) as excinfo:
+        _client().get_json("/apps/some-app")
+    assert excinfo.value.headers == {}

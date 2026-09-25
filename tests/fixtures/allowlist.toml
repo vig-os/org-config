@@ -16,3 +16,10 @@ reason = "throwaway experiment repo, never brought under config"
 [[unmanaged]]
 repository = "external-mirror"
 reason = "read-only mirror managed by an upstream automation, not by us"
+
+# App slugs the plan-time check reports as known-unresolvable rather than as a
+# finding (#259): the canonical case is a private App an installation token
+# cannot read, on a ruleset that is already live and correct.
+[[app_actor]]
+slug = "private-sibling-app"
+reason = "private App owned by a sibling org"
