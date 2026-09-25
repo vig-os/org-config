@@ -8,6 +8,7 @@ version pin (justfile.project) anchors this format's stability.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -191,3 +192,28 @@ def declared_repos() -> frozenset[str]:
 def declared_org_secrets() -> dict[str, tuple[str, tuple[str, ...]]]:
     """The known committed org-secret declarations (ground truth)."""
     return DECLARED_ORG_SECRETS
+
+
+def stub_response(document: object, headers: dict[str, str] | None = None) -> object:
+    """A stand-in for what ``urlopen`` returns: ``.read()`` plus ``.headers``.
+
+    Shared rather than duplicated because two layers stub the transport: the
+    client's own tests, and the controls end-to-end test that drives the real
+    client over a canned page. ``headers`` carries the ``Link`` header the
+    truncation guard reads (#258).
+    """
+
+    class _Ctx:
+        def __init__(self) -> None:
+            self.headers = headers or {}
+
+        def __enter__(self):  # noqa: ANN204
+            return self
+
+        def __exit__(self, *exc: object) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return json.dumps(document).encode()
+
+    return _Ctx()
