@@ -927,6 +927,18 @@ orgs.newOrg('vig-os', 'vig-os') {
         orgs.newRepoSecret('APP_SYNC_ISSUES_PRIVATE_KEY') {
           value: '********',
         },
+        // Credentials of the repo-scoped `tessera-release-plz` GitHub App
+        // (app_id 5050387) that drives tessera's release-plz release-PR flow
+        // (tessera ADR-0052); value managed out-of-band, declared so the plan
+        // stops proposing their deletion (#254, #255). Retire together with
+        // release-plz when tessera migrates to the devkit release train
+        // (tessera#441).
+        orgs.newRepoSecret('RP_APP_ID') {
+          value: '********',
+        },
+        orgs.newRepoSecret('RP_APP_PRIVATE_KEY') {
+          value: '********',
+        },
       ],
       branch_protection_rules: [
         orgs.newBranchProtectionRule('dev') {
