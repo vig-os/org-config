@@ -15,6 +15,12 @@ Every transport failure surfaces as an :class:`ApiError` carrying the HTTP
 status, because the unmanaged-controls leg (issue #116) must tell "the control
 is wrong" apart from "the control could not be read" — a 403 on one row has to
 degrade that row, never be reported as drift or silently resolve its issue.
+
+For the same reason :meth:`RestGitHubClient.get_json` refuses an INCOMPLETE
+answer (issue #258): it asks for the largest page GitHub serves and raises
+:class:`TruncatedResponseError` when the response advertises a further one, so a
+row projecting over a list can never assert the first page of a longer
+collection as if it were the whole of it.
 """
 
 from __future__ import annotations
@@ -28,6 +34,11 @@ from .models import Issue, IssueAction
 
 _API_ROOT = "https://api.github.com"
 
+# The largest page GitHub serves. `get_json` asks for it so the one GET it makes
+# resolves collections up to this size completely; past it the read is refused
+# rather than truncated (issue #258).
+_MAX_PAGE_SIZE = 100
+
 
 class ApiError(Exception):
     """A failed GitHub API call, carrying the HTTP status for triage.
@@ -40,6 +51,26 @@ class ApiError(Exception):
     def __init__(self, status: int, message: str) -> None:
         super().__init__(f"{status}: {message}" if status else message)
         self.status = status
+
+
+class TruncatedResponseError(ApiError):
+    """A 200 that answered only the first page of a longer collection.
+
+    The one :class:`ApiError` whose status is a SUCCESS: the request worked,
+    the answer is incomplete. It is an ``ApiError`` subclass on purpose — every
+    caller already degrades the row it belongs to rather than guessing, and
+    "could not resolve the whole collection" wants exactly that treatment. The
+    alternative, returning the partial body, is the one outcome the table must
+    never produce: a projection over it compares as a shorter set and reads as
+    drift or, worse, as clean (issue #258).
+    """
+
+    def __init__(self, path: str) -> None:
+        super().__init__(
+            200,
+            f'GET {path}: one page of a longer collection (Link: rel="next") — '
+            f"the row cannot be asserted against a partial answer",
+        )
 
 
 class GitHubClient(Protocol):
@@ -73,6 +104,18 @@ class RestGitHubClient:
         self._api_root = api_root.rstrip("/")
 
     def _request(self, method: str, path: str, payload: dict | None = None) -> object:
+        """Send one request and return the decoded body, discarding headers."""
+        document, _ = self._send(method, path, payload)
+        return document
+
+    def _send(self, method: str, path: str, payload: dict | None = None) -> tuple[object, str]:
+        """Send one request and return ``(document, Link header)``.
+
+        The pagination-aware sibling of :meth:`_request`: only ``get_json``
+        needs the ``Link`` header, and it needs it to refuse a partial answer
+        (#258). The dedicated list methods walk their pages by page number and
+        are deliberately unaffected.
+        """
         url = path if path.startswith("http") else f"{self._api_root}{path}"
         data = json.dumps(payload).encode() if payload is not None else None
         req = urllib.request.Request(url, data=data, method=method)
@@ -84,7 +127,8 @@ class RestGitHubClient:
         try:
             with urllib.request.urlopen(req) as resp:
                 raw = resp.read()
-            return json.loads(raw) if raw else None
+                link = resp.headers.get("Link", "") or ""
+            return (json.loads(raw) if raw else None), link
         except urllib.error.HTTPError as exc:
             raise ApiError(exc.code, f"{method} {path}: {exc.reason}") from exc
         except (urllib.error.URLError, json.JSONDecodeError, OSError) as exc:
@@ -138,13 +182,26 @@ class RestGitHubClient:
         return names
 
     def get_json(self, path: str) -> object:
-        """GET one endpoint and return the decoded JSON document.
+        """GET one endpoint and return the decoded JSON document, or refuse.
 
         The generic read the unmanaged-controls leg asserts against (issue
         #116); the row's dotted path does the field selection, so the client
         stays a dumb transport and every control is reachable without a new
-        method per endpoint."""
-        return self._request("GET", path)
+        method per endpoint.
+
+        Still one GET — but never a silently partial one (issue #258). The path
+        gets ``per_page=100`` unless it already chose a page size, and a
+        response advertising ``rel="next"`` raises
+        :class:`TruncatedResponseError` instead of returning page 1. The refusal
+        is unconditional rather than reserved for list-shaped rows, because the
+        transport cannot see the row's path: a dict-shaped endpoint never sends
+        a ``next`` anyway, and over-refusing a scalar read only degrades that
+        one row, while under-refusing a projection asserts a lie."""
+        requested = _with_max_page_size(path)
+        document, link = self._send("GET", requested)
+        if _advertises_next_page(link):
+            raise TruncatedResponseError(requested)
+        return document
 
     def list_org_secrets(self, org: str) -> list[dict]:
         """List the org's Actions secrets (name + visibility), paginated.
@@ -205,6 +262,37 @@ class RestGitHubClient:
             f"/repos/{self._repo}/issues/{number}",
             {"state": "closed", "state_reason": "completed"},
         )
+
+
+def _with_max_page_size(path: str) -> str:
+    """Add ``per_page=100`` unless the path already names a page size.
+
+    Joins with ``&`` when a query string is already there and ``?`` when it is
+    not, and works on a full URL as well as an API path. GitHub ignores query
+    parameters an endpoint does not define (verified against ``GET /orgs/{org}``,
+    which answers normally with ``per_page`` attached), so a non-paginated
+    endpoint is unaffected.
+    """
+    head, separator, query = path.partition("?")
+    parts = query.split("&") if query else []
+    if separator and any(part.partition("=")[0] == "per_page" for part in parts):
+        return path
+    return head + "?" + "&".join([*parts, f"per_page={_MAX_PAGE_SIZE}"])
+
+
+def _advertises_next_page(link: str) -> bool:
+    """Whether a ``Link`` header names a further page.
+
+    Reads the link PARAMETERS only, so a target URL that happens to contain
+    ``rel=next`` is not mistaken for one, and accepts the unquoted RFC 8288
+    spelling as well as the quoted form GitHub sends.
+    """
+    for entry in link.split(","):
+        _, _, params = entry.partition(";")
+        for param in params.split(";"):
+            if param.strip().replace('"', "").replace("'", "").replace(" ", "") == "rel=next":
+                return True
+    return False
 
 
 def execute(actions: list[IssueAction], client: GitHubClient, labels: tuple[str, ...]) -> None:

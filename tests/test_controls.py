@@ -9,6 +9,7 @@ touches the network.
 
 from __future__ import annotations
 
+import urllib.request
 from pathlib import Path
 
 from drift_layer.controls import (
@@ -29,8 +30,9 @@ from drift_layer.controls import (
     resolve_endpoint,
     select_path,
 )
-from drift_layer.github_client import ApiError
+from drift_layer.github_client import ApiError, RestGitHubClient, TruncatedResponseError
 from drift_layer.models import DriftRecord
+from tests.conftest import stub_response
 
 ORG = "vig-os"
 
@@ -377,6 +379,61 @@ def test_absent_field_degrades_rather_than_fabricating_drift() -> None:
     # A 200 whose schema no longer carries the path means GitHub moved the
     # field; reporting that as drift would invent a security finding.
     _degrades({"something_else": True}, "absent")
+
+
+RULES = "/repos/vig-os/org-config/rules/branches/main"
+
+
+def _rules_row(**overrides: object) -> Control:
+    """A list-projection row over the root-list rules endpoint (#205 shape)."""
+    fields: dict[str, object] = {
+        "key": "main-branch-rules",
+        "endpoint": "/repos/{org}/org-config/rules/branches/main",
+        "path": "[].type",
+        "compare": "set",
+        "expect": [f"rule-{i}" for i in range(30)],
+    }
+    fields.update(overrides)
+    return _control(**fields)
+
+
+def test_a_truncated_read_degrades_the_row_rather_than_comparing_a_short_set() -> None:
+    # The transport refuses a partial collection (#258), and the evaluator
+    # treats that refusal like any other unreadable row: unresolved, no record,
+    # never clean.
+    control = _rules_row()
+    result, _ = _evaluate(control, {RULES: TruncatedResponseError(f"{RULES}?per_page=100")})
+    assert result.records == []
+    assert result.clean_fingerprints == set()
+    assert result.unresolved_fingerprints == {_fingerprint(control)}
+    assert [o.status for o in result.outcomes] == [UNRESOLVED]
+    assert [o.actual for o in result.outcomes] == ["truncated"]
+    assert any("truncated" in note and RULES in note for note in result.notes)
+
+
+def test_a_truncated_live_read_never_reads_clean(monkeypatch) -> None:  # noqa: ANN001
+    # End-to-end over the REAL client with a canned first page, because this is
+    # the failure the row shape makes silent: `expect` here is EXACTLY the 30
+    # values page 1 carries, so before #258 the row compared equal and went
+    # green while the live collection kept diverging past the page boundary.
+    page_one = [{"type": f"rule-{i}"} for i in range(30)]
+    link = f'<https://api.github.com{RULES}?per_page=100&page=2>; rel="next"'
+
+    def fake_urlopen(req, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        assert req.full_url.endswith("?per_page=100")
+        return stub_response(page_one, {"Link": link})
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    control = _rules_row()
+    result = evaluate_controls(
+        ControlsConfig(controls=[control]),
+        RestGitHubClient("vig-os/org-config", "token"),
+        org=ORG,
+    )
+    assert result.clean_fingerprints == set()
+    assert result.records == []
+    assert result.unresolved_fingerprints == {_fingerprint(control)}
+    assert [o.status for o in result.outcomes] == [UNRESOLVED]
 
 
 def test_unresolved_rows_are_withheld_from_both_populations() -> None:

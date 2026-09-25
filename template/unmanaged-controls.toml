@@ -32,7 +32,10 @@
 # the literal, and `checks[].context` projects a field out of every element. An
 # empty key applies either to the response itself, for endpoints answering with a
 # list at the root. A path matching zero or several elements degrades the row to
-# UNRESOLVED rather than picking one.
+# UNRESOLVED rather than picking one. So does a collection the API would not
+# deliver in one page: the client asks for GitHub's largest page (100) and
+# refuses a response advertising a further one, so a row never asserts the first
+# 30 of something as if it were the whole set (#258).
 #
 # `compare = "set"` compares two lists order- and duplicate-insensitively, for
 # collections GitHub returns in no guaranteed order. `expect`/`tolerated` are

@@ -72,8 +72,9 @@ element of a list, `[].context` projects a field out of every element, and
 `compare = "set"` asserts the result as an unordered set — so a repository
 ruleset's internals are assertable, including the rule parameters Otterdog's
 schema does not model. The leg degrades **per row** — a control
-that cannot be read, or a path matching zero or several elements, leaves its own
-issue untouched rather than being reported as drift or silently resolved. Check any row against live state without
+that cannot be read, a path matching zero or several elements, or a collection
+too long to arrive in one page, leaves its own issue untouched rather than being
+reported as drift or silently resolved. Check any row against live state without
 writing an issue:
 
 ```bash

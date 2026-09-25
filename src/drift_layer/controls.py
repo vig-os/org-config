@@ -33,6 +33,12 @@ unresolved rows' issues from the reconcile input, so one unreadable row degrades
 only itself while every other row still reconciles. That is strictly better than
 the inventory sweep's all-or-nothing ``None``, and it is possible only because a
 row's fingerprint is derivable from the table without reading the API at all.
+
+A read that arrived INCOMPLETE degrades the same way (issue #258): the client
+refuses a response that advertises a further page rather than returning the
+first one, because a truncated collection is the single failure this table
+cannot survive — it does not raise and does not go MISSING, it just compares as
+a shorter set and reads as drift or, worse, as clean.
 """
 
 from __future__ import annotations
@@ -42,7 +48,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .github_client import ApiError, GitHubClient
+from .github_client import ApiError, GitHubClient, TruncatedResponseError
 from .inventory import extract_declared_org_secrets
 from .models import DriftRecord
 
@@ -287,6 +293,12 @@ def select_path(document: object, path: str) -> object:
     ``False`` and ``None`` are returned verbatim: they are legitimate live
     values, and conflating either with absence would turn a schema change into a
     fabricated drift finding.
+
+    The list this walks is always the WHOLE list. Selection could not detect a
+    collection the transport had already cut short, so the guard sits one layer
+    lower: ``get_json`` asks for the largest page GitHub serves and refuses a
+    response advertising a further one, which degrades the row before it ever
+    reaches here (issue #258).
     """
     segments = _parse_path(path)
     if segments is None:
@@ -518,7 +530,7 @@ def _evaluate_control(
                 scope=scope,
                 status=UNRESOLVED,
                 expected=expected,
-                actual=f"HTTP {document.status}" if document.status else "no response",
+                actual=_degradation_actual(document),
             )
         )
         return
@@ -819,6 +831,14 @@ def _control_detail(control: Control, *, endpoint: str, actual: object) -> str:
 
 
 def _degradation_note(error: ApiError, endpoint: str) -> str:
+    if isinstance(error, TruncatedResponseError):
+        # A 200 the transport refused as incomplete (#258): the row would
+        # otherwise compare the first page of a longer collection as if it were
+        # the whole set — the one degradation that comes from a SUCCESSFUL read.
+        return (
+            f"truncated — {endpoint} answered one page of a longer collection; "
+            f"asserting it would compare a partial set"
+        )
     if error.status == 404:
         return f"endpoint unassertable — {endpoint} returned 404"
     if error.status in (401, 403):
@@ -826,6 +846,13 @@ def _degradation_note(error: ApiError, endpoint: str) -> str:
     if error.status == 0:
         return f"unreadable — {endpoint} gave no answer ({error})"
     return f"unreadable — {endpoint} returned {error.status}"
+
+
+def _degradation_actual(error: ApiError) -> str:
+    """What the report's `actual` column says for an unreadable row."""
+    if isinstance(error, TruncatedResponseError):
+        return "truncated"
+    return f"HTTP {error.status}" if error.status else "no response"
 
 
 def _scope_label(control: Control) -> str:
