@@ -215,9 +215,50 @@ nothing here calls it.
   manual edit included. Repair stays manual until
   [upstream #772](https://github.com/eclipse-csi/otterdog/issues/772) is fixed
   ([#256](https://github.com/vig-os/org-config/issues/256)). Detection itself
-  has one hole, tracked separately: an App bypass actor whose App is *not* an
-  installation on the org is dropped on the read path, leaving a permanent
-  phantom plan diff ([#262](https://github.com/vig-os/org-config/issues/262)).
+  has one hole, tracked separately in the next bullet: an App bypass actor
+  whose App is *not* an installation on the org is dropped on the read path
+  ([#262](https://github.com/vig-os/org-config/issues/262)).
+
+- **An App bypass actor is *read* only while its App is an installation on the
+  organization; otherwise it is silently dropped.** The slug otterdog renders
+  for a live `Integration` bypass actor comes from one map, built per run from
+  `GET /orgs/{org}/installations` (`models/github_organization.py:555-558`) and
+  applied to each ruleset at `:758-765`, behind the project's own `FIXME`
+  ("*need to associate an app id to its slug — GitHub does not support that
+  atm*"). That map can only ever hold **org installations**. An actor whose
+  `actor_id` is missing from it gets no `app_slug`, and
+  `models/ruleset.py:541-548` then logs `fail to map integration actor '<id>',
+  skipping` — to otterdog's log, not to `plan.txt` — and **drops the actor from
+  the model**. Both directions are wrong and neither reaches the pull request:
+  if the config declares the actor, every `plan` proposes to add it back and
+  `apply` never converges, because a ruleset patch re-sends the whole bypass
+  list; if the config does not declare it, a live bypass of a protected branch
+  or tag is never reported at all. Same root cause as
+  [upstream #732](https://github.com/eclipse-csi/otterdog/issues/732) — the
+  same installation map, for required status checks — but a strictly worse
+  symptom: a status check *falls back* to the numeric
+  `<integration_id>:<context>` form (`models/ruleset.py:145-151`) and stays
+  visible and writable, which is why this repo's status-check prefixes are
+  numeric ([#69](https://github.com/vig-os/org-config/issues/69)); a bypass
+  actor has no numeric form and simply disappears. Unfixed at the 1.5.0 pin and
+  unfixed on upstream `main` (both read 2026-09-25). **Nothing here is affected
+  today:** all fifteen `Integration` bypass actors live across the readable
+  `vig-os` and `exo-pet` rulesets — `2433383` `commit-action-bot` (×11),
+  `2930017` `vig-os-release-app` (×3) and one private App owned by a sibling
+  org (×1) — appear in their org's `/installations` listing, compared on
+  2026-09-25. Two blind spots in that comparison, both of them limits of the
+  billing plan rather than surfaces left unread by choice: `vig-os/qms` is
+  private on a Free-plan org, so both of its ruleset endpoints answer
+  `403 Upgrade to GitHub Pro` and its rulesets, if any, could not be read; and
+  `GET /orgs/vig-os/rulesets` answers `403 Upgrade to GitHub Team`, because
+  org-level rulesets are a Team/Enterprise feature — a Free-plan org can hold
+  none, so the refusal is a statement about the plan rather than an unchecked
+  surface, but it was not read either. (`exo-pet` is on Team and was read in
+  full; its org-level ruleset list is empty.) The case that trips it is a
+  bypass slot granted out of band to an App installed on *some repositories*
+  without being an org installation, or an installation removed while the
+  ruleset keeps the `actor_id`
+  ([#262](https://github.com/vig-os/org-config/issues/262)).
 
 - **Creating a repository costs two apply dispatches when Code Security is
   unavailable.** The post-create `PATCH /repos/{org}/{repo}/code-scanning/default-setup`

@@ -355,6 +355,28 @@ it, what reads it, or when it should be rotated.
 # (preferred over a hand-built REST `PUT`, which is the very operation that lost
 # unmodelled fields above), and the exit criterion is an ADR-0005 pin that
 # includes the upstream fix.
+#
+# The one case above where DETECTION also fails is worth stating separately,
+# because it is the one case in this comment where a row would genuinely add
+# something (#262). Otterdog's id->slug map is built solely from
+# `/orgs/{org}/installations` (`models/github_organization.py:555-558`, applied
+# at `:758-765`), so an App that holds a live bypass slot without being an org
+# installation resolves to nothing; `models/ruleset.py:541-548` logs "fail to
+# map integration actor" to otterdog's log — never to `plan.txt` — and DROPS the
+# actor. There is no numeric fallback here, unlike required status checks, which
+# degrade to `<integration_id>:<context>` and stay visible
+# (eclipse-csi/otterdog#732, open; unfixed on upstream `main` as of 2026-09-25).
+# That actor is invisible to both legs at once, which is exactly what this
+# section is for — but it still gets NO ROW HERE, for a reason of fact rather
+# than doctrine: every `Integration` actor live in this org's rulesets IS an
+# installation (compared against `/orgs/vig-os/installations` on 2026-09-25), so
+# there is nothing to assert. A downstream org that has one should hold a row,
+# and the shape is unusual enough to record: bypass actors are not visible on
+# `/rules/branches/{branch}`, so the row must name the ruleset directly —
+# `endpoint = "/repos/{org}/{repo}/rulesets/<id>"`, `path =
+# "bypass_actors[].actor_id"`, `compare = "set"` — which is the one row shape
+# that carries a ruleset id, and which a Free-plan private repo cannot read at
+# all (403, as for `qms` above).
 
 # --- Unassertable controls -----------------------------------------------------
 #

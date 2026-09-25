@@ -254,7 +254,14 @@ orgs.newOrg('vig-os', 'vig-os') {
             // a one-off `otterdog apply` with an org-owner PAT, which CAN
             // read the slug; otterdog then reads the actor back from
             // `/orgs/{org}/installations`, not `/apps/`, and plans clean, but
-            // can no longer repair that ruleset. See README, Known limitations.
+            // can no longer repair that ruleset. That read-back is the second
+            // requirement: the App must also be an INSTALLATION ON THIS ORG,
+            // because `/orgs/{org}/installations` is the ONLY id->slug source
+            // otterdog has. An App with a live bypass slot that is not an org
+            // installation is dropped from the model with a log line and no
+            // plan output — a permanent phantom diff, with no numeric fallback
+            // as there is for the `15368:` status-check prefixes below (#262,
+            // upstream #732). See README, Known limitations.
             'commit-action-bot',
           ],
           include_refs+: [
