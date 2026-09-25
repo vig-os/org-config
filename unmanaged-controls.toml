@@ -24,6 +24,16 @@
 #               A path that matches zero or several elements, or a projection one
 #               element cannot satisfy, degrades the row to UNRESOLVED — it never
 #               picks one. Match literals compare against strings only.
+#
+#               THE LIST A ROW SEES IS ALWAYS THE WHOLE LIST (#258). GitHub
+#               paginates collections at 30 by default, and a truncated list is
+#               the one failure this table cannot survive: it does not error and
+#               it is not absent, it simply compares as a SHORTER SET and reads
+#               as drift or, worse, as clean. So the transport asks for the
+#               largest page GitHub serves (100) and REFUSES a response that
+#               advertises a further one — the row degrades to UNRESOLVED
+#               instead of asserting a partial answer. A collection past 100
+#               therefore needs a narrower endpoint, not a longer `expect`.
 #   compare     "exact" (default) or "set": an unordered, duplicate-insensitive
 #               comparison of two lists, for collections GitHub returns in no
 #               guaranteed order. `expect`/`tolerated` are then TOML arrays of
