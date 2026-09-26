@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-09-24T06:06:23Z
-updated: 2026-09-24T06:11:05Z
+updated: 2026-09-25T17:11:02Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/org-config/issues/246
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-24T07:21:50.121Z
+synced: 2026-09-26T07:11:56.771Z
 ---
 
 # [Issue 246]: [Correct the ruleset-internals prose: Otterdog does not model `allowed_merge_methods`, and repo merge settings own the policy until upstream #768](https://github.com/vig-os/org-config/issues/246)
@@ -124,16 +124,20 @@ above.
 
 ## Acceptance
 
-- [ ] (a) Both prose claims corrected — the TOML section comment states
+- [x] (a) Both prose claims corrected — the TOML section comment states
       precisely what Otterdog models vs. not, the decision, and the exit
       criterion; the README enumeration includes ruleset `pull_request`-rule
-      internals (this issue's PR)
+      internals (PR #247)
 - [x] (b) Upstream bug filed: eclipse-csi/otterdog#768
 - [ ] (c) **BLOCKED on upstream.** When the ADR-0005 otterdog pin reaches a
-      version in which #768 is fixed, declare `allowed_merge_methods: ["merge"]`
-      in the jsonnet for the protected-branch rulesets as ordinary config, and
-      note it in the changelog. This issue stays open as that tracker; the PR
-      for (a) does not close it.
+      version in which #768 is fixed, declare `allowed_merge_methods` in the
+      jsonnet for the protected-branch rulesets as ordinary config, set to
+      each repo's **declared merge policy** — house is merge-only, but
+      `h5v`, `nvd-mirror`, `qms`, `qx`, `vigos-mvp` and `vs-dolt` carry
+      `orgs.legacyMergePolicy` and `org-config-testbed` carries
+      `orgs.upstreamMergePolicy`, so a blanket `["merge"]` would silently
+      narrow seven repos — and note it in the changelog. This issue stays
+      open as that tracker; the PR for (a) does not close it.
 
 ## Context
 
@@ -142,4 +146,5 @@ and whose section comment is the one being corrected), #107 /
 eclipse-csi/otterdog#729 (private-repo ruleset reads). The `template/` copies of
 the affected files carry no equivalent claim to fix, and the affected repos'
 `houseMergePolicy` declaration is untouched.
+
 

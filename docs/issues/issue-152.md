@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-09-25T05:14:30Z
+updated: 2026-09-25T21:00:28Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-25T07:16:19.919Z
+synced: 2026-09-26T07:11:57.229Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
@@ -87,11 +87,12 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 </details>
 
-<details><summary>.github/workflows/plan.yml (4)</summary>
+<details><summary>.github/workflows/plan.yml (5)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
  - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4` → [Updates: `v10.2.0`]
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
+ - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
  - `ubuntu 26.04`
 
 </details>
