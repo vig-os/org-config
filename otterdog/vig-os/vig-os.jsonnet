@@ -562,6 +562,25 @@ orgs.newOrg('vig-os', 'vig-os') {
           requires_commit_signatures: true,
         },
       ],
+      // Live-proof harness for devkit's opt-in `DEVKIT_COMMIT_APP_ENVIRONMENT`
+      // knob (vig-os/devkit#1710, shipped in vig-os/devkit#1724): it binds the
+      // commit-App token-minting jobs to an environment, so the deployment
+      // branch policy (`main` + `release/*`, plus `dev` under gitflow) becomes
+      // the control that refuses an out-of-policy branch. Holds no secrets yet
+      // — the knob is not in a devkit release as of 1.16.0. No reviewers,
+      // deliberately: a reviewer gate here would add a second approval to
+      // devkit's single-approval release train. Declared so the plan stops
+      // proposing its deletion (#279).
+      environments: [
+        orgs.newEnvironment('commit-app') {
+          branch_policies+: [
+            'dev',
+            'main',
+            'release/*',
+          ],
+          deployment_branch_policy: 'selected',
+        },
+      ],
     },
     orgs.newRepo('h5v') {
       allow_update_branch: false,
