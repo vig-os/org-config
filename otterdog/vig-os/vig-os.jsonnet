@@ -381,27 +381,13 @@ orgs.newOrg('vig-os', 'vig-os') {
           checks=['15368:CI Summary'],
           bypass=['commit-action-bot'],
         ),
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            '#RepositoryAdmin:pull_request',
-          ],
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          requires_commit_signatures: true,
-          required_pull_request+: {
-            required_approving_review_count: 1,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
-            ],
-            strict: true,
-          },
-        },
+        // House standard (ADR-0008). `Dist Check` is required on top of the
+        // CI aggregator: it proves the committed `dist/` bundle matches the
+        // source, which no CI Summary leg covers. Signatures come from the
+        // `Signed commits` ruleset alone (this block used to require them a
+        // second time), and the bypass is now the house org-owner PR bypass
+        // instead of `#RepositoryAdmin` (#294).
+        orgs.mainProtection(['15368:CI Summary', '15368:Dist Check']),
         orgs.releaseProtection(
           checks=['15368:CI Summary', '15368:Dist Check'],
           bypass=['commit-action-bot'],
@@ -448,39 +434,16 @@ orgs.newOrg('vig-os', 'vig-os') {
           checks=['15368:Test Summary'],
           bypass=['#OrganizationAdmin', 'commit-action-bot'],
         ),
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            '#OrganizationAdmin',
-          ],
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          required_pull_request+: {
-            // An approval must cover the code being merged: without this, a
-            // review of one commit survives every later push to the branch.
-            // Main only — Dev and Release require 0 approvals, so they have
-            // nothing to dismiss (#118).
-            dismisses_stale_reviews: true,
-            required_approving_review_count: 1,
-            // Deliberately off: `.github/CODEOWNERS` names a single owner who
-            // also authors the PRs, so the gate can never be satisfied and its
-            // only outcome is an #OrganizationAdmin bypass (#115).
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              // Two contexts, not one: `codeql.yml`'s analyze job is a
-              // `language: ['python', 'actions']` matrix, so each leg reports
-              // under its own matrix-suffixed name (#115).
-              '15368:CodeQL Analysis (actions)',
-              '15368:CodeQL Analysis (python)',
-              '15368:Test Summary',
-            ],
-            strict: true,
-          },
-        },
+        // House standard (ADR-0008) on devkit's own aggregator. Two CodeQL
+        // contexts, not one: `codeql.yml`'s analyze job is a
+        // `language: ['python', 'actions']` matrix, so each leg reports under
+        // its own matrix-suffixed name (#115). Stale-review dismissal (#118)
+        // and code-owner review off (#115) come with the shape.
+        orgs.mainProtection([
+          '15368:CodeQL Analysis (actions)',
+          '15368:CodeQL Analysis (python)',
+          '15368:Test Summary',
+        ]),
         // Code-owner review is off in the shape itself, same rationale as
         // Main protection (#115).
         orgs.releaseProtection(
@@ -511,31 +474,30 @@ orgs.newOrg('vig-os', 'vig-os') {
           checks=['15368:CI Summary'],
           bypass=['commit-action-bot'],
         ),
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          // Parity with devkit's Main protection: a sanctioned always-mode
-          // admin override instead of out-of-band ruleset PUTs that the next
-          // apply reverts (#147).
-          bypass_actors+: [
-            '#OrganizationAdmin',
-          ],
-          include_refs+: [
-            'refs/heads/main',
-          ],
+        // House shape (ADR-0008), with three documented exceptions that keep
+        // devkit's release train unattended here. The admin bypass is the
+        // house `pull_request` mode, still the sanctioned override that
+        // replaced out-of-band ruleset PUTs (#147).
+        orgs.mainProtection(['15368:CI Summary']) {
           required_pull_request+: {
-            // No human review: the repo is bot-authored release-validation
-            // scaffolding, and the dispatch listener's approval gate that
-            // needed `reviewDecision` to be computable (vig-os/devkit#1391)
-            // is removed by vig-os/devkit#1506. The operative controls are
-            // the required CI Summary check and devkit's published-smoke-
-            // release validation at promote; count-0-with-required-checks
-            // matches devkit's own Dev and Release protections (#167).
+            // EXCEPTION — no human review: the repo is bot-authored
+            // release-validation scaffolding, and the dispatch listener's
+            // approval gate that needed `reviewDecision` to be computable
+            // (vig-os/devkit#1391) is removed by vig-os/devkit#1506. The
+            // operative controls are the required CI Summary check and
+            // devkit's published-smoke-release validation at promote;
+            // count-0-with-required-checks matches devkit's own Dev and
+            // Release protections (#167).
             required_approving_review_count: 0,
+            // EXCEPTION — no thread-resolution gate: nobody is in the loop to
+            // resolve a thread, so any comment would stall the train.
+            requires_review_thread_resolution: false,
           },
           required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-            ],
+            // EXCEPTION — not strict: a release PR that falls behind `main`
+            // makes `promote-release` fail on `BEHIND`, and no human is
+            // present to update the branch mid-train.
+            strict: false,
           },
         },
         orgs.signedCommits(),
@@ -616,18 +578,12 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
       ],
       rulesets: [
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            '#OrganizationAdmin',
-          ],
-          include_refs+: [
-            'refs/heads/main',
-          ],
+        // House shape (ADR-0008) with one documented exception.
+        orgs.mainProtection(['15368:CI Summary']) {
           required_pull_request+: {
-            // No human review: the repo is solo-maintained, so an approval
-            // (and the single-owner CODEOWNERS gate) is unsatisfiable on
-            // self-authored PRs and its only outcome was a routine
+            // EXCEPTION — no human review: the repo is solo-maintained, so an
+            // approval (and the single-owner CODEOWNERS gate) is unsatisfiable
+            // on self-authored PRs and its only outcome was a routine
             // #OrganizationAdmin bypass on every merge — the #115 pathology.
             // The operative controls are the required CI Summary check and
             // the `production` environment approval (@c-vigo) that gates every
@@ -635,13 +591,6 @@ orgs.newOrg('vig-os', 'vig-os') {
             // count-0-with-required-checks matches devkit's Dev and Release
             // protections and devkit-smoke-test's Main (#167, #195).
             required_approving_review_count: 0,
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-            ],
           },
         },
         orgs.signedCommits(),
@@ -772,37 +721,13 @@ orgs.newOrg('vig-os', 'vig-os') {
           checks=['15368:CI Summary'],
           bypass=['commit-action-bot'],
         ),
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          required_pull_request+: {
-            // An approval must cover the code being merged: without this, a
-            // review of one commit survives every later push to the branch.
-            // Main only — Dev and Release require 0 approvals, so they have
-            // nothing to dismiss (#118, converged here by #184).
-            dismisses_stale_reviews: true,
-            required_approving_review_count: 1,
-            // Deliberately off, same rationale as Dev protection: the seeded
-            // CODEOWNERS stub has no active rule, so the flag gates nothing,
-            // and populating it would recreate the #115 unsatisfiable
-            // single-owner gate (#187).
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
-            ],
-            // Up-to-date branches: the checks must have run against the merge
-            // result, not a stale base. Same principle as the stale-review
-            // dismissal above, applied to CI; `commit-action` and devkit
-            // already carry it (#188).
-            strict: true,
-          },
-        },
+        // House standard (ADR-0008): stale-review dismissal (#118, #184),
+        // strict up-to-date checks (#188, paired with `allow_update_branch`
+        // above) and code-owner review off — the seeded CODEOWNERS stub has
+        // no active rule, and populating it would recreate the #115
+        // unsatisfiable single-owner gate (#187). `Dist Check` as on
+        // commit-action. The org-owner PR bypass is new here (#294).
+        orgs.mainProtection(['15368:CI Summary', '15368:Dist Check']),
         orgs.releaseProtection(
           checks=['15368:CI Summary', '15368:Dist Check'],
           bypass=['commit-action-bot'],
