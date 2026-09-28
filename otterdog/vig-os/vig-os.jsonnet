@@ -112,21 +112,51 @@ orgs.newOrg('vig-os', 'vig-os') {
       value: '********',
       visibility: 'selected',
     },
-    // APP VISIBILITY DECISION (2026-09-28, #271): keep the
-    // `vigos-devkit-upgrade` App PUBLIC — "Any account" — pending the UI
-    // verification below. Recorded here because this file is the App's
-    // only appearance in code anywhere; the engine App's twin decision,
-    // whose shape this follows, is docs/runbooks/github-app.md,
-    // Visibility (#261), and `vig-os/devkit`, which scaffolds the
-    // workflow that consumes these secrets, has no runbook for this App
-    // at all (its own creation runbook is vig-os/devkit#1739, the
-    // follow-up this decision deliberately did not grow into).
-    // Public is not a preference here: the App is installed on a
-    // FOREIGN org (`exo-pet`, installation 151387251, beside `vig-os`'s
-    // own), and GitHub's private setting means installable only on the
-    // account that owns the App — so that installation could not exist
-    // if it were private. Same one-App/N-installations model ADR-0004
-    // chose under "One App, not four".
+    // APP VISIBILITY DECISION (2026-09-28, #271; the UI verification it
+    // was pending was taken the same day, #291): keep the
+    // `vigos-devkit-upgrade` App PUBLIC — "Any account". That is now a
+    // reading and not a hedge. An owner of the `vig-os` organization
+    // opened Settings -> Developer settings -> GitHub Apps ->
+    // vigos-devkit-upgrade -> Advanced on 2026-09-28 and read, under
+    // Danger zone, three controls in this order: "Transfer ownership of
+    // this GitHub App", "Delete this GitHub App", "Make this GitHub App
+    // private" — the third GREYED OUT, subtitled "Private GitHub Apps
+    // cannot be installed on other accounts." The button names the
+    // ACTION, not the state, so the live value is public. Recorded here
+    // because this file is the App's only appearance in code anywhere;
+    // the engine App's twin decision, whose shape this follows — and
+    // whose own reading of the same day this one confirms — is
+    // docs/runbooks/github-app.md, Visibility (#261, #290), and
+    // `vig-os/devkit`, which scaffolds the workflow that consumes these
+    // secrets, has no runbook for this App at all (its own creation
+    // runbook is vig-os/devkit#1739, the follow-up this decision
+    // deliberately did not grow into).
+    //
+    // Public is not a preference here, and it is not currently
+    // reversible either. GitHub states the constraint — "Public apps
+    // cannot be made private if they're installed on other accounts"
+    // (Modifying a GitHub App registration, "Changing the visibility of
+    // a GitHub App") — and the greyed-out control above is that
+    // documented rule enforced in the product. This App has TWO such
+    // installations, one more than the engine App. Re-verified
+    // 2026-09-28 with `gh api /orgs/<org>/installations` across all four
+    // orgs: it is installed on its owner `vig-os` (installation
+    // 150058891, created 2026-07-30) and on the FOREIGN orgs `exo-pet`
+    // (151387251, 2026-08-05) and `exoma-ch` (162764177, 2026-09-18),
+    // while `MorePET` carries none. Private means installable only on
+    // the account that owns the App, so neither foreign installation
+    // could exist if it were private — the same one-App/N-installations
+    // model ADR-0004 chose under "One App, not four".
+    //
+    // THE FLIP IS UNINSTALL-GATED IN TWO ORGS, sequentially, and the
+    // outage is a precondition to the button being clickable at all
+    // rather than a consequence of clicking it: uninstall from `exo-pet`
+    // and from `exoma-ch`, which takes EACH org's devkit-upgrade
+    // automation offline — that workflow mints its token from this App's
+    // DEVKIT_UPGRADE_APP_CLIENT_ID / DEVKIT_UPGRADE_APP_PRIVATE_KEY —
+    // then flip on `vig-os`, then re-onboard both. The engine App's twin
+    // operation (#290) is the same shape against one org; this one costs
+    // two.
     //
     // The grant behind that posture is far narrower than the engine
     // App's, which is what makes the same decision cheaper here:
@@ -162,23 +192,31 @@ orgs.newOrg('vig-os', 'vig-os') {
     // `commit-action-bot`'s and `vig-os-release-app`'s are (see the
     // bypass_actors+ comment below). #81 proposed exactly such a bypass
     // and was closed as superseded by vig-os/devkit#1308. Making this
-    // App private would therefore strand no ruleset — the `exo-pet`
-    // installation is the only thing keeping it public.
+    // App private would therefore strand no ruleset — the two foreign
+    // installations above are the only thing keeping it public.
     //
-    // VERIFICATION IS UI-ONLY, and still owed: `GET /apps/{slug}`
-    // carries no visibility field, so the only API signal is the status
-    // code to an ANONYMOUS call — 200 public, 404 private (observed 200
-    // on 2026-09-28; three sibling `vig-os` Apps answer 404). That is an
-    // observation and not a documented contract, which is also why no
-    // `unmanaged-controls.toml` row can assert it: the controls
-    // transport reads authenticated and never sees the discriminator.
-    // The authority is the App's own settings page — Settings ->
+    // VERIFICATION IS UI-ONLY, and it is no longer owed. There is no
+    // visibility field in `GET /apps/{slug}`, so the only API signal is
+    // the status code to an ANONYMOUS call — 200 public, 404 private
+    // (re-probed 200 on 2026-09-28; three sibling `vig-os` Apps answer
+    // 404). That mapping stays an OBSERVATION and not a documented
+    // contract: it has now been held up against the authority twice and
+    // agreed twice — the engine App on 2026-09-28 (#290) and this App
+    // the same day — which is corroboration on a second App, not the
+    // contract GitHub declines to publish. It is also why no
+    // `unmanaged-controls.toml` row can assert any of this: the controls
+    // transport reads authenticated and never sees the discriminator,
+    // and the button's disabled state has no API surface at all. The
+    // authority remains the App's own settings page — Settings ->
     // Developer settings -> GitHub Apps -> vigos-devkit-upgrade ->
     // Advanced -> "Where can this GitHub App be installed?" — where the
     // Danger-zone button names the ACTION, not the state, so "Make
-    // private" means it is currently public. Click nothing: if the live
-    // value contradicts this paragraph, that is drift in the App itself
-    // and belongs in an issue, not in a hand-flip back.
+    // private" means it is currently public. EXPECT THAT BUTTON TO BE
+    // DISABLED AND READ IT ANYWAY: greyed out is the state to expect
+    // while another account has it installed, not a fault, and it still
+    // reports the visibility. Click nothing: if the live value
+    // contradicts this paragraph, that is drift in the App itself and
+    // belongs in an issue, not in a hand-flip back.
 
     // Consumed since the devkit 1.7.0 adoptions landed vig-os/devkit#1365's
     // DEVKIT_UPGRADE_APP_ID -> _CLIENT_ID rename: devkit-smoke-test and
