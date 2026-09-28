@@ -39,9 +39,11 @@ otterdog/
   the **house repository merge policy** (merge commits only, `PR_TITLE` /
   `PR_BODY`) folded into `newRepo`, so every repo declared in `<org>.jsonnet`
   inherits it without restating five fields per repo. It is org-neutral: copy it
-  verbatim, never edit it. It also exports `upstreamMergePolicy` and
-  `legacyMergePolicy` mixins for repos that deliberately stay on another policy —
-  see the file header, and `vig-os/org-config`'s own
+  verbatim, never edit it. It also exports an `upstreamMergePolicy` mixin for a
+  repo that deliberately stays on the vendored defaults, and the house ruleset
+  shapes (`mainProtection`, `devProtection`, `releaseProtection`,
+  `signedCommits`, `tagProtection`) — see the file header, `vig-os/org-config`'s
+  ADR-0008 for the rule they encode, and its own
   `otterdog/vig-os/vig-os.jsonnet` for worked usage. The overlay resolves
   `vendor/…` relative to itself, so it only ever needs to sit beside the
   `vendor/` tree shown above.
@@ -62,7 +64,7 @@ Bootstrap the initial `<org>.jsonnet` from the live org with
    empty diff. Repos already on the house merge policy no longer need their
    `allow_merge_commit` / `allow_rebase_merge` / `allow_squash_merge` /
    `merge_commit_title` / `merge_commit_message` lines; repos that are **not** on
-   it need an explicit `+ orgs.legacyMergePolicy` (or `+ orgs.upstreamMergePolicy`)
-   so the plan stays empty.
+   it keep those five fields inline (or take `+ orgs.upstreamMergePolicy`) so the
+   plan stays empty.
 
 See the upstream `vig-os/org-config` `otterdog/vig-os/` tree for a worked example.

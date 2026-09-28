@@ -70,16 +70,6 @@ local upstreamMergePolicy = {
   merge_commit_message: 'PR_TITLE',
 };
 
-// All three merge methods enabled, on the upstream commit title/message
-// defaults. This is where repos predating the house policy sit: merge commits
-// were switched on without disabling rebase and squash. Narrowing one of these
-// repos to `houseMergePolicy` is a live settings change (it removes merge
-// buttons contributors may be using), so it is done deliberately, per repo,
-// never as a side effect of this overlay.
-local legacyMergePolicy = upstreamMergePolicy {
-  allow_merge_commit: true,
-};
-
 // ---------------------------------------------------------------------------
 // House ruleset shapes. Each returns a complete `newRepoRuleset`, so a repo
 // block lists them directly in `rulesets:` and overrides any field the usual
@@ -215,7 +205,6 @@ base {
   // five fields. Usage: `orgs.newRepo('x') + orgs.upstreamMergePolicy { ... }`.
   houseMergePolicy:: houseMergePolicy,
   upstreamMergePolicy:: upstreamMergePolicy,
-  legacyMergePolicy:: legacyMergePolicy,
 
   // House ruleset shapes (see above). Usage:
   //   rulesets: [

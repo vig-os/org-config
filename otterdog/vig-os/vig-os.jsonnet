@@ -523,13 +523,9 @@ orgs.newOrg('vig-os', 'vig-os') {
       ],
     },
     orgs.newRepo('h5v') {
-      allow_update_branch: false,
-      delete_branch_on_merge: false,
       description: 'A terminal viewer for HDF5 files with chart, image, string, matrix, and attributes support',
-    } + orgs.legacyMergePolicy,
+    },
     orgs.newRepo('nvd-mirror') {
-      allow_update_branch: false,
-      delete_branch_on_merge: false,
       description: 'Public mirror of the NVD JSON 2.0 feeds for vulnix (see vig-os/devcontainer#870)',
       gh_pages_build_type: 'legacy',
       gh_pages_source_branch: 'gh-pages',
@@ -543,7 +539,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           deployment_branch_policy: 'selected',
         },
       ],
-    } + orgs.legacyMergePolicy,
+    },
     orgs.newRepo('org-config') {
       allow_auto_merge: true,
       custom_properties+: {
@@ -613,7 +609,16 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'SACRIFICIAL testbed for the L3 mutation E2E harness (issue #23) - its live settings are deliberately churned and reverted by .github/workflows/testbed-e2e.yml on every run; do not rely on any state here.',
     } + orgs.upstreamMergePolicy,
     orgs.newRepo('qms') {
+      // OUT OF SCOPE of ADR-0008 and deliberately frozen at its live state
+      // until it gets its own decision (#294): private on a Free-plan org, so
+      // no ruleset can be enforced, and its default branch is a leaked agent
+      // worktree branch. The five merge fields below restate the retired
+      // `legacyMergePolicy` (all three methods, upstream title/message) so
+      // removing that mixin changes nothing live here.
       allow_forking: false,
+      allow_merge_commit: true,
+      allow_rebase_merge: true,
+      allow_squash_merge: true,
       allow_update_branch: false,
       custom_properties+: {
         type: ['tools'],
@@ -622,11 +627,11 @@ orgs.newOrg('vig-os', 'vig-os') {
       delete_branch_on_merge: false,
       description: 'Quality Management System',
       has_wiki: false,
+      merge_commit_message: 'PR_TITLE',
+      merge_commit_title: 'MERGE_MESSAGE',
       private: true,
-    } + orgs.legacyMergePolicy,
+    },
     orgs.newRepo('qx') {
-      allow_update_branch: false,
-      delete_branch_on_merge: false,
       description: 'Per-instance physical part identification: nano-id IDs, QR labels, mint-then-bind workflow',
       gh_pages_build_type: 'workflow',
       homepage: 'https://vig-os.github.io/qx/',
@@ -643,7 +648,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           deployment_branch_policy: 'selected',
         },
       ],
-    } + orgs.legacyMergePolicy,
+    },
     orgs.newRepo('scitadel') {
       allow_auto_merge: true,
       // Deliberate deviation from the house merge policy (house-defaults.libsonnet):
@@ -817,18 +822,14 @@ orgs.newOrg('vig-os', 'vig-os') {
       ],
     },
     orgs.newRepo('vigos-mvp') {
-      allow_update_branch: false,
-      delete_branch_on_merge: false,
       description: 'MVP with basic functions',
       private_vulnerability_reporting_enabled: true,
-    } + orgs.legacyMergePolicy,
+    },
     orgs.newRepo('vs-dolt') {
-      allow_update_branch: false,
-      delete_branch_on_merge: false,
       description: 'VS Code extension, open source SQL workbench for your MySQL and PostgreSQL compatible database with version control features when connected to Dolt.',
       has_issues: false,
       homepage: 'https://hub.docker.com/r/dolthub/dolt-workbench',
       private_vulnerability_reporting_enabled: true,
-    } + orgs.legacyMergePolicy,
+    },
   ],
 }

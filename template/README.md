@@ -122,10 +122,10 @@ secret and is never committed (ADR-0003).
    `vendor/otterdog-defaults/otterdog-defaults.libsonnet` import `otterdog import`
    writes) and **normalize away base-template defaults** so the first plan shows
    an empty diff, then commit. Repos already on the house merge policy can drop
-   their five merge fields; repos that are not need an explicit
-   `+ orgs.legacyMergePolicy` (or `+ orgs.upstreamMergePolicy`) to keep the plan
-   empty — see [`otterdog/README.md`](otterdog/README.md). Delete `import.yml`
-   once the import is done.
+   their five merge fields; repos that are not keep those five fields inline (or
+   take `+ orgs.upstreamMergePolicy`) so the plan stays empty until you move them
+   onto the house policy — see [`otterdog/README.md`](otterdog/README.md). Delete
+   `import.yml` once the import is done.
 2. Open a PR to `main`. The **plan** caller runs a read-only
    `otterdog plan` against the live org and posts the diff as a PR comment —
    nothing is applied.

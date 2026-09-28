@@ -21,8 +21,10 @@ desired state is the committed jsonnet under `otterdog/vig-os/`, evaluated
 against the vendored Eclipse base template in `otterdog/vig-os/vendor/` through
 `otterdog/vig-os/house-defaults.libsonnet` — an org-neutral overlay that folds
 the house repository merge policy (merge commits only, `PR_TITLE` / `PR_BODY`)
-into `newRepo`, so it is declared once here and shipped to every downstream org
-in `template/`. Three repo-owned workflows drive it:
+into `newRepo` and exports the house ruleset shapes, so both are declared once
+here and shipped to every downstream org in `template/`. Which repo carries
+which ruleset, and every exception, is
+[ADR-0008](docs/adr/0008-repository-protection-and-merge-policy.md). Three repo-owned workflows drive it:
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
