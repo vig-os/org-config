@@ -322,6 +322,58 @@ They are set once, by hand, in the repo's Actions secrets and rotated by hand.
 Application secrets and variables that this App *manages* (via Otterdog + SOPS/age) are a separate
 concern and do live as code — these two entries do not.
 
+**Only one of the two is confidential. The Client ID is public, and its disclosure is not a rotation
+trigger.** `GET https://api.github.com/apps/vig-os-org-config` answers `200` to an anonymous caller
+and returns `client_id` together with the full 17-permission grant (re-probed 2026-09-28; what that
+publication does and does not cost is [Visibility](#visibility)). A Client ID is an *identifier*,
+not a credential: it mints no token without the private key that signs the JWT, so the value in the
+table above is already world-readable whatever this repo stores it as. Finding it in a log, a
+screenshot, a public repo or a stranger's `curl` is therefore **not an incident and starts no
+rotation** — [Key rotation](#key-rotation) is triggered by the schedule or by exposure of
+`ORG_CONFIG_APP_PRIVATE_KEY`, and by nothing else. The same reasoning covers the three sibling
+`*_APP_CLIENT_ID` **org** secrets that the client-ID convention
+([#112](https://github.com/vig-os/org-config/issues/112)) created — `COMMIT_APP_CLIENT_ID`,
+`DEVKIT_UPGRADE_APP_CLIENT_ID` and `RELEASE_APP_CLIENT_ID`
+(`otterdog/vig-os/vig-os.jsonnet:66`, `:124`, `:189`) — whose Apps `commit-action-bot`,
+`vigos-devkit-upgrade` and `vig-os-release-app` each answer `200` to the same anonymous call
+(probed 2026-09-28). Read this fleet-wide rather than re-deriving it per App: what is per App is the
+*paired private key*, and each of those is its own rotation trigger.
+
+**Decision (2026-09-28, [#270](https://github.com/vig-os/org-config/issues/270)):
+`ORG_CONFIG_APP_CLIENT_ID` stays an Actions secret, knowingly, even though its value is public.**
+The secret buys **uniformity, not confidentiality**, and that is the whole case for it. The Client
+ID is never used alone — every consumer hands it to `actions/create-github-app-token` in the same
+breath as the PEM (`client-id:` beside `private-key:`), so keeping both in one `secrets:` mechanism
+is one thing to reason about instead of two, and the three sibling `*_APP_CLIENT_ID` org secrets
+above are declared the same way, so a variable here would make this App the exception rather than
+the rule. The alternative's real cost is not the edit but the **cutover**: an engine that reads
+`vars.ORG_CONFIG_APP_CLIENT_ID` while a downstream caller still passes
+`secrets.ORG_CONFIG_APP_CLIENT_ID` does not fail loudly — an undefined `vars.` reference resolves to
+the **empty string**, so the token step fails late and unhelpfully, or, on a scheduled `drift` leg,
+in a run nobody is watching. A silent empty credential is a worse failure mode than a plumbing step,
+and #270's stakes do not pay for it.
+
+**A future move to a variable is a coordinated pin bump, never a one-sided flip.** The honest gain
+is real but small — the declaration at `otterdog/vig-os/vig-os.jsonnet:625` would move from
+`secrets:` to `variables:` and stop being a dummy `'********'` row, becoming genuinely asserted
+(otterdog models Actions variables), and every `secrets:` block and downstream caller would shed a
+line. If it is ever revisited, sequence it in this order and treat the list as the checklist:
+
+1. teach the engine's reusable workflows to accept **both** forms, so a caller on either side stays
+   valid: the `workflow_call` secret declarations at `.github/workflows/plan.yml:150`,
+   `apply.yml:165` and `drift.yml:131`, plus every consuming reference — `plan.yml:229`,
+   `apply.yml:390`/`:499`, `drift.yml:222`/`:316`, `apply-engine.yml:118`/`:142` and
+   `testbed-e2e.yml:162`/`:172`;
+2. move the declaration in `otterdog/vig-os/vig-os.jsonnet:625` and update the record — this section,
+   the table above, ADR-0004's auth-model paragraph (`docs/adr/0004-auth-model-github-app.md:58`) and
+   [Downstream-org installation](#downstream-org-installation) step 2, which tells another org's
+   owner to set *two secrets*;
+3. cut the template and its consumers over **at a pin bump**, not before: `template/README.md:101`
+   and `template/.github/workflows/plan.yml:52`, `apply.yml:72`, `drift.yml:32`, `import.yml:72`,
+   then `exo-pet`'s org-config caller, with `exoma-ch` / `MorePET` landing on the new form when they
+   onboard;
+4. retire the both-forms shim only once every caller runs a pin that no longer passes the secret.
+
 Downstream, otterdog jobs mint the **full installation token** with `actions/create-github-app-token`
 (no `permissions:` narrowing): the token-narrowing API cannot express the Actions Variables scope
 otterdog reads, so the App grant is the permission boundary for `plan`, `apply`, and `drift`'s
@@ -346,7 +398,9 @@ mechanics, both confirmed by the #16 spike, are load-bearing and easy to miss:
 ## Key rotation
 
 The private key is the whole App's secret; rotate it on schedule and on any suspected exposure. The
-**Client ID does not change** on rotation, so only `ORG_CONFIG_APP_PRIVATE_KEY` is touched.
+**Client ID does not change** on rotation, so only `ORG_CONFIG_APP_PRIVATE_KEY` is touched — and a
+*disclosed* Client ID is not a trigger for this procedure at all, because that value is public by
+construction ([Bootstrap secrets](#bootstrap-secrets), [#270](https://github.com/vig-os/org-config/issues/270)).
 
 1. On the App's **General** page → **Private keys** → **Generate a private key**. GitHub keeps the
    old key valid alongside the new one, so there is no outage window.
