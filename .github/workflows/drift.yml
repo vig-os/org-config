@@ -122,7 +122,7 @@ on:  # yamllint disable-line rule:truthy
           from a `justfile.project` in the checkout instead.
         type: string
         # renovate: datasource=pypi depName=otterdog
-        default: '1.5.0'
+        default: '1.6.1'
     # Secret names MATCH this repo's bootstrap Actions secrets (github-app.md), so
     # the credential references below are byte-identical whether reached on this
     # repo's own schedule (repo secrets) or via `workflow_call` (caller-passed). A

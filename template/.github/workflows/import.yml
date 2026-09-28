@@ -42,7 +42,7 @@ on:  # yamllint disable-line rule:truthy
         required: false
         type: string
         # renovate: datasource=pypi depName=otterdog
-        default: "1.5.0"
+        default: "1.6.1"
 
 permissions: {}
 
