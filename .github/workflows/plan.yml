@@ -67,12 +67,14 @@
 #     guard's output, so it degrades to "not checked" instead of reddening
 #     someone else's gate. The App-slug steps below are the worked example
 #     (#259 / #274).
-# Two shipped auxiliary steps do NOT meet that rule yet — `Build plan report`
-# and `Upsert plan comment on the PR`, both `if: always()` with
-# `set -euo pipefail` and `gh api` writes, so a 422/5xx on a cosmetic comment
-# reddens the gate. Tracked in #276; they are the known exceptions, not
-# precedent. ADR-0007's Axis D "advisory" verdict (#236) is about THIS repo
-# only — its 2026-09-25 correction carries the downstream evidence.
+# THE RULE HAS NO EXCEPTIONS. `Build plan report` and `Upsert plan comment on
+# the PR` were the two shipped ones — `if: always()` with `set -euo pipefail`
+# and `gh api` writes, so a 422/5xx on a cosmetic comment reddened the gate —
+# and #276 retired them: both are now `continue-on-error`, and the upsert is
+# additionally gated on the report having succeeded. Every auxiliary step in
+# this job is fail-soft, so a new one that is not has no precedent to point at.
+# ADR-0007's Axis D "advisory" verdict (#236) is about THIS repo only — its
+# 2026-09-25 correction carries the downstream evidence.
 name: Plan
 
 on:  # yamllint disable-line rule:truthy
@@ -416,8 +418,21 @@ jobs:
           cat app-actors.md
           exit 0
 
+      # AUXILIARY, so fail-soft (#276): this step renders cosmetics — the
+      # marker-upserted comment body and the job summary — and contributes
+      # nothing to the verdict, which `Fail on plan error` below carries alone.
+      # What degradation looks like is deliberately visible rather than
+      # swallowed: a red X on THIS step inside a GREEN job, the plan output
+      # still in the job summary (written below, before the comment body is
+      # built, so a failure in the byte-budget half still leaves the plan
+      # readable), and no PR comment. The upsert step is `if:`-gated on this
+      # step's outcome, so a failure here degrades to exactly one red X instead
+      # of a second confusing one from `jq` on a `comment-body.md` that was
+      # never written.
       - name: Build plan report (comment body + job summary)
+        id: report
         if: always() && steps.plan.outcome != 'skipped'
+        continue-on-error: true
         env:
           PLAN_RC: ${{ steps.plan.outputs.rc }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -515,8 +530,26 @@ jobs:
       # Post / update the PR comment in place, keyed by the hidden marker so
       # re-runs edit the same comment instead of stacking. Uses GITHUB_TOKEN
       # (pull-requests: write) — the App token is reserved for the plan itself.
+      #
+      # AUXILIARY, so fail-soft (#276): three network calls under
+      # `set -euo pipefail` — a `--paginate` read, then a PATCH or a POST — none
+      # of which says anything about whether the committed config is valid. A
+      # 422, a 403, a secondary rate limit on a token this job has already spent
+      # on a full org read, or a plain 5xx must not be able to redden a
+      # downstream merge gate; the byte budget above closes one 422 cause
+      # cheaply, and this closes the rest. Both, not either.
+      #
+      # The `steps.report.outcome == 'success'` guard is what keeps the
+      # degradation to a single red X: without it, a failed report leaves a
+      # second, confusing red step here — `jq` exiting nonzero on a
+      # `comment-body.md` that was never written — pointing at the symptom
+      # rather than the cause.
       - name: Upsert plan comment on the PR
-        if: always() && github.event_name == 'pull_request' && steps.plan.outcome != 'skipped'
+        if: >-
+          always() && github.event_name == 'pull_request'
+          && steps.plan.outcome != 'skipped'
+          && steps.report.outcome == 'success'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
