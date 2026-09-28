@@ -41,9 +41,9 @@ Go to <https://github.com/organizations/vig-os/settings/apps/new> and fill in:
   webhook secret **empty**.
 - **Permissions**: set exactly the table below and nothing else.
 - **Where can this GitHub App be installed?**: **Any account** — public by decision (2026-09-25,
-  [#261](https://github.com/vig-os/org-config/issues/261)). This is a deliberate posture with a
-  cost, not a default; the reason, the threat model and how to verify the live setting are in
-  [Visibility](#visibility) below.
+  [#261](https://github.com/vig-os/org-config/issues/261)), confirmed against the App's own settings
+  form on 2026-09-28. This is a deliberate posture with a cost, not a default; the reason, the threat
+  model and how to verify the live setting are in [Visibility](#visibility) below.
 
 ### Permissions
 
@@ -185,21 +185,34 @@ org. This is a hard constraint, not an oversight — see the final section.
 
 ### Visibility
 
-**Decision (2026-09-25, #261): keep the App public — "Any account" — pending the UI verification
-below.** The decision is recorded now; the live value behind it is an API *observation* only
-(status code to an anonymous call — see [Verifying the setting](#verifying-the-setting)), so until
-that checklist has been walked in the UI, read this as the posture we have chosen and expect to
-find, not as a confirmed reading of the form. The downstream-org model is the reason for choosing
-it: one App, N installations. *Only on this account* means installable on `vig-os` and nowhere
-else, so [Downstream-org installation](#downstream-org-installation) below would have to become one
+**Decision (2026-09-25, #261): keep the App public — "Any account". Verified in the UI on
+2026-09-28 by an owner of the `vig-os` organization**, who walked
+[Verifying the setting](#verifying-the-setting) below and read, under **Danger zone** on the App's
+**Advanced** page, three controls in this order: "Transfer ownership of this GitHub App", "Delete
+this GitHub App", and **"Make this GitHub App private"**. The button names the *action*, so the live
+value is **public** — the value the checklist predicted from the anonymous `200`, now agreed with by
+the form itself. That agreement is one confirming reading of a mapping GitHub still documents
+nowhere, so it raises confidence without promoting the status code to a contract; the checklist
+stays as written for the next reading. The downstream-org model is the reason for choosing it: one
+App, N installations. *Only on this account* means installable on `vig-os` and nowhere else, so
+[Downstream-org installation](#downstream-org-installation) below would have to become one
 App per org — N private keys, N rotations, N grant tables held in step — which is precisely the
 design ADR-0004 rejected under *"One App, not four"*. `exo-pet` already runs an installation of
 this App, and `exoma-ch` / `MorePET` are meant to follow it through the same door. The costs below
 are accepted knowingly.
 
-**A flip to private is a four-place edit, not a one-paragraph swap.** The setting has to be stated
-where it is set, so if this decision ever changes, all of these move together — treat it as a
-checklist rather than archaeology:
+**A flip to private begins with an uninstall, and is only then a four-place edit.** The setting is
+not a toggle at all while another account has the App installed — the control is documented as
+unavailable and was observed disabled (**Private would cost the multi-org model** below) — so the
+operation runs in this order: uninstall the App from `exo-pet` (installation `147219320`), which
+takes that org's org-config engine **offline**, because its `plan`, `apply` and `drift` legs all mint
+their tokens
+from this App (`ORG_CONFIG_APP_CLIENT_ID` / `ORG_CONFIG_APP_PRIVATE_KEY`, the same credentials this
+repo uses — [Downstream-org installation](#downstream-org-installation) step 2); then flip the
+button on `vig-os`; then bring `exo-pet` back on whatever replaces it. It is a sequenced two-org
+operation with a downstream outage in the middle, before the button is even clickable. Only after
+that does the prose move, and the setting has to be stated where it is set, so all of these move
+together — treat it as a checklist rather than archaeology:
 
 1. the creation step at the top of this file, **Where can this GitHub App be installed?**, whose
    value is the setting itself;
@@ -238,10 +251,13 @@ does cost:
   `organization_administration: write` included. That is reconnaissance — *this org runs an
   org-admin App whose key sits in some repo's Actions secrets* — not a credential. Treat the Client
   ID as public whatever it happens to be stored as: it is currently held as an Actions secret,
-  which hides nothing that this endpoint does not already publish, and whether it stays a secret or
-  becomes a variable is [#270](https://github.com/vig-os/org-config/issues/270). The same grant
-  table is published by every other public App this org owns, and the second of them,
-  `vigos-devkit-upgrade`, now carries a decision of its own — **also public, also pending its UI
+  which hides nothing that this endpoint does not already publish, and it stays one **by decision**
+  — for uniformity with the paired private key, not for confidentiality — recorded under
+  [#270](https://github.com/vig-os/org-config/issues/270) in **Bootstrap secrets** below, together
+  with the corollary a reader of this bullet needs: finding the Client ID published is *not* a
+  rotation trigger, because the PEM is what a rotation replaces. The same grant table is published
+  by every other public App this org owns, and the second of them, `vigos-devkit-upgrade`, now
+  carries a decision of its own — **also public, also pending its UI
   verification, decided 2026-09-28 under
   [#271](https://github.com/vig-os/org-config/issues/271)** — recorded as the `APP VISIBILITY
   DECISION` comment above the `DEVKIT_UPGRADE_APP_*` declarations in
@@ -253,11 +269,20 @@ does cost:
   [#256](https://github.com/vig-os/org-config/issues/256) coupling below does not bind it at all,
   and its `GET /app/installations` sweep hangs off a different key's rotation.
 
-**Private would cost the multi-org model instead**, plus one thing that must not be discovered the
-hard way: GitHub's documentation does not say whether a public App already installed on accounts it
-does not own *can* be made private at all. Until that is established, the flip is not a setting
-change to try casually — assume a migration (a new App and a new key per org, cut over, retire the
-old one).
+**Private would cost the multi-org model — and is not currently reachable at all.** GitHub states
+the constraint, on the sibling page to the reference linked above: *"Public apps cannot be made
+private if they're installed on other accounts"* ([Modifying a GitHub App registration][app-modify],
+*Changing the visibility of a GitHub App*). This App has exactly such an installation. Re-verified
+2026-09-28 with `gh api /orgs/<org>/installations` across all four orgs this engine serves:
+`vig-os-org-config` is installed on its owner `vig-os` (installation `147168870`, created
+2026-07-17T12:00:45+02:00) **and on `exo-pet`** (`147219320`, created 2026-07-17T16:40:50+02:00),
+while `exoma-ch` and `MorePET` carry no installation of it. The documented rule is also enforced in
+the product, which the 2026-09-28 UI reading saw directly: the **Make this GitHub App private**
+control under **Danger zone** is **greyed out**, carrying the subtitle *"Private GitHub Apps cannot
+be installed on other accounts."* So the flip is not a setting change to try casually, and it is not
+one that *can* be tried: it is gated on removing the foreign installation first (with the cost the
+checklist above prices), and past that point assume a migration — a new App and a new key per org,
+cut over, retire the old one.
 
 **The coupling worth knowing (#256).** An App named as a **ruleset bypass actor** is written by
 resolving its slug through `GET /apps/{slug}`, which this engine's installation token is observed
@@ -276,22 +301,31 @@ The API cannot answer this: `GET /apps/{app_slug}` carries **no visibility field
 signal is the status code returned to an *unauthenticated* caller — `200` for a public App, `404`
 for a private one (control, probed the same day: a private App owned by a sibling org answers
 `404` anonymous and `200` to an org-owner token). GitHub documents neither that mapping nor the
-endpoint's auth requirements, so it is an observation, not a contract — and it is also why **no
-`unmanaged-controls.toml` row can assert this**: the controls transport reads authenticated and so
-never sees the discriminator.
+endpoint's auth requirements, so it is an observation, not a contract — one that has since been held
+up against the authority once, on 2026-09-28, and **held**: the anonymous `200` and the form both
+said *public*. One agreeing reading is corroboration, not a guarantee, so read the form rather than
+the status code. It is also why **no `unmanaged-controls.toml` row can assert this**: the controls
+transport reads authenticated and so never sees the discriminator.
 
 Check the UI, which is the authority:
 
 1. Go to <https://github.com/organizations/vig-os/settings/apps>.
 2. Next to **vig-os-org-config**, click **Edit**.
 3. In the left sidebar, click **Advanced**.
-4. Read the button under **Danger zone**. It names the *action*, not the state: **Make private**
-   means the App is currently **public** — the expected value. **Make public** would mean it is
-   private.
-5. Click nothing. If what you read contradicts the Decision above, that is drift in the App itself:
+4. Read the button under **Danger zone** — on 2026-09-28 the third of three controls there, after
+   "Transfer ownership of this GitHub App" and "Delete this GitHub App". It names the *action*, not
+   the state: **Make this GitHub App private** means the App is currently **public**, which is what
+   that reading found. **Make public** would mean it is private.
+5. Expect that button to be **disabled**, and read it anyway. It is greyed out while any account
+   other than `vig-os` has the App installed — subtitled *"Private GitHub Apps cannot be installed
+   on other accounts"* — which is the state to expect here, not a fault; it still reports the
+   visibility, which is all this step needs. What clearing that block would cost is priced in the
+   flip checklist above.
+6. Click nothing. If what you read contradicts the Decision above, that is drift in the App itself:
    open an issue and reconcile it there, rather than flipping the setting back by hand.
 
 [app-visibility]: https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/making-a-github-app-public-or-private
+[app-modify]: https://docs.github.com/en/apps/maintaining-github-apps/modifying-a-github-app-registration#changing-the-visibility-of-a-github-app
 
 ### Installation
 
