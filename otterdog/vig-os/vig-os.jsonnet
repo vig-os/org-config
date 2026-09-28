@@ -692,8 +692,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       allow_update_branch: false,
       delete_branch_on_merge: false,
       description: 'A terminal viewer for HDF5 files with chart, image, string, matrix, and attributes support',
-      secret_scanning: 'disabled',
-      secret_scanning_push_protection: 'disabled',
     } + orgs.legacyMergePolicy,
     orgs.newRepo('nvd-mirror') {
       allow_update_branch: false,
@@ -702,8 +700,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       gh_pages_build_type: 'legacy',
       gh_pages_source_branch: 'gh-pages',
       gh_pages_source_path: '/',
-      secret_scanning: 'disabled',
-      secret_scanning_push_protection: 'disabled',
       environments: [
         orgs.newEnvironment('github-pages') {
           branch_policies+: [
@@ -725,8 +721,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       // Template repo: downstream orgs' private org-config repos are created
       // from this one (ADR-0006; marked live via one-time gh API action, #52).
       is_template: true,
-      secret_scanning: 'disabled',
-      secret_scanning_push_protection: 'disabled',
       secrets: [
         orgs.newRepoSecret('ORG_CONFIG_APP_CLIENT_ID') {
           value: '********',
@@ -825,8 +819,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'Per-instance physical part identification: nano-id IDs, QR labels, mint-then-bind workflow',
       gh_pages_build_type: 'workflow',
       homepage: 'https://vig-os.github.io/qx/',
-      secret_scanning: 'disabled',
-      secret_scanning_push_protection: 'disabled',
       secrets: [
         orgs.newRepoSecret('PARTREG_TEST_PAT') {
           value: '********',
@@ -850,8 +842,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       allow_squash_merge: true,
       allow_update_branch: false,
       description: 'Scitadel: programmable, reproducible scientific literature retrieval',
-      secret_scanning: 'disabled',
-      secret_scanning_push_protection: 'disabled',
       squash_merge_commit_message: 'PR_BODY',
       squash_merge_commit_title: 'PR_TITLE',
       secrets: [
