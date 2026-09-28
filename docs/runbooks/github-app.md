@@ -257,17 +257,22 @@ does cost:
   with the corollary a reader of this bullet needs: finding the Client ID published is *not* a
   rotation trigger, because the PEM is what a rotation replaces. The same grant table is published
   by every other public App this org owns, and the second of them, `vigos-devkit-upgrade`, now
-  carries a decision of its own — **also public, also pending its UI
-  verification, decided 2026-09-28 under
-  [#271](https://github.com/vig-os/org-config/issues/271)** — recorded as the `APP VISIBILITY
-  DECISION` comment above the `DEVKIT_UPGRADE_APP_*` declarations in
+  carries a decision of its own — **also public, decided 2026-09-28 under
+  [#271](https://github.com/vig-os/org-config/issues/271) and verified against the App's own form
+  the same day under [#291](https://github.com/vig-os/org-config/issues/291)** — recorded as the
+  `APP VISIBILITY DECISION` comment above the `DEVKIT_UPGRADE_APP_*` declarations in
   `otterdog/vig-os/vig-os.jsonnet`, which is that App's only appearance in code (`vig-os/devkit`
   scaffolds the workflow consuming it but has no runbook for it). Read it there rather than
   inferring it from this section: its reason is the same one-App/N-installations model, but its
   grant is far narrower (`contents` / `issues` / `pull_requests` / `workflows` write and `metadata`
   read — no `organization_administration`), the
   [#256](https://github.com/vig-os/org-config/issues/256) coupling below does not bind it at all,
-  and its `GET /app/installations` sweep hangs off a different key's rotation.
+  and its `GET /app/installations` sweep hangs off a different key's rotation. Its flip to private
+  is blocked by the same documented rule as this App's ([Modifying a GitHub App
+  registration][app-modify]) and costs **more**: it carries **two** foreign installations,
+  `exo-pet` and `exoma-ch`, against this App's one, so clearing that block would take
+  devkit-upgrade automation offline in two orgs rather than one — priced in the jsonnet comment,
+  not here.
 
 **Private would cost the multi-org model — and is not currently reachable at all.** GitHub states
 the constraint, on the sibling page to the reference linked above: *"Public apps cannot be made
