@@ -240,9 +240,18 @@ does cost:
   ID as public whatever it happens to be stored as: it is currently held as an Actions secret,
   which hides nothing that this endpoint does not already publish, and whether it stays a secret or
   becomes a variable is [#270](https://github.com/vig-os/org-config/issues/270). The same grant
-  table is published by every other public App this org owns, and the one still lacking a decision
-  of its own is `vigos-devkit-upgrade`, tracked as
-  [#271](https://github.com/vig-os/org-config/issues/271).
+  table is published by every other public App this org owns, and the second of them,
+  `vigos-devkit-upgrade`, now carries a decision of its own — **also public, also pending its UI
+  verification, decided 2026-09-28 under
+  [#271](https://github.com/vig-os/org-config/issues/271)** — recorded as the `APP VISIBILITY
+  DECISION` comment above the `DEVKIT_UPGRADE_APP_*` declarations in
+  `otterdog/vig-os/vig-os.jsonnet`, which is that App's only appearance in code (`vig-os/devkit`
+  scaffolds the workflow consuming it but has no runbook for it). Read it there rather than
+  inferring it from this section: its reason is the same one-App/N-installations model, but its
+  grant is far narrower (`contents` / `issues` / `pull_requests` / `workflows` write and `metadata`
+  read — no `organization_administration`), the
+  [#256](https://github.com/vig-os/org-config/issues/256) coupling below does not bind it at all,
+  and its `GET /app/installations` sweep hangs off a different key's rotation.
 
 **Private would cost the multi-org model instead**, plus one thing that must not be discovered the
 hard way: GitHub's documentation does not say whether a public App already installed on accounts it
