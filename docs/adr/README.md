@@ -18,3 +18,4 @@ index has no status column. Cross-repo decisions are referenced as `<repo>#ADR-N
 | [0005](0005-repo-tooling.md) | Repo tooling |
 | [0006](0006-distribution-topology-and-versioning.md) | Distribution topology & versioning |
 | [0007](0007-ci-and-testing-strategy.md) | CI & testing strategy |
+| [0008](0008-repository-protection-and-merge-policy.md) | Repository protection & merge policy |
