@@ -1039,20 +1039,28 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
         orgs.newBranchProtectionRule('main') {
           required_approving_review_count: null,
-          // `main`'s CI produces only `Dependency Review` and `CI Summary`
-          // (the latter aggregates the former), so the `nix flake check` this
-          // required until #226 could never report and every `main` PR needed
-          // an admin merge. The real flake-check gate lives on `dev` and moves
-          // here at the first alpha cut.
+          // The alpha promotion (tessera `5281db2a`, 2026-09-23) replaced
+          // `main`'s tree with dev's, so `main` now runs the nix shim and
+          // emits no `CI Summary` at all, while the devkit scaffold
+          // (tessera#442) gave `dev` a second workflow also named `CI`, so a
+          // promotion PR reports both sets. `nix flake check` is the only
+          // context a `main`-origin PR and a `dev`-promotion PR both report,
+          // which is why it is the one required here (#234, superseding the
+          // `CI Summary` of #226/#231).
           // Un-prefixed = bound to the `github-actions` app, as in the `dev`
           // rule above. A numeric `15368:` prefix is RULESET syntax: in a
           // classic branch protection rule otterdog resolves the prefix as an
           // app slug (`GET /apps/{slug}`) with no numeric branch, so it would
           // 404 at apply while plan stayed green.
           required_status_checks: [
-            'CI Summary',
+            'nix flake check',
           ],
           requires_pull_request: false,
+          // Strict here and deliberately not on `dev`: `dev` moves
+          // constantly, so re-running both arch legs on every push would
+          // cost more there than up-to-date-ness is worth, while `main` is
+          // release-only and moves rarely, so the same re-run is cheap and
+          // the guarantee is worth more on a release branch (#234).
           requires_strict_status_checks: true,
         },
       ],
