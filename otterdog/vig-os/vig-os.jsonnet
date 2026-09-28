@@ -189,9 +189,10 @@ orgs.newOrg('vig-os', 'vig-os') {
     // bypass actor or a status-check app NOWHERE in this file, so
     // `apply` never resolves its slug through `GET /apps/<slug>` and its
     // visibility is not configuration-relevant the way
-    // `commit-action-bot`'s and `vig-os-release-app`'s are (see the
-    // bypass_actors+ comment below). #81 proposed exactly such a bypass
-    // and was closed as superseded by vig-os/devkit#1308. Making this
+    // `commit-action-bot`'s and `vig-os-release-app`'s are (see the App
+    // bypass-actor comment on commit-action's rulesets below). #81 proposed
+    // exactly such a bypass and was closed as superseded by
+    // vig-os/devkit#1308. Making this
     // App private would therefore strand no ruleset — the two foreign
     // installations above are the only thing keeping it public.
     //
@@ -346,53 +347,40 @@ orgs.newOrg('vig-os', 'vig-os') {
         actions_can_approve_pull_request_reviews: false,
       },
       rulesets: [
-        orgs.newRepoRuleset('Dev protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            // Applies to every App bypass actor throughout this file. An App
-            // actor (no `#role` / `@team` prefix) is WRITTEN by resolving its
-            // slug through `GET /apps/<slug>`, which this engine's
-            // installation token is observed to read only for a PUBLIC App
-            // (#256, upstream #772). Both Apps named in this file are public,
-            // and keeping them public is load-bearing, not incidental: make
-            // one private and every ruleset below that names it becomes
-            // unrepairable. A non-public App has to be written out of band —
-            // a one-off `otterdog apply` with an org-owner PAT, which CAN
-            // read the slug; otterdog then reads the actor back from
-            // `/orgs/{org}/installations`, not `/apps/`, and plans clean, but
-            // can no longer repair that ruleset. That read-back is the second
-            // requirement: the App must also be an INSTALLATION ON THIS ORG,
-            // because `/orgs/{org}/installations` is the ONLY id->slug source
-            // otterdog has. An App with a live bypass slot that is not an org
-            // installation is dropped from the model with a log line and no
-            // plan output — a permanent phantom diff, with no numeric fallback
-            // as there is for the `15368:` status-check prefixes below (#262,
-            // upstream #732). See README, Known limitations.
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/dev',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              // Canonical status-check prefix form is PER-APP, throughout this
-              // file (#69): checks bound to FIRST-PARTY apps that are never org
-              // installations (github-actions, app_id 15368) MUST use the
-              // numeric `15368:` form — otterdog's id->slug resolution covers
-              // only `/orgs/{org}/installations`, so live always reads back
-              // numeric and a committed slug is a permanent phantom plan diff
-              // (#130-#141). Checks from org-installed apps DO resolve to slugs
-              // and use slug form (cf. tessera's `any:` note). Writing the
-              // numeric form needs otterdog >= 1.4.0 (upstream #695/#700); the
-              // pin lives in justfile.project.
-              '15368:CI Summary',
-            ],
-          },
-        },
+        // Applies to every App bypass actor throughout this file. An App
+        // actor (no `#role` / `@team` prefix) is WRITTEN by resolving its
+        // slug through `GET /apps/<slug>`, which this engine's
+        // installation token is observed to read only for a PUBLIC App
+        // (#256, upstream #772). Both Apps named in this file are public,
+        // and keeping them public is load-bearing, not incidental: make
+        // one private and every ruleset below that names it becomes
+        // unrepairable. A non-public App has to be written out of band —
+        // a one-off `otterdog apply` with an org-owner PAT, which CAN
+        // read the slug; otterdog then reads the actor back from
+        // `/orgs/{org}/installations`, not `/apps/`, and plans clean, but
+        // can no longer repair that ruleset. That read-back is the second
+        // requirement: the App must also be an INSTALLATION ON THIS ORG,
+        // because `/orgs/{org}/installations` is the ONLY id->slug source
+        // otterdog has. An App with a live bypass slot that is not an org
+        // installation is dropped from the model with a log line and no
+        // plan output — a permanent phantom diff, with no numeric fallback
+        // as there is for the `15368:` status-check prefixes below (#262,
+        // upstream #732). See README, Known limitations.
+        //
+        // Canonical status-check prefix form is PER-APP, throughout this
+        // file (#69): checks bound to FIRST-PARTY apps that are never org
+        // installations (github-actions, app_id 15368) MUST use the
+        // numeric `15368:` form — otterdog's id->slug resolution covers
+        // only `/orgs/{org}/installations`, so live always reads back
+        // numeric and a committed slug is a permanent phantom plan diff
+        // (#130-#141). Checks from org-installed apps DO resolve to slugs
+        // and use slug form (cf. tessera's `any:` note). Writing the
+        // numeric form needs otterdog >= 1.4.0 (upstream #695/#700); the
+        // pin lives in justfile.project.
+        orgs.devProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
         orgs.newRepoRuleset('Main protection') {
           allows_creations: true,
           bypass_actors+: [
@@ -414,50 +402,12 @@ orgs.newOrg('vig-os', 'vig-os') {
             strict: true,
           },
         },
-        orgs.newRepoRuleset('Release protection') {
-          allows_creations: true,
-          allows_deletions: true,
-          bypass_actors+: [
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/release/*',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
-        orgs.newRepoRuleset('Tag protection') {
-          allows_force_pushes: true,
-          allows_updates: false,
-          bypass_actors+: [
-            'vig-os-release-app',
-          ],
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          target: 'tag',
-        },
+        orgs.releaseProtection(
+          checks=['15368:CI Summary', '15368:Dist Check'],
+          bypass=['commit-action-bot'],
+        ),
+        orgs.signedCommits(),
+        orgs.tagProtection(['vig-os-release-app']),
       ],
     },
     orgs.newRepo('devkit') {
@@ -494,25 +444,10 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
       ],
       rulesets: [
-        orgs.newRepoRuleset('Dev protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            '#OrganizationAdmin',
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/dev',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:Test Summary',
-            ],
-          },
-        },
+        orgs.devProtection(
+          checks=['15368:Test Summary'],
+          bypass=['#OrganizationAdmin', 'commit-action-bot'],
+        ),
         orgs.newRepoRuleset('Main protection') {
           allows_creations: true,
           bypass_actors+: [
@@ -546,56 +481,18 @@ orgs.newOrg('vig-os', 'vig-os') {
             strict: true,
           },
         },
-        orgs.newRepoRuleset('Release protection') {
-          allows_creations: true,
-          allows_deletions: true,
-          bypass_actors+: [
-            '#OrganizationAdmin',
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/release/*',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            // Deliberately off, same rationale as Main protection (#115).
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:Test Summary',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
+        // Code-owner review is off in the shape itself, same rationale as
+        // Main protection (#115).
+        orgs.releaseProtection(
+          checks=['15368:Test Summary'],
+          bypass=['#OrganizationAdmin', 'commit-action-bot'],
+        ),
+        orgs.signedCommits(),
         // Tag protection mirrors commit-action's: devkit publishes the release
         // tags every consumer pins, and `release.yml` is the only tag writer —
         // it pushes (and `promote-release.yml` prunes RC tags) with a
         // vig-os-release-app token, so one always-bypass actor is enough.
-        orgs.newRepoRuleset('Tag protection') {
-          allows_force_pushes: true,
-          allows_updates: false,
-          bypass_actors+: [
-            'vig-os-release-app',
-          ],
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          target: 'tag',
-        },
+        orgs.tagProtection(['vig-os-release-app']),
       ],
       environments: [
         orgs.newEnvironment('copilot'),
@@ -606,29 +503,14 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'Repository to test deployment workflows of vigOS devcontainer',
       private_vulnerability_reporting_enabled: true,
       rulesets: [
-        orgs.newRepoRuleset('Dev protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/dev',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            // Deliberately off: `.github/CODEOWNERS` is the devkit-seeded stub
-            // with every rule line commented out, so no owner ever matches and
-            // the flag gates nothing. Populating it would recreate the #115
-            // unsatisfiable single-owner gate instead (#187).
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-            ],
-          },
-        },
+        // Code-owner review is off in the shape itself: `.github/CODEOWNERS`
+        // is the devkit-seeded stub with every rule line commented out, so no
+        // owner ever matches and the flag gates nothing. Populating it would
+        // recreate the #115 unsatisfiable single-owner gate instead (#187).
+        orgs.devProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
         orgs.newRepoRuleset('Main protection') {
           allows_creations: true,
           // Parity with devkit's Main protection: a sanctioned always-mode
@@ -656,17 +538,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             ],
           },
         },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
+        orgs.signedCommits(),
       ],
       // Live-proof harness for devkit's opt-in `DEVKIT_COMMIT_APP_ENVIRONMENT`
       // knob (vig-os/devkit#1710, shipped in vig-os/devkit#1724): it binds the
@@ -772,17 +644,7 @@ orgs.newOrg('vig-os', 'vig-os') {
             ],
           },
         },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
+        orgs.signedCommits(),
       ],
     },
     orgs.newRepo('org-config-testbed') {
@@ -902,29 +764,14 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'GitHub Action that syncs issues and pull requests to markdown files with full comments, review threads, and diff snippets. Useful for documentation, backups, and offline access. Supports incremental syncing with state caching and GitHub App authentication.',
       private_vulnerability_reporting_enabled: true,
       rulesets: [
-        orgs.newRepoRuleset('Dev protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/dev',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            // Deliberately off: `.github/CODEOWNERS` is the devkit-seeded stub
-            // with every rule line commented out, so no owner ever matches and
-            // the flag gates nothing. Populating it would recreate the #115
-            // unsatisfiable single-owner gate instead (#187).
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-            ],
-          },
-        },
+        // Code-owner review is off in the shape itself: `.github/CODEOWNERS`
+        // is the devkit-seeded stub with every rule line commented out, so no
+        // owner ever matches and the flag gates nothing. Populating it would
+        // recreate the #115 unsatisfiable single-owner gate instead (#187).
+        orgs.devProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
         orgs.newRepoRuleset('Main protection') {
           allows_creations: true,
           include_refs+: [
@@ -956,50 +803,12 @@ orgs.newOrg('vig-os', 'vig-os') {
             strict: true,
           },
         },
-        orgs.newRepoRuleset('Release protection') {
-          allows_creations: true,
-          allows_deletions: true,
-          bypass_actors+: [
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/release/*',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
-        orgs.newRepoRuleset('Tag protection') {
-          allows_force_pushes: true,
-          allows_updates: false,
-          bypass_actors+: [
-            'vig-os-release-app',
-          ],
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          target: 'tag',
-        },
+        orgs.releaseProtection(
+          checks=['15368:CI Summary', '15368:Dist Check'],
+          bypass=['commit-action-bot'],
+        ),
+        orgs.signedCommits(),
+        orgs.tagProtection(['vig-os-release-app']),
       ],
       environments: [
         orgs.newEnvironment('copilot'),
