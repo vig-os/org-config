@@ -316,7 +316,7 @@ nothing here calls it.
 
 - **That same installation map is also truncated at thirty entries, so the set
   of dropped actors is larger than the bullet above describes.** The map is
-  built from one unpaginated call: `org_client.py:484-491` (1.5.0, the ADR-0005
+  built from one unpaginated call: `org_client.py:484-491` (1.6.1, the ADR-0005
   pin) reaches `GET /orgs/{org}/installations` through the single-shot
   `request_json`, which sends no `per_page` and never reads the `Link` header,
   and returns `response["installations"]` — one page. That endpoint paginates
@@ -330,8 +330,9 @@ nothing here calls it.
   "install the App on the organization" does not make a declaration safe, and
   which Apps survive depends on the order GitHub returns them in, which makes
   the same committed config capable of planning differently on two runs after an
-  unrelated App is installed or removed. Unfixed at the 1.5.0 pin and unfixed on
-  upstream `main` (read 2026-09-25 at `ba3d1f9`, where the call is
+  unrelated App is installed or removed. Unfixed at the 1.6.1 pin, where the call
+  is byte-identical to 1.5.0 down to the line numbers, and unfixed on upstream
+  `main` (re-read 2026-09-28, still at `ba3d1f9`, where the call is
   byte-identical and the map has moved to
   `models/github_organization.py:576`). It is the odd one out in its own file:
   `org_client.py` already uses the paged form for repos, members, advisories and
@@ -343,10 +344,14 @@ nothing here calls it.
   ([#269](https://github.com/vig-os/org-config/issues/269)).
   **Nothing here is affected today, and the measurement is a one-liner an
   operator can repeat:** `gh api /orgs/<org>/installations --jq .total_count`
-  answered **8** for `vig-os` and **12** for `exo-pet` on 2026-09-25, both well
-  under 30. Re-measuring both is a step of the otterdog pin bump, written into
-  the comment above the pin literal in `justfile.project`, because that is the
-  bump where the upstream code is re-read anyway.
+  answered **8** for `vig-os`, **12** for `exo-pet`, **7** for `exoma-ch` and
+  **5** for `MorePET` on 2026-09-28 — every org in
+  [ADR-0006](docs/adr/0006-distribution-topology-and-versioning.md) scope, all
+  well under 30. Re-measuring each of them is a step of the otterdog pin bump,
+  written into the comment above the pin literal in `justfile.project` and into
+  the body of the Renovate pull request that proposes the bump, because that is
+  the bump where the upstream code is re-read anyway and that PR is where it is
+  adopted.
   **This repo's own plan-time check does not cover the gap, and the reason is a
   threshold, not an omission:** `read_installations`
   (`src/drift_layer/app_actors.py:436-476`) reads the same endpoint with

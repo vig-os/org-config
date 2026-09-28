@@ -31,11 +31,14 @@ project := "org_config"
 # plan-fixture format, and two reads that no test can make for you: re-read
 # `get_app_installations` in the new otterdog
 # (`providers/github/rest/org_client.py`) to see whether it still reaches
-# `/orgs/{org}/installations` unpaginated, and re-measure both orgs with
-# `gh api /orgs/<org>/installations --jq .total_count` (8 and 12 on
-# 2026-09-25). Past 30 installations the unpaginated call drops App bypass
-# actors silently, and the plan-time check only fires past 100
-# (#269, README "Known limitations").
+# `/orgs/{org}/installations` unpaginated, and re-measure every managed org with
+# `gh api /orgs/<org>/installations --jq .total_count` (vig-os 8, exo-pet 12,
+# exoma-ch 7, MorePET 5 on 2026-09-28; at 1.6.1 the call is still
+# `org_client.py:484-491`, byte-identical to 1.5.0). Past 30 installations the
+# unpaginated call drops App bypass actors silently, and the plan-time check
+# only fires past 100 (#269, README "Known limitations"). Both reads are also
+# quoted in the Renovate PR body via `prBodyNotes` (#288), because a five-literal
+# version diff gives its reviewer no reason to scroll into this comment.
 #
 # The `otterdog.json` `otterdog-defaults` pin is NOT managed by that regex and
 # is NOT in lockstep with this one (ADR-0005 Corrections, #225) — it stays at
