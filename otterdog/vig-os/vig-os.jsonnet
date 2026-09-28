@@ -112,6 +112,74 @@ orgs.newOrg('vig-os', 'vig-os') {
       value: '********',
       visibility: 'selected',
     },
+    // APP VISIBILITY DECISION (2026-09-28, #271): keep the
+    // `vigos-devkit-upgrade` App PUBLIC — "Any account" — pending the UI
+    // verification below. Recorded here because this file is the App's
+    // only appearance in code anywhere; the engine App's twin decision,
+    // whose shape this follows, is docs/runbooks/github-app.md,
+    // Visibility (#261), and `vig-os/devkit`, which scaffolds the
+    // workflow that consumes these secrets, has no runbook for this App
+    // at all (its own creation runbook is vig-os/devkit#1739, the
+    // follow-up this decision deliberately did not grow into).
+    // Public is not a preference here: the App is installed on a
+    // FOREIGN org (`exo-pet`, installation 151387251, beside `vig-os`'s
+    // own), and GitHub's private setting means installable only on the
+    // account that owns the App — so that installation could not exist
+    // if it were private. Same one-App/N-installations model ADR-0004
+    // chose under "One App, not four".
+    //
+    // The grant behind that posture is far narrower than the engine
+    // App's, which is what makes the same decision cheaper here:
+    // `contents`, `issues`, `pull_requests`, `workflows` write plus
+    // `metadata` read — no organization_administration, no secrets, no
+    // members, no administration. An unauthenticated
+    // `GET /apps/vigos-devkit-upgrade` publishes exactly that table plus
+    // the numeric id, the owner, the creation date, the Client ID and
+    // `events: []` — i.e. *this org runs a write-capable upgrade bot* —
+    // and publishes NONE of: the private key, the installation set, or
+    // which repositories the lists below name. Treat the Client ID as
+    // public whatever it is stored as (#270).
+    //
+    // Two costs are accepted with it, the same two as #261:
+    //   - An installation set we neither control nor hear about. Any
+    //     account owner can install from the public page, and with
+    //     `events: []` there is no `installation` event to receive, so
+    //     `GET /app/installations` — a JWT signed with
+    //     DEVKIT_UPGRADE_APP_PRIVATE_KEY, which no workflow holds — is
+    //     the only inventory. SWEEP IT WHENEVER THAT KEY IS ROTATED and
+    //     confirm every installation is one of ours; rotation is the one
+    //     moment the check is free. A stray installation is inert while
+    //     the key is sound — what it widens is the blast radius of a key
+    //     compromise, from our orgs to ours plus whoever installed it.
+    //   - A world-readable grant table (above). Reconnaissance, not a
+    //     credential.
+    //
+    // The #256 coupling does NOT bind here, and that is half the value
+    // of writing this down: `vigos-devkit-upgrade` is named as a ruleset
+    // bypass actor or a status-check app NOWHERE in this file, so
+    // `apply` never resolves its slug through `GET /apps/<slug>` and its
+    // visibility is not configuration-relevant the way
+    // `commit-action-bot`'s and `vig-os-release-app`'s are (see the
+    // bypass_actors+ comment below). #81 proposed exactly such a bypass
+    // and was closed as superseded by vig-os/devkit#1308. Making this
+    // App private would therefore strand no ruleset — the `exo-pet`
+    // installation is the only thing keeping it public.
+    //
+    // VERIFICATION IS UI-ONLY, and still owed: `GET /apps/{slug}`
+    // carries no visibility field, so the only API signal is the status
+    // code to an ANONYMOUS call — 200 public, 404 private (observed 200
+    // on 2026-09-28; three sibling `vig-os` Apps answer 404). That is an
+    // observation and not a documented contract, which is also why no
+    // `unmanaged-controls.toml` row can assert it: the controls
+    // transport reads authenticated and never sees the discriminator.
+    // The authority is the App's own settings page — Settings ->
+    // Developer settings -> GitHub Apps -> vigos-devkit-upgrade ->
+    // Advanced -> "Where can this GitHub App be installed?" — where the
+    // Danger-zone button names the ACTION, not the state, so "Make
+    // private" means it is currently public. Click nothing: if the live
+    // value contradicts this paragraph, that is drift in the App itself
+    // and belongs in an issue, not in a hand-flip back.
+
     // Consumed since the devkit 1.7.0 adoptions landed vig-os/devkit#1365's
     // DEVKIT_UPGRADE_APP_ID -> _CLIENT_ID rename: devkit-smoke-test and
     // org-config reference it today. commit-action and sync-issues-action keep
