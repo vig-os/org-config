@@ -189,9 +189,10 @@ orgs.newOrg('vig-os', 'vig-os') {
     // bypass actor or a status-check app NOWHERE in this file, so
     // `apply` never resolves its slug through `GET /apps/<slug>` and its
     // visibility is not configuration-relevant the way
-    // `commit-action-bot`'s and `vig-os-release-app`'s are (see the
-    // bypass_actors+ comment below). #81 proposed exactly such a bypass
-    // and was closed as superseded by vig-os/devkit#1308. Making this
+    // `commit-action-bot`'s and `vig-os-release-app`'s are (see the App
+    // bypass-actor comment on commit-action's rulesets below). #81 proposed
+    // exactly such a bypass and was closed as superseded by
+    // vig-os/devkit#1308. Making this
     // App private would therefore strand no ruleset — the two foreign
     // installations above are the only thing keeping it public.
     //
@@ -346,118 +347,53 @@ orgs.newOrg('vig-os', 'vig-os') {
         actions_can_approve_pull_request_reviews: false,
       },
       rulesets: [
-        orgs.newRepoRuleset('Dev protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            // Applies to every App bypass actor throughout this file. An App
-            // actor (no `#role` / `@team` prefix) is WRITTEN by resolving its
-            // slug through `GET /apps/<slug>`, which this engine's
-            // installation token is observed to read only for a PUBLIC App
-            // (#256, upstream #772). Both Apps named in this file are public,
-            // and keeping them public is load-bearing, not incidental: make
-            // one private and every ruleset below that names it becomes
-            // unrepairable. A non-public App has to be written out of band —
-            // a one-off `otterdog apply` with an org-owner PAT, which CAN
-            // read the slug; otterdog then reads the actor back from
-            // `/orgs/{org}/installations`, not `/apps/`, and plans clean, but
-            // can no longer repair that ruleset. That read-back is the second
-            // requirement: the App must also be an INSTALLATION ON THIS ORG,
-            // because `/orgs/{org}/installations` is the ONLY id->slug source
-            // otterdog has. An App with a live bypass slot that is not an org
-            // installation is dropped from the model with a log line and no
-            // plan output — a permanent phantom diff, with no numeric fallback
-            // as there is for the `15368:` status-check prefixes below (#262,
-            // upstream #732). See README, Known limitations.
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/dev',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              // Canonical status-check prefix form is PER-APP, throughout this
-              // file (#69): checks bound to FIRST-PARTY apps that are never org
-              // installations (github-actions, app_id 15368) MUST use the
-              // numeric `15368:` form — otterdog's id->slug resolution covers
-              // only `/orgs/{org}/installations`, so live always reads back
-              // numeric and a committed slug is a permanent phantom plan diff
-              // (#130-#141). Checks from org-installed apps DO resolve to slugs
-              // and use slug form (cf. tessera's `any:` note). Writing the
-              // numeric form needs otterdog >= 1.4.0 (upstream #695/#700); the
-              // pin lives in justfile.project.
-              '15368:CI Summary',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            '#RepositoryAdmin:pull_request',
-          ],
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          requires_commit_signatures: true,
-          required_pull_request+: {
-            required_approving_review_count: 1,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
-            ],
-            strict: true,
-          },
-        },
-        orgs.newRepoRuleset('Release protection') {
-          allows_creations: true,
-          allows_deletions: true,
-          bypass_actors+: [
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/release/*',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
-        orgs.newRepoRuleset('Tag protection') {
-          allows_force_pushes: true,
-          allows_updates: false,
-          bypass_actors+: [
-            'vig-os-release-app',
-          ],
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          target: 'tag',
-        },
+        // Applies to every App bypass actor throughout this file. An App
+        // actor (no `#role` / `@team` prefix) is WRITTEN by resolving its
+        // slug through `GET /apps/<slug>`, which this engine's
+        // installation token is observed to read only for a PUBLIC App
+        // (#256, upstream #772). Both Apps named in this file are public,
+        // and keeping them public is load-bearing, not incidental: make
+        // one private and every ruleset below that names it becomes
+        // unrepairable. A non-public App has to be written out of band —
+        // a one-off `otterdog apply` with an org-owner PAT, which CAN
+        // read the slug; otterdog then reads the actor back from
+        // `/orgs/{org}/installations`, not `/apps/`, and plans clean, but
+        // can no longer repair that ruleset. That read-back is the second
+        // requirement: the App must also be an INSTALLATION ON THIS ORG,
+        // because `/orgs/{org}/installations` is the ONLY id->slug source
+        // otterdog has. An App with a live bypass slot that is not an org
+        // installation is dropped from the model with a log line and no
+        // plan output — a permanent phantom diff, with no numeric fallback
+        // as there is for the `15368:` status-check prefixes below (#262,
+        // upstream #732). See README, Known limitations.
+        //
+        // Canonical status-check prefix form is PER-APP, throughout this
+        // file (#69): checks bound to FIRST-PARTY apps that are never org
+        // installations (github-actions, app_id 15368) MUST use the
+        // numeric `15368:` form — otterdog's id->slug resolution covers
+        // only `/orgs/{org}/installations`, so live always reads back
+        // numeric and a committed slug is a permanent phantom plan diff
+        // (#130-#141). Checks from org-installed apps DO resolve to slugs
+        // and use slug form (cf. tessera's `any:` note). Writing the
+        // numeric form needs otterdog >= 1.4.0 (upstream #695/#700); the
+        // pin lives in justfile.project.
+        orgs.devProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        // House standard (ADR-0008). `Dist Check` is required on top of the
+        // CI aggregator: it proves the committed `dist/` bundle matches the
+        // source, which no CI Summary leg covers. Signatures come from the
+        // `Signed commits` ruleset alone (this block used to require them a
+        // second time), and the bypass is now the house org-owner PR bypass
+        // instead of `#RepositoryAdmin` (#294).
+        orgs.mainProtection(['15368:CI Summary', '15368:Dist Check']),
+        orgs.releaseProtection(
+          checks=['15368:CI Summary', '15368:Dist Check'],
+          bypass=['commit-action-bot'],
+        ),
+        orgs.signedCommits(),
+        orgs.tagProtection(['vig-os-release-app']),
       ],
     },
     orgs.newRepo('devkit') {
@@ -494,108 +430,32 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
       ],
       rulesets: [
-        orgs.newRepoRuleset('Dev protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            '#OrganizationAdmin',
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/dev',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:Test Summary',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            '#OrganizationAdmin',
-          ],
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          required_pull_request+: {
-            // An approval must cover the code being merged: without this, a
-            // review of one commit survives every later push to the branch.
-            // Main only — Dev and Release require 0 approvals, so they have
-            // nothing to dismiss (#118).
-            dismisses_stale_reviews: true,
-            required_approving_review_count: 1,
-            // Deliberately off: `.github/CODEOWNERS` names a single owner who
-            // also authors the PRs, so the gate can never be satisfied and its
-            // only outcome is an #OrganizationAdmin bypass (#115).
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              // Two contexts, not one: `codeql.yml`'s analyze job is a
-              // `language: ['python', 'actions']` matrix, so each leg reports
-              // under its own matrix-suffixed name (#115).
-              '15368:CodeQL Analysis (actions)',
-              '15368:CodeQL Analysis (python)',
-              '15368:Test Summary',
-            ],
-            strict: true,
-          },
-        },
-        orgs.newRepoRuleset('Release protection') {
-          allows_creations: true,
-          allows_deletions: true,
-          bypass_actors+: [
-            '#OrganizationAdmin',
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/release/*',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            // Deliberately off, same rationale as Main protection (#115).
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:Test Summary',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
+        orgs.devProtection(
+          checks=['15368:Test Summary'],
+          bypass=['#OrganizationAdmin', 'commit-action-bot'],
+        ),
+        // House standard (ADR-0008) on devkit's own aggregator. Two CodeQL
+        // contexts, not one: `codeql.yml`'s analyze job is a
+        // `language: ['python', 'actions']` matrix, so each leg reports under
+        // its own matrix-suffixed name (#115). Stale-review dismissal (#118)
+        // and code-owner review off (#115) come with the shape.
+        orgs.mainProtection([
+          '15368:CodeQL Analysis (actions)',
+          '15368:CodeQL Analysis (python)',
+          '15368:Test Summary',
+        ]),
+        // Code-owner review is off in the shape itself, same rationale as
+        // Main protection (#115).
+        orgs.releaseProtection(
+          checks=['15368:Test Summary'],
+          bypass=['#OrganizationAdmin', 'commit-action-bot'],
+        ),
+        orgs.signedCommits(),
         // Tag protection mirrors commit-action's: devkit publishes the release
         // tags every consumer pins, and `release.yml` is the only tag writer —
         // it pushes (and `promote-release.yml` prunes RC tags) with a
         // vig-os-release-app token, so one always-bypass actor is enough.
-        orgs.newRepoRuleset('Tag protection') {
-          allows_force_pushes: true,
-          allows_updates: false,
-          bypass_actors+: [
-            'vig-os-release-app',
-          ],
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          target: 'tag',
-        },
+        orgs.tagProtection(['vig-os-release-app']),
       ],
       environments: [
         orgs.newEnvironment('copilot'),
@@ -606,67 +466,41 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'Repository to test deployment workflows of vigOS devcontainer',
       private_vulnerability_reporting_enabled: true,
       rulesets: [
-        orgs.newRepoRuleset('Dev protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/dev',
-          ],
+        // Code-owner review is off in the shape itself: `.github/CODEOWNERS`
+        // is the devkit-seeded stub with every rule line commented out, so no
+        // owner ever matches and the flag gates nothing. Populating it would
+        // recreate the #115 unsatisfiable single-owner gate instead (#187).
+        orgs.devProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        // House shape (ADR-0008), with three documented exceptions that keep
+        // devkit's release train unattended here. The admin bypass is the
+        // house `pull_request` mode, still the sanctioned override that
+        // replaced out-of-band ruleset PUTs (#147).
+        orgs.mainProtection(['15368:CI Summary']) {
           required_pull_request+: {
+            // EXCEPTION — no human review: the repo is bot-authored
+            // release-validation scaffolding, and the dispatch listener's
+            // approval gate that needed `reviewDecision` to be computable
+            // (vig-os/devkit#1391) is removed by vig-os/devkit#1506. The
+            // operative controls are the required CI Summary check and
+            // devkit's published-smoke-release validation at promote;
+            // count-0-with-required-checks matches devkit's own Dev and
+            // Release protections (#167).
             required_approving_review_count: 0,
-            // Deliberately off: `.github/CODEOWNERS` is the devkit-seeded stub
-            // with every rule line commented out, so no owner ever matches and
-            // the flag gates nothing. Populating it would recreate the #115
-            // unsatisfiable single-owner gate instead (#187).
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
+            // EXCEPTION — no thread-resolution gate: nobody is in the loop to
+            // resolve a thread, so any comment would stall the train.
+            requires_review_thread_resolution: false,
           },
           required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-            ],
+            // EXCEPTION — not strict: a release PR that falls behind `main`
+            // makes `promote-release` fail on `BEHIND`, and no human is
+            // present to update the branch mid-train.
+            strict: false,
           },
         },
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          // Parity with devkit's Main protection: a sanctioned always-mode
-          // admin override instead of out-of-band ruleset PUTs that the next
-          // apply reverts (#147).
-          bypass_actors+: [
-            '#OrganizationAdmin',
-          ],
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          required_pull_request+: {
-            // No human review: the repo is bot-authored release-validation
-            // scaffolding, and the dispatch listener's approval gate that
-            // needed `reviewDecision` to be computable (vig-os/devkit#1391)
-            // is removed by vig-os/devkit#1506. The operative controls are
-            // the required CI Summary check and devkit's published-smoke-
-            // release validation at promote; count-0-with-required-checks
-            // matches devkit's own Dev and Release protections (#167).
-            required_approving_review_count: 0,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
+        orgs.signedCommits(),
       ],
       // Live-proof harness for devkit's opt-in `DEVKIT_COMMIT_APP_ENVIRONMENT`
       // knob (vig-os/devkit#1710, shipped in vig-os/devkit#1724): it binds the
@@ -689,13 +523,9 @@ orgs.newOrg('vig-os', 'vig-os') {
       ],
     },
     orgs.newRepo('h5v') {
-      allow_update_branch: false,
-      delete_branch_on_merge: false,
       description: 'A terminal viewer for HDF5 files with chart, image, string, matrix, and attributes support',
-    } + orgs.legacyMergePolicy,
+    },
     orgs.newRepo('nvd-mirror') {
-      allow_update_branch: false,
-      delete_branch_on_merge: false,
       description: 'Public mirror of the NVD JSON 2.0 feeds for vulnix (see vig-os/devcontainer#870)',
       gh_pages_build_type: 'legacy',
       gh_pages_source_branch: 'gh-pages',
@@ -709,7 +539,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           deployment_branch_policy: 'selected',
         },
       ],
-    } + orgs.legacyMergePolicy,
+    },
     orgs.newRepo('org-config') {
       allow_auto_merge: true,
       custom_properties+: {
@@ -744,45 +574,9 @@ orgs.newOrg('vig-os', 'vig-os') {
         },
       ],
       rulesets: [
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            '#OrganizationAdmin',
-          ],
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          required_pull_request+: {
-            // No human review: the repo is solo-maintained, so an approval
-            // (and the single-owner CODEOWNERS gate) is unsatisfiable on
-            // self-authored PRs and its only outcome was a routine
-            // #OrganizationAdmin bypass on every merge — the #115 pathology.
-            // The operative controls are the required CI Summary check and
-            // the `production` environment approval (@c-vigo) that gates every
-            // live apply with the plan preview in the same run;
-            // count-0-with-required-checks matches devkit's Dev and Release
-            // protections and devkit-smoke-test's Main (#167, #195).
-            required_approving_review_count: 0,
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
+        // House standard (ADR-0008).
+        orgs.mainProtection(['15368:CI Summary']),
+        orgs.signedCommits(),
       ],
     },
     orgs.newRepo('org-config-testbed') {
@@ -802,7 +596,16 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'SACRIFICIAL testbed for the L3 mutation E2E harness (issue #23) - its live settings are deliberately churned and reverted by .github/workflows/testbed-e2e.yml on every run; do not rely on any state here.',
     } + orgs.upstreamMergePolicy,
     orgs.newRepo('qms') {
+      // OUT OF SCOPE of ADR-0008 and deliberately frozen at its live state
+      // until it gets its own decision (#294): private on a Free-plan org, so
+      // no ruleset can be enforced, and its default branch is a leaked agent
+      // worktree branch. The five merge fields below restate the retired
+      // `legacyMergePolicy` (all three methods, upstream title/message) so
+      // removing that mixin changes nothing live here.
       allow_forking: false,
+      allow_merge_commit: true,
+      allow_rebase_merge: true,
+      allow_squash_merge: true,
       allow_update_branch: false,
       custom_properties+: {
         type: ['tools'],
@@ -811,11 +614,11 @@ orgs.newOrg('vig-os', 'vig-os') {
       delete_branch_on_merge: false,
       description: 'Quality Management System',
       has_wiki: false,
+      merge_commit_message: 'PR_TITLE',
+      merge_commit_title: 'MERGE_MESSAGE',
       private: true,
-    } + orgs.legacyMergePolicy,
+    },
     orgs.newRepo('qx') {
-      allow_update_branch: false,
-      delete_branch_on_merge: false,
       description: 'Per-instance physical part identification: nano-id IDs, QR labels, mint-then-bind workflow',
       gh_pages_build_type: 'workflow',
       homepage: 'https://vig-os.github.io/qx/',
@@ -832,7 +635,7 @@ orgs.newOrg('vig-os', 'vig-os') {
           deployment_branch_policy: 'selected',
         },
       ],
-    } + orgs.legacyMergePolicy,
+    },
     orgs.newRepo('scitadel') {
       allow_auto_merge: true,
       // Deliberate deviation from the house merge policy (house-defaults.libsonnet):
@@ -902,104 +705,27 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'GitHub Action that syncs issues and pull requests to markdown files with full comments, review threads, and diff snippets. Useful for documentation, backups, and offline access. Supports incremental syncing with state caching and GitHub App authentication.',
       private_vulnerability_reporting_enabled: true,
       rulesets: [
-        orgs.newRepoRuleset('Dev protection') {
-          allows_creations: true,
-          bypass_actors+: [
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/dev',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            // Deliberately off: `.github/CODEOWNERS` is the devkit-seeded stub
-            // with every rule line commented out, so no owner ever matches and
-            // the flag gates nothing. Populating it would recreate the #115
-            // unsatisfiable single-owner gate instead (#187).
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Main protection') {
-          allows_creations: true,
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          required_pull_request+: {
-            // An approval must cover the code being merged: without this, a
-            // review of one commit survives every later push to the branch.
-            // Main only — Dev and Release require 0 approvals, so they have
-            // nothing to dismiss (#118, converged here by #184).
-            dismisses_stale_reviews: true,
-            required_approving_review_count: 1,
-            // Deliberately off, same rationale as Dev protection: the seeded
-            // CODEOWNERS stub has no active rule, so the flag gates nothing,
-            // and populating it would recreate the #115 unsatisfiable
-            // single-owner gate (#187).
-            requires_code_owner_review: false,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
-            ],
-            // Up-to-date branches: the checks must have run against the merge
-            // result, not a stale base. Same principle as the stale-review
-            // dismissal above, applied to CI; `commit-action` and devkit
-            // already carry it (#188).
-            strict: true,
-          },
-        },
-        orgs.newRepoRuleset('Release protection') {
-          allows_creations: true,
-          allows_deletions: true,
-          bypass_actors+: [
-            'commit-action-bot',
-          ],
-          include_refs+: [
-            'refs/heads/release/*',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              '15368:CI Summary',
-              '15368:Dist Check',
-            ],
-          },
-        },
-        orgs.newRepoRuleset('Signed commits') {
-          allows_creations: true,
-          allows_deletions: true,
-          allows_force_pushes: true,
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          requires_commit_signatures: true,
-        },
-        orgs.newRepoRuleset('Tag protection') {
-          allows_force_pushes: true,
-          allows_updates: false,
-          bypass_actors+: [
-            'vig-os-release-app',
-          ],
-          include_refs+: [
-            '~ALL',
-          ],
-          required_pull_request: null,
-          required_status_checks: null,
-          target: 'tag',
-        },
+        // Code-owner review is off in the shape itself: `.github/CODEOWNERS`
+        // is the devkit-seeded stub with every rule line commented out, so no
+        // owner ever matches and the flag gates nothing. Populating it would
+        // recreate the #115 unsatisfiable single-owner gate instead (#187).
+        orgs.devProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        // House standard (ADR-0008): stale-review dismissal (#118, #184),
+        // strict up-to-date checks (#188, paired with `allow_update_branch`
+        // above) and code-owner review off — the seeded CODEOWNERS stub has
+        // no active rule, and populating it would recreate the #115
+        // unsatisfiable single-owner gate (#187). `Dist Check` as on
+        // commit-action. The org-owner PR bypass is new here (#294).
+        orgs.mainProtection(['15368:CI Summary', '15368:Dist Check']),
+        orgs.releaseProtection(
+          checks=['15368:CI Summary', '15368:Dist Check'],
+          bypass=['commit-action-bot'],
+        ),
+        orgs.signedCommits(),
+        orgs.tagProtection(['vig-os-release-app']),
       ],
       environments: [
         orgs.newEnvironment('copilot'),
@@ -1083,18 +809,14 @@ orgs.newOrg('vig-os', 'vig-os') {
       ],
     },
     orgs.newRepo('vigos-mvp') {
-      allow_update_branch: false,
-      delete_branch_on_merge: false,
       description: 'MVP with basic functions',
       private_vulnerability_reporting_enabled: true,
-    } + orgs.legacyMergePolicy,
+    },
     orgs.newRepo('vs-dolt') {
-      allow_update_branch: false,
-      delete_branch_on_merge: false,
       description: 'VS Code extension, open source SQL workbench for your MySQL and PostgreSQL compatible database with version control features when connected to Dolt.',
       has_issues: false,
       homepage: 'https://hub.docker.com/r/dolthub/dolt-workbench',
       private_vulnerability_reporting_enabled: true,
-    } + orgs.legacyMergePolicy,
+    },
   ],
 }
