@@ -524,12 +524,58 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('h5v') {
       description: 'A terminal viewer for HDF5 files with chart, image, string, matrix, and attributes support',
+      // Tier A (ADR-0008): a devkit 1.17.0 trunk scaffold (`.vig-os`
+      // DEVKIT_WORKFLOW=trunk) — no `dev` branch; releases fork
+      // `release/X.Y.Z` from `main` and merge back through the release PR.
+      // `CI Summary` is `ci.yml`'s aggregator job, reported by github-actions
+      // on every PR into `main` and `release/**` (#294).
+      rulesets: [
+        // House standard, no bot bypass. Until vig-os/h5v#9 lands, h5v's
+        // nightly `sync-issues.yml` still commits straight to `main` as the
+        // Commit App (`DEVKIT_SYNC_TARGET` unset) and this ruleset refuses
+        // that push (vig-os/devkit#1227); #9 retargets it to
+        // `sync/issue-mirror`, the org-config pattern (#294).
+        orgs.mainProtection(['15368:CI Summary']),
+        // The trunk release train writes `release/X.Y.Z` as the Commit App
+        // only: `prepare-release.yml` creates the branch and commits the
+        // freeze, `release-core.yml` commits the finalize and dispatches the
+        // archive sync onto it, and `release.yml`'s rollback reverts it.
+        // `abandon-release.yml` deletes it with the Release App, which the
+        // shape's `allows_deletions` already permits.
+        orgs.releaseProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        // Every automated branch writer commits through the API, so GitHub
+        // signs it: the Commit App (commit-action), the devkit-upgrade App
+        // (`devkit-upgrade.yml` builds its commit with `git/commits`) and
+        // Renovate (platform commits).
+        orgs.signedCommits(),
+        // The only tag writer is the release train: `release-publish.yml`
+        // creates the release tag, and `promote-release.yml` prunes RC tags,
+        // both as the Release App. h5v has no tags yet.
+        orgs.tagProtection(['vig-os-release-app']),
+      ],
     },
     orgs.newRepo('nvd-mirror') {
       description: 'Public mirror of the NVD JSON 2.0 feeds for vulnix (see vig-os/devcontainer#870)',
       gh_pages_build_type: 'legacy',
       gh_pages_source_branch: 'gh-pages',
       gh_pages_source_path: '/',
+      // Tier B (ADR-0008): no PR workflow, so no check to require (#294).
+      rulesets: [
+        orgs.mainProtection([]),
+        // EXCEPTION (ADR-0008) — `gh-pages` is outside the signing rule. It
+        // is `refresh.yml`'s output, not source: every six hours the job
+        // force-pushes a fresh, UNSIGNED orphan commit there with the
+        // workflow's GITHUB_TOKEN, and github-actions cannot be a ruleset
+        // bypass actor. `main` only ever takes signed, human commits.
+        orgs.signedCommits() {
+          exclude_refs+: [
+            'refs/heads/gh-pages',
+          ],
+        },
+      ],
       environments: [
         orgs.newEnvironment('github-pages') {
           branch_policies+: [
@@ -811,12 +857,33 @@ orgs.newOrg('vig-os', 'vig-os') {
     orgs.newRepo('vigos-mvp') {
       description: 'MVP with basic functions',
       private_vulnerability_reporting_enabled: true,
+      // Tier B (ADR-0008): no workflows at all, so no check to require and
+      // no automated writer. Every commit on every branch is already signed
+      // by its human author, so `Signed commits` refuses nothing in use
+      // (#294).
+      rulesets: [
+        orgs.mainProtection([]),
+        orgs.signedCommits(),
+      ],
     },
     orgs.newRepo('vs-dolt') {
       description: 'VS Code extension, open source SQL workbench for your MySQL and PostgreSQL compatible database with version control features when connected to Dolt.',
       has_issues: false,
       homepage: 'https://hub.docker.com/r/dolthub/dolt-workbench',
       private_vulnerability_reporting_enabled: true,
+      // Tier B (ADR-0008): a fork of dolthub/dolt-workbench with no commits
+      // of its own. Its upstream workflows are not enabled on the fork, and
+      // CodeQL default setup writes nothing, so no automated writer exists.
+      // Updating from upstream now goes through a PR (upstream `main` into
+      // this `main`); the one-click "Sync fork" is a direct push, which
+      // `Main protection` refuses (#294).
+      //
+      // No `Signed commits` (ADR-0008 tier B signs only where every writer
+      // already does): upstream lands unsigned commits, so a signing rule
+      // would make every upstream sync unmergeable.
+      rulesets: [
+        orgs.mainProtection([]),
+      ],
     },
   ],
 }
