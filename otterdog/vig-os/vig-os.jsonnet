@@ -530,16 +530,12 @@ orgs.newOrg('vig-os', 'vig-os') {
       // `CI Summary` is `ci.yml`'s aggregator job, reported by github-actions
       // on every PR into `main` and `release/**` (#294).
       rulesets: [
-        orgs.mainProtection(['15368:CI Summary']) {
-          // EXCEPTION (ADR-0008) — a bot bypass on Main. `DEVKIT_SYNC_TARGET`
-          // is unset, so the scaffolded `sync-issues.yml` resolves to the
-          // trunk default and commits the nightly issue/PR archive straight
-          // to `main` as the Commit App, through the API. A require-PR
-          // ruleset refuses that push (vig-os/devkit#1227). The exit is the
-          // org-config pattern: h5v sets `DEVKIT_SYNC_TARGET=sync/issue-mirror`
-          // (vig-os/devkit#1228), and this bypass is dropped (#294).
-          bypass_actors+: ['commit-action-bot'],
-        },
+        // House standard, no bot bypass. Until vig-os/h5v#9 lands, h5v's
+        // nightly `sync-issues.yml` still commits straight to `main` as the
+        // Commit App (`DEVKIT_SYNC_TARGET` unset) and this ruleset refuses
+        // that push (vig-os/devkit#1227); #9 retargets it to
+        // `sync/issue-mirror`, the org-config pattern (#294).
+        orgs.mainProtection(['15368:CI Summary']),
         // The trunk release train writes `release/X.Y.Z` as the Commit App
         // only: `prepare-release.yml` creates the branch and commits the
         // freeze, `release-core.yml` commits the finalize and dispatches the

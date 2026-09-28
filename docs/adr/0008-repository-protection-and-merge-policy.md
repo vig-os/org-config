@@ -136,7 +136,6 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
 | `devkit-smoke-test` | No `Release protection` | Existing shape, not re-litigated here | Follow-up under #294 |
 | `scitadel` | Squash only; unpinned checks; no Signed/Tag; non-house ruleset names | Transitional | #294 PR 4 |
 | `qx` | No rulesets; its only PR check is a matrix job | Transitional: needs a `CI Summary` aggregator first | #294 PR 5 |
-| `h5v` | Main: **`commit-action-bot` bypass** (`always`) | `DEVKIT_SYNC_TARGET` is unset, so the scaffolded nightly `sync-issues.yml` commits the issue/PR archive straight to `main` as the Commit App, which a require-PR rule refuses (vig-os/devkit#1227) | h5v sets `DEVKIT_SYNC_TARGET=sync/issue-mirror`, as `org-config` does; then the bypass is dropped |
 | `nvd-mirror` | `Signed commits` excludes `refs/heads/gh-pages` | `refresh.yml` force-pushes an unsigned orphan commit to `gh-pages` every six hours with the Actions token, and github-actions cannot be a ruleset bypass actor. `gh-pages` holds generated feeds, not source | Permanent while the mirror publishes from a branch |
 | `tessera` | Classic branch protection; all three merge methods; `delete_branch_on_merge: false`; `dev` as default branch | Transitional | #294 PR 6 |
 | `qms` | All three merge methods, `delete_branch_on_merge: false`, `allow_update_branch: false`, restated inline | Deferred and out of scope, so its live state must not move | Its own decision |

@@ -197,7 +197,7 @@ def _evaluate(path: Path) -> dict:
 def test_the_committed_config_declares_exactly_these_app_slugs() -> None:
     """Ground truth on the REAL config, in the spirit of ``DECLARED_REPOS``.
 
-    Three slugs, fifteen sites. `github-actions` is not written anywhere in the
+    Three slugs, fourteen sites. `github-actions` is not written anywhere in the
     jsonnet — it is the implicit slug tessera's two un-prefixed
     branch-protection status checks resolve to, which is precisely the site a
     literal read of the config text could not see. Update this set deliberately
@@ -214,7 +214,7 @@ def test_the_committed_config_declares_exactly_these_app_slugs() -> None:
         SITE_RULESET_BYPASS_ACTOR,
         SITE_BRANCH_PROTECTION_STATUS_CHECK,
     }
-    assert len(sites) == 15
+    assert len(sites) == 14
 
 
 # --------------------------------------------------------------------------
