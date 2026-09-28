@@ -21,10 +21,17 @@
   ],
   "packageRules": [
     {
-      "description": "The otterdog pin is proposed by Renovate and adopted by a human (#250). The engine ref selects the binary that produces every plan, so the PR requests review and never automerges. `Plan` does run on it (#230 added justfile.project to the paths filter) but is advisory, not a required check *in this repository* (ADR-0007 Axis D, #236; a consumer org decides that for itself and the only one made its plan context required — #268), so the review is where the empty-plan evidence is actually read. Note this is a requested review, not an enforced one: the `Main protection` ruleset grants OrganizationAdmin an `always` bypass, so no ruleset setting can gate the maintainer's own merge.",
+      "description": "The otterdog pin is proposed by Renovate and adopted by a human (#250). The engine ref selects the binary that produces every plan, so the PR requests review and never automerges. `Plan` does run on it (#230 added justfile.project to the paths filter) but is advisory, not a required check *in this repository* (ADR-0007 Axis D, #236; a consumer org decides that for itself and the only one made its plan context required — #268), so the review is where the empty-plan evidence is actually read. Note this is a requested review, not an enforced one: the `Main protection` ruleset grants OrganizationAdmin an `always` bypass, so no ruleset setting can gate the maintainer's own merge. `prBodyNotes` carries the two reads that no test can make into the body of the PR itself (#288): the 1.5.0 -> 1.6.1 bump was adopted without them because the checklist lived only in the `justfile.project` comment the diff edits, which a five-literal version diff gives its reviewer no reason to read.",
       "matchManagers": ["custom.regex"],
       "matchDepNames": ["otterdog"],
       "reviewers": ["c-vigo"],
+      "prBodyNotes": [
+        "**Adoption checklist (ADR-0005, #269, #288) — two reads no test can make:**",
+        "- [ ] Re-read `get_app_installations` in the new release (`otterdog/providers/github/rest/org_client.py`): does it still reach `GET /orgs/{org}/installations` unpaginated, with no `per_page` and no `Link` walk? Past 30 installations it drops App bypass actors silently and the plan-time check only fires past 100.",
+        "- [ ] Re-measure every managed org: `gh api /orgs/<org>/installations --jq .total_count` for `vig-os`, `exo-pet`, `exoma-ch`, `MorePET`.",
+        "- [ ] Refresh the version, code location, counts and date in `justfile.project`'s pin comment and in the README \"Known limitations\" bullet that cites them.",
+        "- [ ] Re-check the dev-shell path and the ADR-0007 L1 plan-fixture format; the empty `Plan` on this PR is the acceptance evidence (#230)."
+      ],
       "automerge": false,
       "addLabels": ["area:ci"],
       "semanticCommitType": "ci",
