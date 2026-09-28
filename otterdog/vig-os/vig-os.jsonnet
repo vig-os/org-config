@@ -668,6 +668,23 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'Per-instance physical part identification: nano-id IDs, QR labels, mint-then-bind workflow',
       gh_pages_build_type: 'workflow',
       homepage: 'https://vig-os.github.io/qx/',
+      // Tier A (ADR-0008), trunk-based with no `dev` or `release/*` branch.
+      // `CI Summary` is the aggregator vig-os/qx#311 adds to `ci.yml` over
+      // its `flake-check` matrix (vig-os/qx#310); it reports on every PR.
+      // qx has no bot writers at all: every commit, merge and tag is a
+      // maintainer's, and `release.yml` / `pages.yml` write only GitHub
+      // Releases and Pages with the Actions token (#294).
+      rulesets: [
+        orgs.mainProtection(['15368:CI Summary']),
+        // Every commit on `main`, fork PRs included, is signed.
+        orgs.signedCommits(),
+        // EXCEPTION (ADR-0008) — the bypass is the org owners, not a release
+        // App: qx releases by a maintainer (an org owner) pushing a `v*` tag
+        // by hand, which triggers `release.yml`. There is no release App to
+        // name. `#OrganizationAdmin` in always mode, since a tag push is not
+        // a pull request.
+        orgs.tagProtection(['#OrganizationAdmin']),
+      ],
       secrets: [
         orgs.newRepoSecret('PARTREG_TEST_PAT') {
           value: '********',
@@ -684,56 +701,58 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('scitadel') {
       allow_auto_merge: true,
-      // Deliberate deviation from the house merge policy (house-defaults.libsonnet):
-      // scitadel merges by squash, keeping the house PR_TITLE/PR_BODY wording on
-      // the squash commit instead of the merge commit.
-      allow_merge_commit: false,
-      allow_squash_merge: true,
-      allow_update_branch: false,
       description: 'Scitadel: programmable, reproducible scientific literature retrieval',
-      squash_merge_commit_message: 'PR_BODY',
-      squash_merge_commit_title: 'PR_TITLE',
       secrets: [
         orgs.newRepoSecret('CARGO_REGISTRY_TOKEN') {
           value: '********',
         },
       ],
+      // Tier A (ADR-0008): a devkit gitflow scaffold (`.vig-os`
+      // DEVKIT_WORKFLOW unset) that releases through the devkit train —
+      // `dev` integrates, `release/X.Y.Z` is forked from it, and the
+      // App-authored release PR merges into `main` with `gh pr merge
+      // --merge`, which the squash-only policy this repo used to declare
+      // refused. The same shapes as commit-action's (#294).
+      //
+      // `CI Summary` is `ci.yml`'s aggregator, reported by github-actions on
+      // PRs into `dev`, `release/**` and `main` (seen on #226 into `dev` and
+      // on the 0.8.0 release PR #222 into `main`). It replaces the
+      // unpinned `Lint` / `Test (...)` contexts, which any app or commit
+      // status could satisfy. Those jobs belong to `rust-ci.yml`, a second
+      // workflow the aggregator does not cover: its `clippy -D warnings` and
+      // the macOS test leg keep running but no longer gate a merge.
       rulesets: [
-        orgs.newRepoRuleset('dev protection') {
-          allows_creations: true,
-          include_refs+: [
-            'refs/heads/dev',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              'Lint',
-              'Test (ubuntu-latest)',
-            ],
-            strict: true,
-          },
-        },
-        orgs.newRepoRuleset('main protection') {
-          allows_creations: true,
-          include_refs+: [
-            'refs/heads/main',
-          ],
-          required_pull_request+: {
-            required_approving_review_count: 0,
-            requires_review_thread_resolution: true,
-          },
-          required_status_checks+: {
-            status_checks: [
-              'Lint',
-              'Test (macos-latest)',
-              'Test (ubuntu-latest)',
-            ],
-            strict: true,
-          },
-        },
+        // Every direct push to `dev` is the Commit App's: `sync-issues.yml`
+        // commits the nightly issue mirror there, and `prepare-release.yml`
+        // commits through commit-action. Merges of the sync-main-to-dev PR
+        // and devkit-upgrade PRs go through a PR.
+        orgs.devProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        // House standard, no bot bypass: nothing pushes to `main` directly;
+        // the release PR is merged by the Release App after the human
+        // approval.
+        orgs.mainProtection(['15368:CI Summary']),
+        // The train writes `release/X.Y.Z` as the Commit App only
+        // (`prepare-release.yml` / `prepare-hotfix.yml` create it and commit
+        // the freeze, `release-core.yml` the finalize); `abandon-release.yml`
+        // deletes it as the Release App, which the shape's `allows_deletions`
+        // permits.
+        orgs.releaseProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        // Every writer signs: humans' commits on `main` and `dev` verify, and
+        // every bot commit is an API commit GitHub signs (the Commit App via
+        // commit-action, the devkit-upgrade App, Renovate's changelog
+        // commits, Dependabot).
+        orgs.signedCommits(),
+        // The only tag writer is the release train: `release-publish.yml`
+        // creates the release tag and `promote-release.yml` prunes RC tags,
+        // both as the Release App. `binaries.yml` only uploads assets to the
+        // existing tag's release.
+        orgs.tagProtection(['vig-os-release-app']),
       ],
       environments: [
         orgs.newEnvironment('crates-io'),
@@ -779,18 +798,17 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('tessera') {
       allow_auto_merge: true,
-      // Deliberate deviation from the house merge policy (house-defaults.libsonnet):
-      // rebase and squash stay available alongside merge commits.
-      allow_rebase_merge: true,
-      allow_squash_merge: true,
-      allow_update_branch: false,
-      // The only vig-os repo not defaulting to `main`, and deliberately so
-      // (tessera#383): `main` is release-only with no release cut yet
-      // (0.1.0-alpha.1 held), while every open PR, Dependabot branch and the
-      // last 500+ commits live on `dev`. Flip back to the vendored `main`
-      // default at the first alpha.
+      // EXCEPTION (ADR-0008) — the only vig-os repo not defaulting to `main`
+      // (tessera#383). The first alpha (0.1.0-alpha.1) was cut on
+      // 2026-09-23, but `dev` is still the integration branch: every PR,
+      // Dependabot's `target-branch` and release-plz (run on every push to
+      // `dev` since tessera#436) target it, and `main` only moves at a
+      // promotion. Flipping now would run the scheduled workflows from
+      // `main`'s stale copies — it lacks the devkit scaffold and
+      // `devkit-upgrade.yml`, and its `sync-issues.yml` still uses the
+      // repo-scoped sync App. Revisit once `main` carries the scaffold, or
+      // with tessera#441's release-train decision (#294).
       default_branch: 'dev',
-      delete_branch_on_merge: false,
       description: 'FAIR Data on HDF5 — self-describing, FAIR-principled data format for scientific data products',
       private_vulnerability_reporting_enabled: true,
       // Credentials of the repo-scoped `tessera-sync-issues-bot` GitHub App
@@ -816,42 +834,45 @@ orgs.newOrg('vig-os', 'vig-os') {
           value: '********',
         },
       ],
-      branch_protection_rules: [
-        orgs.newBranchProtectionRule('dev') {
-          required_approving_review_count: null,
-          // Deliberately un-prefixed: the live check is app-bound (app_id
-          // 15368), which otterdog serializes without the `any:` prefix.
-          required_status_checks: [
-            'nix flake check',
-          ],
-          requires_pull_request: false,
-        },
-        orgs.newBranchProtectionRule('main') {
-          required_approving_review_count: null,
-          // The alpha promotion (tessera `5281db2a`, 2026-09-23) replaced
-          // `main`'s tree with dev's, so `main` now runs the nix shim and
-          // emits no `CI Summary` at all, while the devkit scaffold
-          // (tessera#442) gave `dev` a second workflow also named `CI`, so a
-          // promotion PR reports both sets. `nix flake check` is the only
-          // context a `main`-origin PR and a `dev`-promotion PR both report,
-          // which is why it is the one required here (#234, superseding the
-          // `CI Summary` of #226/#231).
-          // Un-prefixed = bound to the `github-actions` app, as in the `dev`
-          // rule above. A numeric `15368:` prefix is RULESET syntax: in a
-          // classic branch protection rule otterdog resolves the prefix as an
-          // app slug (`GET /apps/{slug}`) with no numeric branch, so it would
-          // 404 at apply while plan stayed green.
-          required_status_checks: [
-            'nix flake check',
-          ],
-          requires_pull_request: false,
-          // Strict here and deliberately not on `dev`: `dev` moves
-          // constantly, so re-running both arch legs on every push would
-          // cost more there than up-to-date-ness is worth, while `main` is
-          // release-only and moves rarely, so the same re-run is cheap and
-          // the guarantee is worth more on a release branch (#234).
-          requires_strict_status_checks: true,
-        },
+      // Tier A (ADR-0008) on a `dev` + `main` model without `release/*`
+      // branches: release-plz opens the release PR into `dev`, and `main`
+      // takes a promotion from `dev`. These rulesets replace the classic
+      // branch protection on both branches (#294).
+      //
+      // The required context stays `nix flake check`, now in ruleset syntax
+      // (`15368:`), not `CI Summary`: it is the only aggregator both a
+      // `main`-origin PR and a `dev` promotion PR report (#234), since
+      // `main` still runs the pre-scaffold `CI` shim. It also reports on
+      // every PR into `dev`, where `CI Summary` would additionally gate
+      // commit messages that Dependabot's PRs currently fail.
+      rulesets: [
+        // Not strict, as before: `dev` moves constantly, so re-running both
+        // arch legs on every push would cost more there than up-to-date-ness
+        // is worth (#234). New: a PR is now required. The only direct pusher
+        // is the Commit App, which `sync-issues.yml` commits the nightly
+        // issue mirror to `dev` with; release-plz, devkit-upgrade and
+        // Dependabot all go through PRs.
+        orgs.devProtection(
+          checks=['15368:nix flake check'],
+          bypass=['commit-action-bot'],
+        ),
+        // House standard. The alpha promotion was pushed to `main` directly
+        // (tessera `5281db2`, `ee277ad`, both unsigned); from here on a
+        // promotion is a `dev` -> `main` PR.
+        orgs.mainProtection(['15368:nix flake check']),
+        // EXCEPTION (ADR-0008) — no `Signed commits`: tessera's main
+        // contributor pushes unsigned commits (every commit on the open
+        // PRs, and the two promotion commits on `main`). Under merge-commit
+        // only, a signing rule would make each of those PRs unmergeable.
+        // Add `orgs.signedCommits()` once they sign.
+        //
+        // EXCEPTION (ADR-0008) — the bypass is the org owners, not a release
+        // App: `v0.1.0-alpha.1` was tagged by hand by a maintainer (an org
+        // owner), and release-plz is wired for `release-pr` only, so no App
+        // creates tags. When `release-plz release` takes over tagging, its
+        // App replaces this bypass (and must be public, see the note at the
+        // top of this list).
+        orgs.tagProtection(['#OrganizationAdmin']),
       ],
     },
     orgs.newRepo('vigos-mvp') {
