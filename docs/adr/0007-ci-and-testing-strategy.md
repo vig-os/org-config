@@ -227,8 +227,9 @@ Entries are added here only if an assumption above is later found wrong, preserv
 > fail-soft and scoped instead (#274). Corrected above, and the engineering consequence now also lives in
 > `plan.yml`'s header and in `template/`'s caller, where a workflow author and an onboarding org respectively will
 > meet it. The header states the rule as two classes — the verdict spine reddens by design, everything auxiliary
-> must be fail-soft — and names the two shipped auxiliary steps that do not meet it yet (`Build plan report`,
-> `Upsert plan comment on the PR`; #276), so the rule is not read as a description of the file's current state.
+> must be fail-soft — and, as first written, named the two shipped auxiliary steps that did not meet it yet
+> (`Build plan report`, `Upsert plan comment on the PR`), so the rule would not be read as a description of the
+> file's current state. #276 then made both fail-soft, and the header states the rule with no exceptions.
 >
 > Unaffected: the preceding bullet — `Main protection` here gains **no** second required context — is a statement
 > about **this** repository and stands, as does the #236 Axis D verdict behind it (`vig-os`'s own gate requires only
