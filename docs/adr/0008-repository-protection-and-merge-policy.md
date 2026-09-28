@@ -132,7 +132,6 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
 | `devkit-smoke-test` | Main: **0 approvals** | Its PRs into `main` are bot-authored release-validation PRs merged by devkit's release train. No human reviews them, and vig-os/devkit#1506 removed the approval gate (#167) | Permanent while the repo is bot-only |
 | `devkit-smoke-test` | Main: **not strict** | A release PR that is behind `main` stops `promote-release` (`BEHIND`), and no human is present to update the branch in the middle of an automated train | Permanent while the repo is bot-only |
 | `devkit-smoke-test` | Main: **review threads not required** | A thread left by any commenter would stall an unattended train. This is the live value, kept | Permanent while the repo is bot-only |
-| `org-config` | Main: **0 approvals** | Solo-maintained. A self-authored PR cannot be approved, so 1 approval would make every merge a routine admin bypass (#115). Every live change is still gated by the `production` environment approval, which shows the plan preview in the same run (#167, #195) | Re-decide when there is a second maintainer (see ADR-0007, Axis D trigger b) |
 | `devkit-smoke-test`, `org-config` | No `Tag protection`, though both cut releases | Out of scope for the conversion PR, which only restated existing rulesets | Follow-up under #294 |
 | `devkit-smoke-test` | No `Release protection` | Existing shape, not re-litigated here | Follow-up under #294 |
 | `scitadel` | Squash only; unpinned checks; no Signed/Tag; non-house ruleset names | Transitional | #294 PR 4 |
@@ -171,8 +170,11 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
 - Deleting `legacyMergePolicy` is a **breaking change to the template contract** (ADR-0006). A downstream config that
   still names `orgs.legacyMergePolicy` fails to evaluate once it copies the new overlay. It has to restate the five
   fields inline, as `qms` does here, or move to the house policy. `exo-pet`'s config does not use it.
+  **Decided (2026-09-28): the copied overlay is part of the SemVer contract, so the next engine release is
+  v2.0.0.**
 - Turning on 1 approval with stale dismissal on a solo-maintained repo means its owner merges self-authored PRs
-  through the `pull_request` bypass. That is the accepted cost everywhere except `org-config` (Exceptions).
+  through the `pull_request` bypass. That is the accepted cost, `org-config` included: its `production`
+  environment approval gates the apply, and the Main approval gates the merge.
 - Contributors lose the squash and rebase buttons on the converged repos, and merged branches are deleted
   automatically.
 - A tier-B repo is still not check-gated. That gap is visible in the Exceptions table, not hidden.
@@ -185,7 +187,6 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
 
 - **eclipse-csi/otterdog#768 ships** in the ADR-0005 pin: declare `allowed_merge_methods: ['merge']` in the ruleset
   shapes and drop the "repo fields are the only lever" caveat.
-- **A second maintainer on `org-config`**: re-decide its 0-approval exception.
 - **A GitHub plan change** (Team for `vig-os`, or private-repo rulesets on Free): `qms` becomes protectable and org
   rulesets could replace the per-repo copies. Re-weigh both.
 - **devkit changes its release train** so that a human reviews smoke-test PRs, or `promote-release` updates a
@@ -197,8 +198,9 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
 - #246 / eclipse-csi/otterdog#768: `allowed_merge_methods` is unmodelled, so repo fields own the merge policy
 - #115, #187: why code-owner review is off. #118, #184: stale-review dismissal. #188: strict plus update-branch
 - #167, vig-os/devkit#1504, vig-os/devkit#1506: the single-approval release train
-- #147, #148: the admin bypass on `devkit-smoke-test`. #195: `org-config`'s 0-approval Main
-- ADR-0005 (otterdog pin), ADR-0006 (template contract and versioning), ADR-0007 (Axis D, when to revisit the
-  solo-maintainer gate)
+- #147, #148: the admin bypass on `devkit-smoke-test`. #195: `org-config`'s former 0-approval Main, retired by this
+  ADR
+- ADR-0005 (otterdog pin), ADR-0006 (template contract and versioning), ADR-0007 (Axis D, the `Plan` check stays
+  advisory)
 - GitHub Docs: About rulesets:
   <https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets>
