@@ -65,6 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Secret scanning and push protection are back on for `h5v`, `nvd-mirror`, `org-config`, `qx` and `scitadel`** ([#294](https://github.com/vig-os/org-config/issues/294)): each of the five repo blocks in `otterdog/vig-os/vig-os.jsonnet` carried an explicit, uncommented `secret_scanning: 'disabled'` / `secret_scanning_push_protection: 'disabled'` pair, and both overrides are removed so the repos inherit the vendored `otterdog-defaults` value, `'enabled'` — the same state the org already sets for new repositories. All five are public, so both features are free and need no GHAS entitlement, and none is attached to an org code-security configuration that could override a repo-level write. The live state was `disabled` on all five before this change; the next `apply` turns both features on. `qms` is out of scope and untouched.
+
 ## [v1.4.0](https://github.com/vig-os/org-config/releases/tag/v1.4.0) - 2026-09-23
 
 ### Added
