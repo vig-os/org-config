@@ -51,7 +51,7 @@ project := "org_config"
 # acceptance evidence now arrives on the PR by itself — before #230 a pure pin
 # bump matched no path and the evidence had to be dispatched by hand (#229).
 # renovate: datasource=pypi depName=otterdog
-otterdog_version := "1.5.0"
+otterdog_version := "1.6.1"
 # ===============================================================================
 # INFO
 # ===============================================================================
