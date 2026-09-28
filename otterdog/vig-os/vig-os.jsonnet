@@ -858,17 +858,6 @@ orgs.newOrg('vig-os', 'vig-os') {
         orgs.newRepoSecret('CARGO_REGISTRY_TOKEN') {
           value: '********',
         },
-        orgs.newRepoSecret('RELEASE_BOT_PRIVATE_KEY') {
-          value: '********',
-        },
-        orgs.newRepoSecret('RELEASE_PLEASE_TOKEN') {
-          value: '********',
-        },
-      ],
-      variables: [
-        orgs.newRepoVariable('RELEASE_BOT_APP_ID') {
-          value: '3931309',
-        },
       ],
       rulesets: [
         orgs.newRepoRuleset('dev protection') {
