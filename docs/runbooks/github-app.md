@@ -373,7 +373,7 @@ rotation** — [Key rotation](#key-rotation) is triggered by the schedule or by 
 `*_APP_CLIENT_ID` **org** secrets that the client-ID convention
 ([#112](https://github.com/vig-os/org-config/issues/112)) created — `COMMIT_APP_CLIENT_ID`,
 `DEVKIT_UPGRADE_APP_CLIENT_ID` and `RELEASE_APP_CLIENT_ID`
-(`otterdog/vig-os/vig-os.jsonnet:66`, `:124`, `:189`) — whose Apps `commit-action-bot`,
+(`otterdog/vig-os/vig-os.jsonnet:66`, `:231`, `:296`) — whose Apps `commit-action-bot`,
 `vigos-devkit-upgrade` and `vig-os-release-app` each answer `200` to the same anonymous call
 (probed 2026-09-28). Read this fleet-wide rather than re-deriving it per App: what is per App is the
 *paired private key*, and each of those is its own rotation trigger.
@@ -393,17 +393,17 @@ in a run nobody is watching. A silent empty credential is a worse failure mode t
 and #270's stakes do not pay for it.
 
 **A future move to a variable is a coordinated pin bump, never a one-sided flip.** The honest gain
-is real but small — the declaration at `otterdog/vig-os/vig-os.jsonnet:625` would move from
+is real but small — the declaration at `otterdog/vig-os/vig-os.jsonnet:615` would move from
 `secrets:` to `variables:` and stop being a dummy `'********'` row, becoming genuinely asserted
 (otterdog models Actions variables), and every `secrets:` block and downstream caller would shed a
 line. If it is ever revisited, sequence it in this order and treat the list as the checklist:
 
 1. teach the engine's reusable workflows to accept **both** forms, so a caller on either side stays
-   valid: the `workflow_call` secret declarations at `.github/workflows/plan.yml:150`,
-   `apply.yml:165` and `drift.yml:131`, plus every consuming reference — `plan.yml:229`,
+   valid: the `workflow_call` secret declarations at `.github/workflows/plan.yml:152`,
+   `apply.yml:165` and `drift.yml:131`, plus every consuming reference — `plan.yml:231`,
    `apply.yml:390`/`:499`, `drift.yml:222`/`:316`, `apply-engine.yml:118`/`:142` and
    `testbed-e2e.yml:162`/`:172`;
-2. move the declaration in `otterdog/vig-os/vig-os.jsonnet:625` and update the record — this section,
+2. move the declaration in `otterdog/vig-os/vig-os.jsonnet:615` and update the record — this section,
    the table above, ADR-0004's auth-model paragraph (`docs/adr/0004-auth-model-github-app.md:58`) and
    [Downstream-org installation](#downstream-org-installation) step 2, which tells another org's
    owner to set *two secrets*;

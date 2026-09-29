@@ -114,6 +114,17 @@ permanent noise, degrading the whole channel.
   bypassed: a knowingly-wrong control declares a `tolerated` value in its own row, keeping the *desired* value on
   record, instead of being silenced in `drift-allowlist.toml`. Because only the evidence source is new and the response
   policy is untouched, this is recorded as a correction here rather than as a new ADR.
+- **2026-09-29 — "all four orgs are on the GitHub Free plan" is no longer true (issue
+  [#294](https://github.com/vig-os/org-config/issues/294)).** The first Context constraint was accurate when written, but
+  `exo-pet` has been on **GitHub Team** since 2026-08-07 ([#6](https://github.com/vig-os/org-config/issues/6), the upgrade
+  ADR-0006's sequencing rule required), so its private repos *do* have enforceable rulesets and branch protection;
+  `vig-os`, `exoma-ch` and `MorePET` remain on Free (each re-checked live via `GET /orgs/{org}` `plan.name`,
+  2026-09-29). The Free-plan reasoning in the Decision and Rationale therefore holds for three orgs, not four.
+  **What this does NOT change:** the decision stands for all four. Rulesets gate writes to branches and tags; they do
+  not stop an owner from changing an org or repo setting, editing a ruleset, or creating a repo, which is what the
+  drift layer watches — so on `exo-pet` too the tooling can only detect and report that class of change, and it stays
+  issue-only. The supersession trigger below ("the orgs move to a plan where rulesets enforce prevention") is thus met
+  for `exo-pet` only in the branch-write sense and does not re-open this ADR.
 
 ## Open questions / supersession triggers
 
