@@ -70,6 +70,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'devkit-smoke-test',
         'h5v',
         'org-config',
+        'revkit',
         'scitadel',
         'sync-issues-action',
         'tessera',
@@ -89,6 +90,7 @@ orgs.newOrg('vig-os', 'vig-os') {
       selected_repositories+: [
         'commit-action',
         'h5v',
+        'revkit',
         'scitadel',
         'sync-issues-action',
       ],
@@ -105,6 +107,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'devkit-smoke-test',
         'h5v',
         'org-config',
+        'revkit',
         'scitadel',
         'sync-issues-action',
         'tessera',
@@ -234,6 +237,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'devkit-smoke-test',
         'h5v',
         'org-config',
+        'revkit',
         'scitadel',
         'sync-issues-action',
         'tessera',
@@ -270,6 +274,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'devkit-smoke-test',
         'h5v',
         'org-config',
+        'revkit',
         'scitadel',
         'sync-issues-action',
         'tessera',
@@ -300,6 +305,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'devkit-smoke-test',
         'h5v',
         'org-config',
+        'revkit',
         'scitadel',
         'sync-issues-action',
       ],
@@ -311,6 +317,7 @@ orgs.newOrg('vig-os', 'vig-os') {
     orgs.newOrgSecret('RELEASE_APP_ID') {
       selected_repositories+: [
         'h5v',
+        'revkit',
         'scitadel',
       ],
       value: '********',
@@ -324,6 +331,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'devkit-smoke-test',
         'h5v',
         'org-config',
+        'revkit',
         'scitadel',
         'sync-issues-action',
       ],
@@ -725,6 +733,32 @@ orgs.newOrg('vig-os', 'vig-os') {
           ],
           deployment_branch_policy: 'selected',
         },
+      ],
+    },
+    orgs.newRepo('revkit') {
+      allow_auto_merge: true,
+      description: 'HTML-first review surface for the agentic era: doc/ADR review with persistent comments, GH PR round-trip, and agent-rich question UIs',
+      // Tier A (ADR-0008): a devkit gitflow scaffold (`.vig-os`
+      // DEVKIT_WORKFLOW unset, devkit 1.17.0) that will release through the
+      // devkit train, so the same shapes as scitadel (#311). `CI Summary` is
+      // the managed `ci.yml` aggregator (job `summary`), reported on PRs into
+      // `dev`, `release/**` and `main`.
+      rulesets: [
+        // Direct pushes to `dev` are the Commit App's only (sync-issues
+        // mirror, prepare-release); everything else lands by PR.
+        orgs.devProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        // House standard, no bot bypass: the release PR is merged by the
+        // Release App after the human approval.
+        orgs.mainProtection(['15368:CI Summary']),
+        orgs.releaseProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        orgs.signedCommits(),
+        orgs.tagProtection(['vig-os-release-app']),
       ],
     },
     orgs.newRepo('scitadel') {
