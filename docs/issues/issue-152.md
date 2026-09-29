@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-09-23T21:03:02Z
+updated: 2026-09-28T09:32:18Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-23T21:09:35.825Z
+synced: 2026-09-29T08:00:48.535Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
@@ -24,9 +24,7 @@ This issue lists Renovate updates and detected dependencies. Read the [Dependenc
 
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
- - [ ] <!-- unschedule-branch=renovate/github-actions-(minor-and-patch) -->ci(actions): update astral-sh/setup-uv action to v10.2.0
  - [ ] <!-- unschedule-branch=renovate/lock-file-maintenance -->build(pip): lock file maintenance
- - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
 
 ## Detected Dependencies
 
@@ -52,7 +50,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>.github/workflows/apply.yml (5)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
- - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4` → [Updates: `v10.2.0`]
+ - `astral-sh/setup-uv v10.2.0@c18668ad3cf93ea998bef934396af7bb5c839dc7`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `ubuntu 26.04`
@@ -77,7 +75,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>.github/workflows/drift.yml (6)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
- - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4` → [Updates: `v10.2.0`]
+ - `astral-sh/setup-uv v10.2.0@c18668ad3cf93ea998bef934396af7bb5c839dc7`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
@@ -85,11 +83,12 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 </details>
 
-<details><summary>.github/workflows/plan.yml (4)</summary>
+<details><summary>.github/workflows/plan.yml (5)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
- - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4` → [Updates: `v10.2.0`]
+ - `astral-sh/setup-uv v10.2.0@c18668ad3cf93ea998bef934396af7bb5c839dc7`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
+ - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
  - `ubuntu 26.04`
 
 </details>
@@ -144,7 +143,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>.github/workflows/testbed-e2e.yml (5)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
- - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4` → [Updates: `v10.2.0`]
+ - `astral-sh/setup-uv v10.2.0@c18668ad3cf93ea998bef934396af7bb5c839dc7`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `ubuntu 26.04`
@@ -172,7 +171,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>template/.github/workflows/import.yml (5)</summary>
 
  - `actions/checkout v7.0.1@3d3c42e5aac5ba805825da76410c181273ba90b1`
- - `astral-sh/setup-uv v10.1.0@bec219d24cd3e171d82865faccec33120bb574f4` → [Updates: `v10.2.0`]
+ - `astral-sh/setup-uv v10.2.0@c18668ad3cf93ea998bef934396af7bb5c839dc7`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
  - `ubuntu 26.04`
@@ -195,7 +194,43 @@ The following updates are awaiting their schedule. To get an update now, click o
 
  - `pytest ==9.1.1`
  - `pytest-cov ==7.1.0`
- - `ruff ==0.16.8`
+ - `ruff ==0.16.9`
+
+</details>
+
+</blockquote>
+</details>
+
+<details><summary>regex (5)</summary>
+<blockquote>
+
+<details><summary>.github/workflows/apply.yml (1)</summary>
+
+ - `otterdog 1.6.1`
+
+</details>
+
+<details><summary>.github/workflows/drift.yml (1)</summary>
+
+ - `otterdog 1.6.1`
+
+</details>
+
+<details><summary>.github/workflows/plan.yml (1)</summary>
+
+ - `otterdog 1.6.1`
+
+</details>
+
+<details><summary>justfile.project (1)</summary>
+
+ - `otterdog 1.6.1`
+
+</details>
+
+<details><summary>template/.github/workflows/import.yml (1)</summary>
+
+ - `otterdog 1.6.1`
 
 </details>
 
