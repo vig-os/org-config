@@ -120,6 +120,10 @@ create, move or delete one.
   exempt testbed.
 - **`delete_branch_on_merge`** follows the vendored default (`true`). Per-repo overrides are removed.
 - **Secret scanning and push protection** follow the vendored default (`enabled`). Both are free on public repos.
+- **Dependabot security updates** are on for every tier-A repo (`dependabot_security_updates_enabled: true`).
+  Tier B, the exempt testbed and `qms` stay on the vendored default (`false`). Dependabot alerts are already on
+  everywhere; this only adds the automated fix PRs, and only where a required aggregator checks them.
+  **Decided (2026-09-29).**
 - The ruleset shapes carry **no merge policy**, because the repo fields own it (#246). When the ADR-0005 otterdog pin
   reaches a version that fixes eclipse-csi/otterdog#768, `allowed_merge_methods` is declared to match, as `["merge"]`.
 
@@ -137,6 +141,7 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
 | `nvd-mirror` | `Signed commits` excludes `refs/heads/gh-pages` | `refresh.yml` force-pushes an unsigned orphan commit to `gh-pages` every six hours with the Actions token, and github-actions cannot be a ruleset bypass actor. `gh-pages` holds generated feeds, not source | Permanent while the mirror publishes from a branch |
 | `tessera` | No `Signed commits` | Its main contributor pushes unsigned commits (all open PRs, and the alpha promotion on `main`). Under merge-commit only, a signing rule would make those PRs unmergeable | That contributor signs |
 | `tessera` | `dev` as default branch | `dev` is still the integration branch after the first alpha: every PR, Dependabot and release-plz target it. Flipping would run the scheduled workflows from `main`'s stale copies | `main` carries the devkit scaffold, or tessera#441 moves it to the devkit train |
+| `scitadel` | Main gates only `CI Summary`, not `rust-ci.yml` (known gap, recorded 2026-09-29) | `rust-ci.yml`'s `clippy -D warnings` and macOS test jobs still run but cannot gate a merge: the managed `CI Summary` aggregator cannot include jobs from another workflow. Listing those job names as extra required checks was considered and rejected: a job rename would block every merge, and it would put the repo's CI layout into the org config | vig-os/devkit#1761 gives consumers a way to feed extra jobs into the managed `CI Summary` |
 | `qms` | All three merge methods, `delete_branch_on_merge: false`, `allow_update_branch: false`, restated inline | Deferred and out of scope, so its live state must not move | Its own decision |
 | `org-config-testbed` | Upstream merge defaults, no rulesets | Exempt by construction | n/a |
 

@@ -339,6 +339,7 @@ orgs.newOrg('vig-os', 'vig-os') {
       custom_properties+: {
         type: ['tools'],
       },
+      dependabot_security_updates_enabled: true,
       description: 'GitHub Action that commits changes via GitHub API or GitHub Token, creating automatically signed commits. Modular TypeScript design - use as a standalone action or import as a library.',
       has_projects: false,
       has_wiki: false,
@@ -463,6 +464,7 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('devkit-smoke-test') {
       allow_auto_merge: true,
+      dependabot_security_updates_enabled: true,
       description: 'Repository to test deployment workflows of vigOS devcontainer',
       private_vulnerability_reporting_enabled: true,
       rulesets: [
@@ -537,6 +539,7 @@ orgs.newOrg('vig-os', 'vig-os') {
       ],
     },
     orgs.newRepo('h5v') {
+      dependabot_security_updates_enabled: true,
       description: 'A terminal viewer for HDF5 files with chart, image, string, matrix, and attributes support',
       // Tier A (ADR-0008): a devkit 1.17.0 trunk scaffold (`.vig-os`
       // DEVKIT_WORKFLOW=trunk) — no `dev` branch; releases fork
@@ -605,6 +608,7 @@ orgs.newOrg('vig-os', 'vig-os') {
       custom_properties+: {
         type: ['tools'],
       },
+      dependabot_security_updates_enabled: true,
       description: 'GitHub Organization Management',
       has_projects: false,
       has_wiki: false,
@@ -636,6 +640,15 @@ orgs.newOrg('vig-os', 'vig-os') {
       rulesets: [
         // House standard (ADR-0008).
         orgs.mainProtection(['15368:CI Summary']),
+        // The train writes `release/X.Y.Z` as the Commit App only
+        // (`prepare-release.yml` creates it and commits the freeze,
+        // `release-core.yml` the finalize and the archive fold, `release.yml`'s
+        // rollback reverts it); `abandon-release.yml` deletes it as the
+        // Release App, which the shape's `allows_deletions` permits.
+        orgs.releaseProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
         orgs.signedCommits(),
         // The only tag writer is the release train: `release-publish.yml`
         // creates the release tag and `promote-release.yml` prunes RC tags
@@ -683,6 +696,7 @@ orgs.newOrg('vig-os', 'vig-os') {
       private: true,
     },
     orgs.newRepo('qx') {
+      dependabot_security_updates_enabled: true,
       description: 'Per-instance physical part identification: nano-id IDs, QR labels, mint-then-bind workflow',
       gh_pages_build_type: 'workflow',
       homepage: 'https://vig-os.github.io/qx/',
@@ -719,6 +733,7 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('scitadel') {
       allow_auto_merge: true,
+      dependabot_security_updates_enabled: true,
       description: 'Scitadel: programmable, reproducible scientific literature retrieval',
       secrets: [
         orgs.newRepoSecret('CARGO_REGISTRY_TOKEN') {
@@ -785,6 +800,7 @@ orgs.newOrg('vig-os', 'vig-os') {
       custom_properties+: {
         type: ['tools'],
       },
+      dependabot_security_updates_enabled: true,
       description: 'GitHub Action that syncs issues and pull requests to markdown files with full comments, review threads, and diff snippets. Useful for documentation, backups, and offline access. Supports incremental syncing with state caching and GitHub App authentication.',
       private_vulnerability_reporting_enabled: true,
       rulesets: [
@@ -827,6 +843,7 @@ orgs.newOrg('vig-os', 'vig-os') {
       // repo-scoped sync App. Revisit once `main` carries the scaffold, or
       // with tessera#441's release-train decision (#294).
       default_branch: 'dev',
+      dependabot_security_updates_enabled: true,
       description: 'FAIR Data on HDF5 — self-describing, FAIR-principled data format for scientific data products',
       private_vulnerability_reporting_enabled: true,
       // Credentials of the repo-scoped `tessera-sync-issues-bot` GitHub App
