@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`revkit` is declared as a tier-A repository** ([#311](https://github.com/vig-os/org-config/issues/311)): the new public `vig-os/revkit` (HTML-first doc/ADR review, devkit 1.17.0 gitflow scaffold) gets the same shapes as `scitadel` under [ADR-0008](docs/adr/0008-repository-protection-and-merge-policy.md) — `Dev`/`Main`/`Release protection` gated on `CI Summary` with `commit-action-bot` as the Dev/Release bypass, `Signed commits`, and `Tag protection` bypassed only by `vig-os-release-app` — and the house merge policy via `newRepo`. Declaring it also clears the repo from the drift sweep's undeclared inventory.
+- **`revkit` is declared as a tier-A repository** ([#311](https://github.com/vig-os/org-config/issues/311)): the new public `vig-os/revkit` (HTML-first doc/ADR review, devkit 1.17.0 gitflow scaffold) gets the same shapes as `scitadel` under [ADR-0008](docs/adr/0008-repository-protection-and-merge-policy.md) — `Dev`/`Main`/`Release protection` gated on `CI Summary` with `commit-action-bot` as the Dev/Release bypass, `Signed commits`, and `Tag protection` bypassed only by `vig-os-release-app` — and the house merge policy via `newRepo`. It also joins the `selected_repositories` of the eight App org secrets `scitadel` has (`COMMIT_APP_*`, `RELEASE_APP_*`, `DEVKIT_UPGRADE_APP_CLIENT_ID`/`_PRIVATE_KEY`), so its release train, issue sync and devkit-upgrade workflows can mint tokens. Declaring it also clears the repo from the drift sweep's undeclared inventory.
 
 ### Changed
 
