@@ -120,10 +120,11 @@ create, move or delete one.
   exempt testbed.
 - **`delete_branch_on_merge`** follows the vendored default (`true`). Per-repo overrides are removed.
 - **Secret scanning and push protection** follow the vendored default (`enabled`). Both are free on public repos.
-- **Dependabot security updates** are on for every tier-A repo (`dependabot_security_updates_enabled: true`).
-  Tier B, the exempt testbed and `qms` stay on the vendored default (`false`). Dependabot alerts are already on
-  everywhere; this only adds the automated fix PRs, and only where a required aggregator checks them.
-  **Decided (2026-09-29).**
+- **Dependabot security updates** are off: every repo follows the vendored default
+  (`dependabot_security_updates_enabled: false`), except `qx` (see Exceptions). Vulnerability fix PRs come from
+  Renovate, which targets each repo's integration branch. Dependabot alerts stay on everywhere. New repos default to
+  off (`new-repo-dependabot-security-updates` in `unmanaged-controls.toml`). **Decided (2026-09-29, #307)**,
+  replacing the same-day tier-A opt-in (see Corrections).
 - The ruleset shapes carry **no merge policy**, because the repo fields own it (#246). When the ADR-0005 otterdog pin
   reaches a version that fixes eclipse-csi/otterdog#768, `allowed_merge_methods` is declared to match, as `["merge"]`.
 
@@ -142,6 +143,8 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
 | `tessera` | No `Signed commits` | Its main contributor pushes unsigned commits (all open PRs, and the alpha promotion on `main`). Under merge-commit only, a signing rule would make those PRs unmergeable | That contributor signs |
 | `tessera` | `dev` as default branch | `dev` is still the integration branch after the first alpha: every PR, Dependabot and release-plz target it. Flipping would run the scheduled workflows from `main`'s stale copies | `main` carries the devkit scaffold, or tessera#441 moves it to the devkit train |
 | `scitadel` | Main gates only `CI Summary`, not `rust-ci.yml` (known gap, recorded 2026-09-29) | `rust-ci.yml`'s `clippy -D warnings` and macOS test jobs still run but cannot gate a merge: the managed `CI Summary` aggregator cannot include jobs from another workflow. Listing those job names as extra required checks was considered and rejected: a job rename would block every merge, and it would put the repo's CI layout into the org config | vig-os/devkit#1761 gives consumers a way to feed extra jobs into the managed `CI Summary` |
+| `qx` | Dependabot security updates on (`dependabot_security_updates_enabled: true`) | No Renovate yet, so Dependabot is its only source of vulnerability fix PRs | `qx` adopts Renovate and it is proven to run |
+| `h5v`, `scitadel`, `tessera`, `devkit-smoke-test` | No vulnerability fix PR for some advisories (known gap, recorded 2026-09-29) | Advisories in ecosystems Renovate does not yet cover (Cargo; `uv` for `devkit-smoke-test`) get alerts but no fix PR. Renovate is not yet running on `h5v`, `scitadel` and `tessera` at all: none has ever had a `renovate/*` PR or a Dependency Dashboard | The per-repo Renovate coverage PRs land and Renovate is verified running |
 | `qms` | All three merge methods, `delete_branch_on_merge: false`, `allow_update_branch: false`, restated inline | Deferred and out of scope, so its live state must not move | Its own decision |
 | `org-config-testbed` | Upstream merge defaults, no rulesets | Exempt by construction | n/a |
 
@@ -185,7 +188,17 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
 
 ## Corrections
 
-<!-- None yet. Preserve here any assumption above later shown wrong, with date and source, for audit. -->
+<!-- Preserve here any assumption above later shown wrong, with date and source, for audit. -->
+
+- **2026-09-29 — Dependabot security-update PRs do not land "where a required aggregator checks them" (issue
+  [#307](https://github.com/vig-os/org-config/issues/307)).** The tier-A opt-in decided earlier the same day (#294,
+  #304) read: *"Dependabot alerts are already on everywhere; this only adds the automated fix PRs, and only where a
+  required aggregator checks them."* Dependabot security-update PRs always target the default branch, whatever
+  `target-branch` says, and on devkit-managed repos they fail the managed `Commit Messages` gate: the `dependabot/*`
+  branch name is not allowed, and the titles are not Conventional Commits. vig-os/devkit-smoke-test#433 to #437 and
+  vig-os/h5v#11 were all blocked on `Commit Messages` / `CI Summary`. The Repository settings bullet above now
+  records the replacement decision: Renovate is the vulnerability-fix channel, and security updates are off except
+  on `qx`.
 
 ## Open questions / supersession triggers
 
