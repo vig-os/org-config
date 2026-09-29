@@ -197,7 +197,7 @@ def _evaluate(path: Path) -> dict:
 def test_the_committed_config_declares_exactly_these_app_slugs() -> None:
     """Ground truth on the REAL config, in the spirit of ``DECLARED_REPOS``.
 
-    Two slugs, twenty sites, all ruleset bypass actors. The implicit
+    Two slugs, twenty-three sites, all ruleset bypass actors. The implicit
     `github-actions` slug of tessera's two un-prefixed classic
     branch-protection status checks left with those rules, which rulesets
     replaced (#294); the fixture tests above still cover that site. Update this
@@ -212,7 +212,7 @@ def test_the_committed_config_declares_exactly_these_app_slugs() -> None:
     assert {site.site for site in sites} == {
         SITE_RULESET_BYPASS_ACTOR,
     }
-    assert len(sites) == 20
+    assert len(sites) == 23
 
 
 # --------------------------------------------------------------------------

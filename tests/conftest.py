@@ -31,6 +31,7 @@ DECLARED_REPOS: frozenset[str] = frozenset(
         "org-config-testbed",
         "qms",
         "qx",
+        "revkit",
         "scitadel",
         "sync-issues-action",
         "tessera",
