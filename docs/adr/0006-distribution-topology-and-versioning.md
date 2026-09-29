@@ -110,7 +110,16 @@ what makes a changed plan expected rather than alarming.
 
 ## Corrections
 
-<!-- None yet. Preserve here any assumption above later shown wrong, with date and source, for audit. -->
+<!-- Preserve here any assumption above later shown wrong, with date and source, for audit. -->
+
+- **2026-09-29 — "all on the GitHub Free plan" is no longer true (issue
+  [#294](https://github.com/vig-os/org-config/issues/294)).** The Context's plan claim was verified live on 2026-07-06
+  and was accurate then. `exo-pet` has since upgraded to **GitHub Team** (2026-08-07,
+  [#6](https://github.com/vig-os/org-config/issues/6)) exactly as the sequencing rule above requires, so its private
+  config repo has enforceable rulesets and the rule's precondition for write credentials is met there; `vig-os`,
+  `exoma-ch` and `MorePET` remain on Free (each re-checked live via `GET /orgs/{org}` `plan.name`, 2026-09-29). The
+  decisions stand unchanged: the Free-plan constraints still bind the three Free orgs, and the sequencing rule still
+  gates `exoma-ch` and `MorePET` when they onboard.
 
 ## Open questions / supersession triggers
 
