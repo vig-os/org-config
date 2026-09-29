@@ -85,8 +85,9 @@ consequence.
 
 It is deliberately NOT applied to the other two sites. A branch-protection
 status check with no prefix resolves to the implicit ``github-actions``, which is
-a first-party App and never an org installation — this org's own config declares
-it (tessera's two rules) and plans clean, so asking for an installation there
+a first-party App and never an org installation — this org's own config declared
+it (tessera's two rules, until #294 replaced them with rulesets) and planned
+clean, so asking for an installation there
 would fire on green config, which is the exact failure mode #256 rejected. The
 environment-reviewer read path was not traced, so nothing is claimed about it.
 

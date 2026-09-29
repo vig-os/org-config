@@ -197,24 +197,22 @@ def _evaluate(path: Path) -> dict:
 def test_the_committed_config_declares_exactly_these_app_slugs() -> None:
     """Ground truth on the REAL config, in the spirit of ``DECLARED_REPOS``.
 
-    Three slugs, fourteen sites. `github-actions` is not written anywhere in the
-    jsonnet — it is the implicit slug tessera's two un-prefixed
-    branch-protection status checks resolve to, which is precisely the site a
-    literal read of the config text could not see. Update this set deliberately
-    when the config declares a new App.
+    Two slugs, sixteen sites, all ruleset bypass actors. The implicit
+    `github-actions` slug of tessera's two un-prefixed classic
+    branch-protection status checks left with those rules, which rulesets
+    replaced (#294); the fixture tests above still cover that site. Update this
+    set deliberately when the config declares a new App.
     """
     config = _evaluate(REPO_ROOT / "otterdog" / "vig-os" / "vig-os.jsonnet")
     sites = extract_app_actor_sites(config)
     assert {site.slug for site in sites} == {
         "commit-action-bot",
-        "github-actions",
         "vig-os-release-app",
     }
     assert {site.site for site in sites} == {
         SITE_RULESET_BYPASS_ACTOR,
-        SITE_BRANCH_PROTECTION_STATUS_CHECK,
     }
-    assert len(sites) == 14
+    assert len(sites) == 16
 
 
 # --------------------------------------------------------------------------

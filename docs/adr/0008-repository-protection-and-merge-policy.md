@@ -115,8 +115,9 @@ create, move or delete one.
 ### Repository settings
 
 - **Merge commits only, on every repo** (`houseMergePolicy`, folded into `newRepo`), with the PR title and body as the
-  merge commit's title and message. This includes `scitadel` and `tessera` once their own PRs land. The `exo-pet`
-  fleet already complies. **`legacyMergePolicy` is deleted.** `upstreamMergePolicy` stays for the exempt testbed.
+  merge commit's title and message. This includes `scitadel`, which was squash-only, and `tessera`, which allowed all
+  three. The `exo-pet` fleet already complies. **`legacyMergePolicy` is deleted.** `upstreamMergePolicy` stays for the
+  exempt testbed.
 - **`delete_branch_on_merge`** follows the vendored default (`true`). Per-repo overrides are removed.
 - **Secret scanning and push protection** follow the vendored default (`enabled`). Both are free on public repos.
 - The ruleset shapes carry **no merge policy**, because the repo fields own it (#246). When the ADR-0005 otterdog pin
@@ -134,10 +135,10 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
 | `devkit-smoke-test` | Main: **review threads not required** | A thread left by any commenter would stall an unattended train. This is the live value, kept | Permanent while the repo is bot-only |
 | `devkit-smoke-test`, `org-config` | No `Tag protection`, though both cut releases | Out of scope for the conversion PR, which only restated existing rulesets | Follow-up under #294 |
 | `devkit-smoke-test` | No `Release protection` | Existing shape, not re-litigated here | Follow-up under #294 |
-| `scitadel` | Squash only; unpinned checks; no Signed/Tag; non-house ruleset names | Transitional | #294 PR 4 |
-| `qx` | No rulesets; its only PR check is a matrix job | Transitional: needs a `CI Summary` aggregator first | #294 PR 5 |
+| `qx`, `tessera` | `Tag protection` bypass is `#OrganizationAdmin` (always mode), not a release App | Both release by a maintainer, an org owner, pushing the tag by hand: `qx`'s `release.yml` is tag-triggered, and `tessera`'s release-plz only opens release PRs. No App writes tags there | An App takes over tagging (for `tessera`, `release-plz release` or the devkit train, tessera#441) |
 | `nvd-mirror` | `Signed commits` excludes `refs/heads/gh-pages` | `refresh.yml` force-pushes an unsigned orphan commit to `gh-pages` every six hours with the Actions token, and github-actions cannot be a ruleset bypass actor. `gh-pages` holds generated feeds, not source | Permanent while the mirror publishes from a branch |
-| `tessera` | Classic branch protection; all three merge methods; `delete_branch_on_merge: false`; `dev` as default branch | Transitional | #294 PR 6 |
+| `tessera` | No `Signed commits` | Its main contributor pushes unsigned commits (all open PRs, and the alpha promotion on `main`). Under merge-commit only, a signing rule would make those PRs unmergeable | That contributor signs |
+| `tessera` | `dev` as default branch | `dev` is still the integration branch after the first alpha: every PR, Dependabot and release-plz target it. Flipping would run the scheduled workflows from `main`'s stale copies | `main` carries the devkit scaffold, or tessera#441 moves it to the devkit train |
 | `qms` | All three merge methods, `delete_branch_on_merge: false`, `allow_update_branch: false`, restated inline | Deferred and out of scope, so its live state must not move | Its own decision |
 | `org-config-testbed` | Upstream merge defaults, no rulesets | Exempt by construction | n/a |
 
