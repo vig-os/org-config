@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Renovate is the vulnerability-fix channel; Dependabot security updates are off again except on `qx`** ([#307](https://github.com/vig-os/org-config/issues/307)): the eight devkit-managed repos that declared `dependabot_security_updates_enabled: true` — `commit-action`, `devkit`, `devkit-smoke-test`, `h5v`, `org-config`, `scitadel`, `sync-issues-action`, `tessera` — drop the line and inherit the vendored default, `false`. Dependabot security-update PRs always target the default branch, whatever `target-branch` says, and fail devkit's managed `Commit Messages` gate (`dependabot/*` branch, non-Conventional titles), as vig-os/devkit-smoke-test#433 to #437 and vig-os/h5v#11 showed. `qx` keeps them, as an [ADR-0008](docs/adr/0008-repository-protection-and-merge-policy.md) exception, because it has no Renovate yet. Dependabot alerts stay on everywhere. The `new-repo-dependabot-security-updates` unmanaged control now expects `false`; ADR-0008 records the decision, a Correction, and the known gap on `h5v`, `scitadel`, `tessera` and `devkit-smoke-test`, where advisories Renovate does not yet cover get alerts but no fix PR.
+
 ## [v2.0.0](https://github.com/vig-os/org-config/releases/tag/v2.0.0) - 2026-09-29
 
 ### Added

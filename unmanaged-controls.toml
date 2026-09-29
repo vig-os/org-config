@@ -206,11 +206,11 @@ reason = "A new repo must start reporting known-vulnerable dependencies, not wai
 [[control]]
 key = "new-repo-dependabot-security-updates"
 scope = "org"
-title = "Dependabot security updates on by default for new repositories"
+title = "Dependabot security updates off by default for new repositories"
 endpoint = "/orgs/{org}"
 path = "dependabot_security_updates_enabled_for_new_repositories"
-expect = true
-reason = "Alerts without automated fix PRs put the whole remediation burden on a one-engineer team; the default must include the fixes."
+expect = false
+reason = "Vulnerability fix PRs come from Renovate (ADR-0008); alerts stay on."
 
 [[control]]
 key = "new-repo-secret-scanning"

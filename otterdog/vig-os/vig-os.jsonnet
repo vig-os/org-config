@@ -339,7 +339,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       custom_properties+: {
         type: ['tools'],
       },
-      dependabot_security_updates_enabled: true,
       description: 'GitHub Action that commits changes via GitHub API or GitHub Token, creating automatically signed commits. Modular TypeScript design - use as a standalone action or import as a library.',
       has_projects: false,
       has_wiki: false,
@@ -402,7 +401,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       custom_properties+: {
         type: ['internal', 'tools'],
       },
-      dependabot_security_updates_enabled: true,
       description: 'Reproducible dev environment (devcontainer or Nix/direnv) with batteries-included tooling and good practices.',
       has_discussions: true,
       has_projects: false,
@@ -464,7 +462,6 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('devkit-smoke-test') {
       allow_auto_merge: true,
-      dependabot_security_updates_enabled: true,
       description: 'Repository to test deployment workflows of vigOS devcontainer',
       private_vulnerability_reporting_enabled: true,
       rulesets: [
@@ -539,7 +536,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       ],
     },
     orgs.newRepo('h5v') {
-      dependabot_security_updates_enabled: true,
       description: 'A terminal viewer for HDF5 files with chart, image, string, matrix, and attributes support',
       // Tier A (ADR-0008): a devkit 1.17.0 trunk scaffold (`.vig-os`
       // DEVKIT_WORKFLOW=trunk) — no `dev` branch; releases fork
@@ -608,7 +604,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       custom_properties+: {
         type: ['tools'],
       },
-      dependabot_security_updates_enabled: true,
       description: 'GitHub Organization Management',
       has_projects: false,
       has_wiki: false,
@@ -696,6 +691,7 @@ orgs.newOrg('vig-os', 'vig-os') {
       private: true,
     },
     orgs.newRepo('qx') {
+      // ADR-0008 exception: no Renovate yet; Dependabot is its only fix-PR source.
       dependabot_security_updates_enabled: true,
       description: 'Per-instance physical part identification: nano-id IDs, QR labels, mint-then-bind workflow',
       gh_pages_build_type: 'workflow',
@@ -733,7 +729,6 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     orgs.newRepo('scitadel') {
       allow_auto_merge: true,
-      dependabot_security_updates_enabled: true,
       description: 'Scitadel: programmable, reproducible scientific literature retrieval',
       secrets: [
         orgs.newRepoSecret('CARGO_REGISTRY_TOKEN') {
@@ -800,7 +795,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       custom_properties+: {
         type: ['tools'],
       },
-      dependabot_security_updates_enabled: true,
       description: 'GitHub Action that syncs issues and pull requests to markdown files with full comments, review threads, and diff snippets. Useful for documentation, backups, and offline access. Supports incremental syncing with state caching and GitHub App authentication.',
       private_vulnerability_reporting_enabled: true,
       rulesets: [
@@ -843,7 +837,6 @@ orgs.newOrg('vig-os', 'vig-os') {
       // repo-scoped sync App. Revisit once `main` carries the scaffold, or
       // with tessera#441's release-train decision (#294).
       default_branch: 'dev',
-      dependabot_security_updates_enabled: true,
       description: 'FAIR Data on HDF5 — self-describing, FAIR-principled data format for scientific data products',
       private_vulnerability_reporting_enabled: true,
       // Credentials of the repo-scoped `tessera-sync-issues-bot` GitHub App
