@@ -500,7 +500,21 @@ orgs.newOrg('vig-os', 'vig-os') {
             strict: false,
           },
         },
+        // The train writes `release/X.Y.Z` as the Commit App only
+        // (`prepare-release.yml` / `prepare-hotfix.yml` create it and commit
+        // the freeze, `release-core.yml` the finalize, `sync-issues.yml` the
+        // archive sync); `abandon-release.yml` and the dispatch listener's
+        // stale-branch cleanup delete it as the Release App, which the
+        // shape's `allows_deletions` permits.
+        orgs.releaseProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
         orgs.signedCommits(),
+        // The only tag writer is the release train: `release-publish.yml`
+        // creates the release and RC tags, and `promote-release.yml` prunes
+        // RC tags and moves floating tags, all as the Release App.
+        orgs.tagProtection(['vig-os-release-app']),
       ],
       // Live-proof harness for devkit's opt-in `DEVKIT_COMMIT_APP_ENVIRONMENT`
       // knob (vig-os/devkit#1710, shipped in vig-os/devkit#1724): it binds the
@@ -623,6 +637,10 @@ orgs.newOrg('vig-os', 'vig-os') {
         // House standard (ADR-0008).
         orgs.mainProtection(['15368:CI Summary']),
         orgs.signedCommits(),
+        // The only tag writer is the release train: `release-publish.yml`
+        // creates the release tag and `promote-release.yml` prunes RC tags
+        // and moves floating tags, all as the Release App.
+        orgs.tagProtection(['vig-os-release-app']),
       ],
     },
     orgs.newRepo('org-config-testbed') {
