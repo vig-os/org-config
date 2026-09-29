@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-08-07T09:37:46Z
-updated: 2026-08-07T09:44:07Z
+updated: 2026-09-23T21:21:27Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/org-config/issues/107
-comments: 1
+comments: 2
 labels: bug, priority:medium, area:workflow
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-08-08T03:28:19.635Z
+synced: 2026-09-24T07:21:56.744Z
 ---
 
 # [Issue 107]: [otterdog 1.3.4 cannot read live repo rulesets on private repos below enterprise plan](https://github.com/vig-os/org-config/issues/107)
@@ -105,4 +105,64 @@ automation), then re-declare the exo-pet ruleset once a fixed version is pinned.
 _Posted on August 7, 2026 at 09:44 AM_
 
 Reported upstream as eclipse-csi/otterdog#729 (includes the stale org-ruleset sibling gates — read gate at main L633 and the hard validation error at main L200 — offered there as an optional split). Durable fix now tracks the upstream issue; the manual-management interim in exo-pet/org-config stands until it lands in a released otterdog we can pin.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on September 23, 2026 at 09:21 PM_
+
+## Resolved by the otterdog 1.5.0 pin, released in v1.4.0
+
+Upstream [eclipse-csi/otterdog#731](https://github.com/eclipse-csi/otterdog/pull/731)
+(`ab66569`) removed the `repo.private is False or org_settings.plan ==
+"enterprise"` condition from the repository-ruleset read path — the exact gate
+this issue reports at `models/github_organization.py:701-703` — and shipped it in
+otterdog **v1.5.0**. Confirmed at the release tag: both read paths
+(`github_organization.py` L659 and L754) are ungated.
+
+Pinned here by [PR #229](https://github.com/vig-os/org-config/pull/229) (#225,
+merge `d00fddd`) and released in
+[v1.4.0](https://github.com/vig-os/org-config/releases/tag/v1.4.0) (tag
+`022462b`), which is the version a downstream org can actually consume — hence
+closing against the release rather than the merge.
+
+The same commit also gave both ruleset clients `if ex.status in (403, 404):
+return []` at `debug` level, which is what makes the bump safe on a Free-plan org
+like `vig-os`: the newly-attempted `/repos/{org}/{repo}/rulesets` and
+`/orgs/{org}/rulesets` calls answer `403 Upgrade to GitHub Pro` and are absorbed
+silently instead of aborting the plan or adding lines to the `plan.txt` the drift
+layer parses. Effect on this org is nil — every repo but `qms` is public and
+already ruleset-complete, `qms` declares none, and `otterdog 1.5.0 validate
+--local` output is identical to 1.4.0.
+
+**For the downstream org this issue was filed from** (Team plan, private repos,
+rulesets hand-managed with the declaration held out of the jsonnet), the
+re-declare condition stated in the interim workaround is now met. The order
+matters, and it is the migration note of v1.4.0:
+
+1. Declare the live rulesets in the jsonnet.
+2. Bump the engine pin to `v1.4.0` in the same change — the engine ref selects
+   the otterdog release, so this is what makes the live rulesets visible.
+3. Empty plan as the acceptance evidence.
+
+Bumping first and declaring later produces a red plan proposing one deletion per
+ruleset, plus one `drift` + `critical` issue per ruleset on the next scheduled
+run. It does **not** delete live protection: `apply.yml` omits
+`--delete-resources`, and `operations/apply.py` is byte-identical across 1.4.0
+and 1.5.0.
+
+Scope note: this closes the **repository** ruleset read gate only.
+**Organization**-level rulesets remain unusable below `enterprise` — #731 left
+the matching condition in `GitHubOrganization.validate()` (L219), which raises an
+`ERROR` on any declared org ruleset. Filed as
+[upstream #763](https://github.com/eclipse-csi/otterdog/issues/763) and carried
+in the README's "Known limitations"; anything org-wide stays hand-managed.
+
+Upstream [#729](https://github.com/eclipse-csi/otterdog/issues/729), the report
+this issue was escalated to, is still open upstream despite being fixed by #731 —
+so this is closed against the released version, not against that issue's state.
+
+Closing as completed.
+
 

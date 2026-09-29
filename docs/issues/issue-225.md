@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-09-23T08:08:59Z
-updated: 2026-09-23T11:36:10Z
+updated: 2026-09-23T21:21:36Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/org-config/issues/225
-comments: 3
+comments: 4
 labels: none
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-23T21:09:35.080Z
+synced: 2026-09-24T07:21:54.503Z
 ---
 
 # [Issue 225]: [Bump the ADR-0005 otterdog pin to 1.5.0 — ungates ruleset reads (#107), needs a declare-before-bump migration note](https://github.com/vig-os/org-config/issues/225)
@@ -149,50 +149,51 @@ branch protection).
 
 **Pin — all five literals move together** (the 1.4.0 bump missed one, #164 item 7):
 
-- [ ] `justfile.project:19` — `otterdog_version := "1.5.0"`
-- [ ] `template/.github/workflows/plan.yml` — `otterdog_version: "1.5.0"`
-- [ ] `template/.github/workflows/apply.yml` — `otterdog_version: "1.5.0"`
-- [ ] `template/.github/workflows/drift.yml` — `otterdog_version: "1.5.0"`
-- [ ] `template/.github/workflows/import.yml` — `default: "1.5.0"`
+- [x] `justfile.project:19` — `otterdog_version := "1.5.0"`
+- [x] `template/.github/workflows/plan.yml` — `otterdog_version: "1.5.0"`
+- [x] `template/.github/workflows/apply.yml` — `otterdog_version: "1.5.0"`
+- [x] `template/.github/workflows/drift.yml` — `otterdog_version: "1.5.0"`
+- [x] `template/.github/workflows/import.yml` — `default: "1.5.0"`
 
 **Explicitly NOT in scope**
 
-- [ ] `otterdog.json` keeps `otterdog-defaults@v0.13.1`. v0.14.x adds
+- [x] `otterdog.json` keeps `otterdog-defaults@v0.13.1`. v0.14.x adds
       `max_cache_size_gb`, whose endpoint answers `402` on this org's Free plan,
       which would write a permanent `WARNING` into `plan.txt` on every run.
       A deliberate decision, recorded — not an oversight.
 
 **Verification**
 
-- [ ] `just precommit` green (includes `otterdog@1.5.0 validate --local`)
-- [ ] `just test` green — L1 plan-fixture recheck per ADR-0007: 1.5.0 is a
+- [x] `just precommit` green (includes `otterdog@1.5.0 validate --local`)
+- [x] `just test` green — L1 plan-fixture recheck per ADR-0007: 1.5.0 is a
       **minor**, and this pin is the plan-format anchor (ADR-0005), so confirm
       the recorded fixtures still parse or re-record them deliberately
-- [ ] This PR's own `plan` check reports an **empty** diff against live `vig-os`
+- [x] This PR's own `plan` check reports an **empty** diff against live `vig-os`
       before merge — the acceptance evidence, as in PR #145
 
 **Documentation truth**
 
-- [ ] README "Known limitations" — the private-repo ruleset read-gate bullet
+- [x] README "Known limitations" — the private-repo ruleset read-gate bullet
       (#191) is retired or restated as fixed-at-1.5.0
-- [ ] ADR-0005 `## Corrections` — "Renovate owns the pin" is false;
+- [x] ADR-0005 `## Corrections` — "Renovate owns the pin" is false;
       `renovate.json` enables only `github-actions`/`pep621`/`npm`, none of which
       can see a `justfile`. Fix the same claim at `justfile.project:18` and the
       "Renovate can bump this" comments in the `template/` callers.
-- [ ] `CHANGELOG.md` `## Unreleased` entry
+- [x] `CHANGELOG.md` `## Unreleased` entry
 
 **Release + follow-through**
 
-- [ ] Release cut, with a migration note covering: declare-before-bump ordering,
+- [x] Release cut, with a migration note covering: declare-before-bump ordering,
       the corrected severity (red plan + drift issues, **not** deletion), the
       fact that downstream callers must hand-edit their own literals (#56), and
       that the defaults pin stays at v0.13.1
-- [ ] #107 closed against the released version
-- [ ] Note what remains blocked by eclipse-csi/otterdog#763 (org-level rulesets
+- [x] #107 closed against the released version
+- [x] Note what remains blocked by eclipse-csi/otterdog#763 (org-level rulesets
       still ERROR below Enterprise — `validate()` gate untouched by #731)
-- [ ] Note that #209 is **not** fixed by this bump (eclipse-csi/otterdog#738
+- [x] Note that #209 is **not** fixed by this bump (eclipse-csi/otterdog#738
       still open; `_update_code_scanning_config` byte-identical at v1.5.0), so it
       does not read as silently resolved
+
 
 ---
 
@@ -405,4 +406,106 @@ The `## Unreleased` block now carries both this and #205, so the same release
 gives the downstream org the ruleset-declaration capability *and* the
 list-addressable unmanaged-control paths — the two should not be used to manage
 the same control.
+
+---
+
+# [Comment #4]() by [c-vigo]()
+
+_Posted on September 23, 2026 at 09:20 PM_
+
+## Released in v1.4.0 — closing
+
+[v1.4.0](https://github.com/vig-os/org-config/releases/tag/v1.4.0) is published
+(tag `022462b`, merged to `main` as `c8edc6e`). It carries the 1.5.0 pin from
+PR #229 and the migration note this issue existed for; the release body states
+all four required points:
+
+- **declare-before-bump ordering** — declare the repository rulesets in the
+  jsonnet first, then bump the pin, in one change, with an empty plan as the
+  acceptance evidence;
+- **the corrected severity** — a red plan plus one `drift` + `critical` issue
+  per ruleset on the next scheduled run, none of which self-close. **Not**
+  deletion: `apply.yml` omits `--delete-resources` and
+  `operations/apply.py` is byte-identical across 1.4.0 and 1.5.0, so every
+  `REMOVE` patch is still counted and skipped;
+- **downstream propagation** — nothing propagates the pin (#56), so it moves
+  across five hand-maintained literals here;
+- **the defaults pin stays at `otterdog-defaults@v0.13.1`** — deliberately, not
+  by omission. v0.14.x adds `max_cache_size_gb`, which would enter otterdog's
+  `included_keys` and call `/orgs/{org}/actions/cache/storage-limit`, a `402` on
+  this org's Free plan, writing a permanent `WARNING` into every plan. The
+  otterdog pin and the `base_template` pin are not in lockstep and must not be
+  moved by reflex; recorded in ADR-0005 `## Corrections`.
+
+### Downstream order — and #56 is superseded inside this same release
+
+The "each downstream hand-edits its own literal" half of the migration note is
+correct only for an engine ref older than v1.4.0. #228 (PR #240) shipped in this
+same release and defaults `otterdog_version` to the engine's own pin on
+`workflow_call`, so downstream mirrors go to zero. **The order matters:**
+
+1. **Bump the engine pin to `v1.4.0` first.** A consumer's existing
+   `otterdog_version` literal keeps working and wins over the new default, so
+   nothing breaks at this step.
+2. **Then delete the `otterdog_version` literals** from the `plan` / `apply` /
+   `drift` callers.
+
+Doing it the other way round — deleting the literal while still pinned to a
+pre-#228 engine — sends an empty input to a workflow whose `justfile.project`
+fallback does not exist in the consumer's checkout, and every run fails at
+"Resolve otterdog version pin".
+
+And because the engine ref now selects the otterdog release as well as the
+workflow code, step 1 is also the step that makes previously-unreadable
+private-repo rulesets visible. A downstream org with live rulesets it does not
+declare should land the jsonnet declarations in the same PR as the engine bump.
+
+### What remains blocked by eclipse-csi/otterdog#763
+
+**Organization-level rulesets, on any plan below `enterprise`.** Upstream #731
+removed the `plan == "enterprise"` condition from *both* read paths — repository
+rulesets (the #107 gate, now fixed) and organization rulesets — but left the
+matching condition in `GitHubOrganization.validate()`
+(`models/github_organization.py` L219), which still raises a `FailureType.ERROR`,
+*"use of organization rulesets requires an 'enterprise' plan"*, whenever a config
+declares any.
+
+The two sides now disagree, which is the mirror image of #729: at 1.5.0 live org
+rulesets are read into the current model on every plan while the config is
+structurally forbidden from containing one, so on a non-enterprise org the
+declared set is permanently empty and the live set is not — the asymmetry points
+at a permanent proposed **delete** rather than a phantom `add`, and the usual
+remedy of declaring the ruleset fails validation with an `ERROR` before a plan is
+ever produced. Nothing in this pin bump changes that: anything org-wide stays
+hand-managed until #763 lands. Recorded in the README's "Known limitations".
+
+### #209 is not fixed by 1.5.0 and stays open
+
+`_update_code_scanning_config` is byte-identical at v1.5.0 and still raises
+unconditionally; upstream eclipse-csi/otterdog#738 is open. Creating a repository
+still costs two apply dispatches when Code Security is unavailable. #209 remains
+open and is carried as the second entry in the README's "Known limitations" so it
+does not read as silently resolved.
+
+### Checklist
+
+All boxes in the body are now ticked. Two notes on what the ticked text means
+today:
+
+- The three `template/.github/workflows/{plan,apply,drift}.yml` literals were set
+  to `1.5.0` by PR #229 and then **removed** by #228 (PR #240), which relocated
+  them to the `workflow_call` defaults of the three reusable workflows in this
+  repo. `template/.github/workflows/import.yml` keeps its own literal — it is a
+  standalone `workflow_dispatch` bootstrap, not a caller. The pin count is
+  unchanged at five, all five now live here, and `tests/test_otterdog_pin.py`
+  asserts each mirror equals `justfile.project`, so the next bump fails in this
+  repo's CI rather than silently in a consumer org.
+- The empty-plan evidence had to be dispatched by hand
+  ([run 35844030809](https://github.com/vig-os/org-config/actions/runs/35844030809),
+  `0 to add, 0 to change, 0 to delete`) because `plan.yml`'s paths filter omitted
+  `justfile.project`. Fixed by #230, also in this release.
+
+#107 is closed against the released version in the next comment there. Closing
+this as completed.
+
 
