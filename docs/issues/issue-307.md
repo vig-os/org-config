@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-09-29T08:50:09Z
-updated: 2026-09-29T08:50:09Z
+updated: 2026-09-29T13:08:01Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/org-config/issues/307
-comments: 0
+comments: 1
 labels: chore, priority:low, area:workflow, effort:small
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-29T09:51:25.667Z
+synced: 2026-09-30T08:09:22.310Z
 ---
 
 # [Issue 307]: [chore(config): watch for duplicate Dependabot and Renovate advisory PRs on tier-A repos until 2026-10-29](https://github.com/vig-os/org-config/issues/307)
@@ -64,4 +64,12 @@ Low
 ## Changelog Category
 
 No changelog needed
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on September 29, 2026 at 01:08 PM_
+
+Resolved early, 2026-09-29: took the 'Prefer Renovate' option instead of watching until 10-29. #310 merged and applied (run 36572077080). Dependabot security updates are now off on the 8 devkit-managed repos (qx keeps them as an ADR-0008 exception). The org default for new repos was set to false through the API, which matches unmanaged-controls.toml. Renovate coverage landed first: h5v#13, tessera#512, scitadel#241/#243, qx#313, devkit#1764. Obsolete Dependabot PRs are closed.
 
