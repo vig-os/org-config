@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`qms` is archived** ([#306](https://github.com/vig-os/org-config/issues/306)): its content was migrated to the destination org's controlled-document store on 2026-09-30, so the `qms` block in `otterdog/vig-os/vig-os.jsonnet` sets `archived: true` and keeps every other field at its frozen live state, since an archived repo cannot be edited. The history stays read-only and private. [ADR-0008](docs/adr/0008-repository-protection-and-merge-policy.md) drops `qms` from its Tiers and Exceptions tables and records, under Corrections, that archiving reverses its "no archiving" stance for this one repo: private on a Free-plan org, `qms` could never carry an enforceable ruleset. The only live change is `archived` false → true.
+
 ### Deprecated
 
 ### Removed

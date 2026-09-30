@@ -676,17 +676,21 @@ orgs.newOrg('vig-os', 'vig-os') {
       description: 'SACRIFICIAL testbed for the L3 mutation E2E harness (issue #23) - its live settings are deliberately churned and reverted by .github/workflows/testbed-e2e.yml on every run; do not rely on any state here.',
     } + orgs.upstreamMergePolicy,
     orgs.newRepo('qms') {
-      // OUT OF SCOPE of ADR-0008 and deliberately frozen at its live state
-      // until it gets its own decision (#294): private on a Free-plan org, so
-      // no ruleset can be enforced, and its default branch is a leaked agent
-      // worktree branch. The five merge fields below restate the retired
-      // `legacyMergePolicy` (all three methods, upstream title/message) so
-      // removing that mixin changes nothing live here.
+      // ARCHIVED (#306, ADR-0008 Corrections 2026-09-30): the content was
+      // migrated to the destination org's controlled-document store on
+      // 2026-09-30, and the repository is archived, read-only. Its history is
+      // kept: it contains committed licensed standards PDFs, which is one
+      // reason it stays private. An archived repo cannot be edited, so every
+      // other field below is its frozen live state and must not change: the
+      // five merge fields restate the retired `legacyMergePolicy` (all three
+      // methods, upstream title/message), and the default branch is the leaked
+      // agent worktree branch it was archived on.
       allow_forking: false,
       allow_merge_commit: true,
       allow_rebase_merge: true,
       allow_squash_merge: true,
       allow_update_branch: false,
+      archived: true,
       custom_properties+: {
         type: ['tools'],
       },
