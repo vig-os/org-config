@@ -88,7 +88,6 @@ Merge mechanism:
 | **A — releasing** | A public repo that cuts releases and has a CI aggregator | `mainProtection(checks)`, `signedCommits()`, `tagProtection(releaseApp)`; plus `devProtection` / `releaseProtection` where its release train uses `dev` / `release/*` |
 | **B — active, no aggregator** | A public repo that takes changes but has no single CI context to require | `mainProtection([])`: the Main standard without required checks, until it grows an aggregator. Plus `signedCommits()` where every writer to the repo already signs; a writer that lands unsigned commits (an upstream it syncs from, a bot on the Actions token) rules it out |
 | **Exempt** | `org-config-testbed` | None. It deliberately runs on the vendored upstream defaults (`upstreamMergePolicy`), because that is what it tests |
-| **Deferred** | `qms` | None, and its live state is left untouched. It is private, so a ruleset cannot be enforced on the Free plan, and its default branch is a leaked agent worktree branch. It needs its own decision |
 
 ### The `Main protection` standard
 
@@ -145,7 +144,6 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
 | `scitadel` | Main gates only `CI Summary`, not `rust-ci.yml` (known gap, recorded 2026-09-29) | `rust-ci.yml`'s `clippy -D warnings` and macOS test jobs still run but cannot gate a merge: the managed `CI Summary` aggregator cannot include jobs from another workflow. Listing those job names as extra required checks was considered and rejected: a job rename would block every merge, and it would put the repo's CI layout into the org config | vig-os/devkit#1761 gives consumers a way to feed extra jobs into the managed `CI Summary` |
 | `qx` | Dependabot security updates on (`dependabot_security_updates_enabled: true`) | No Renovate yet, so Dependabot is its only source of vulnerability fix PRs | `qx` adopts Renovate and it is proven to run |
 | `h5v`, `scitadel`, `tessera`, `devkit-smoke-test` | No vulnerability fix PR for some advisories (known gap, recorded 2026-09-29) | Advisories in ecosystems Renovate does not yet cover (Cargo; `uv` for `devkit-smoke-test`) get alerts but no fix PR. Renovate is not yet running on `h5v`, `scitadel` and `tessera` at all: none has ever had a `renovate/*` PR or a Dependency Dashboard | The per-repo Renovate coverage PRs land and Renovate is verified running |
-| `qms` | All three merge methods, `delete_branch_on_merge: false`, `allow_update_branch: false`, restated inline | Deferred and out of scope, so its live state must not move | Its own decision |
 | `org-config-testbed` | Upstream merge defaults, no rulesets | Exempt by construction | n/a |
 
 ## Rationale
@@ -199,13 +197,21 @@ override in `otterdog/vig-os/vig-os.jsonnet`.
   vig-os/h5v#11 were all blocked on `Commit Messages` / `CI Summary`. The Repository settings bullet above now
   records the replacement decision: Renovate is the vulnerability-fix channel, and security updates are off except
   on `qx`.
+- **2026-09-30 — `qms` is archived, reversing "no archiving" for that one repo (issue
+  [#306](https://github.com/vig-os/org-config/issues/306)).** The Tiers table left `qms` **Deferred** pending its own
+  decision, and the alternatives above rejected archiving as an owner decision. #306 decided to archive `qms`: it is
+  private on a Free-plan org, so no ruleset can be enforced on it, and its content has moved to the destination org's
+  controlled-document store, which is on a plan with enforceable rulesets. The migration was verified on 2026-09-30.
+  The repository keeps its history read-only. It stays declared in `vig-os.jsonnet` with `archived: true` and its
+  frozen live settings, and it is no longer in the Tiers or Exceptions tables. "No archiving" still holds for every
+  other repo.
 
 ## Open questions / supersession triggers
 
 - **eclipse-csi/otterdog#768 ships** in the ADR-0005 pin: declare `allowed_merge_methods: ['merge']` in the ruleset
   shapes and drop the "repo fields are the only lever" caveat.
-- **A GitHub plan change** (Team for `vig-os`, or private-repo rulesets on Free): `qms` becomes protectable and org
-  rulesets could replace the per-repo copies. Re-weigh both.
+- **A GitHub plan change** (Team for `vig-os`, or private-repo rulesets on Free): private repos become protectable and
+  org rulesets could replace the per-repo copies. Re-weigh both.
 - **devkit changes its release train** so that a human reviews smoke-test PRs, or `promote-release` updates a
   `BEHIND` branch itself: re-decide the `devkit-smoke-test` exceptions.
 
