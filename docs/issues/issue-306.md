@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-09-29T08:50:05Z
-updated: 2026-09-29T09:08:33Z
+updated: 2026-09-30T16:42:18Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/org-config/issues/306
-comments: 1
+comments: 2
 labels: chore, priority:low, area:workflow, effort:small
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-29T09:51:26.307Z
+synced: 2026-10-01T08:28:25.755Z
 ---
 
 # [Issue 306]: [chore(config): decide qms — integrate and make public, keep private and unprotected, or archive](https://github.com/vig-os/org-config/issues/306)
@@ -73,4 +73,12 @@ Changed
 _Posted on September 29, 2026 at 09:08 AM_
 
 Decided 2026-09-29: the content moves into the PET-scanner project's controlled-document store in the `exo-pet` org (Team plan, so it gets enforceable rulesets there); `vig-os/qms` is retired once ingested and verified, then this block and the ADR-0008 row go. Tracked in the destination org; this issue closes when the block is removed.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on September 30, 2026 at 04:36 PM_
+
+Ingestion into the destination store is verified (closing PR merged 2026-09-30; every source file maps to a destination or an explicit disposition, 127 rows, none unmapped). The source author confirmed the git tree is the complete content. Decision: **archive** (option c). The config change (`archived: true` on the `qms` block, ADR-0008 amendment dropping `qms` from the tier and exceptions tables, changelog line) follows as a PR here.
 

@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-08-07T12:52:36Z
-updated: 2026-08-10T13:10:18Z
+updated: 2026-09-30T20:19:09Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/org-config/issues/112
-comments: 2
+comments: 3
 labels: chore, priority:low, area:ci, effort:large
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-08-11T03:47:05.711Z
+synced: 2026-10-01T08:28:26.133Z
 ---
 
 # [Issue 112]: [Consolidate GitHub App secrets to client-ID-only across orgs](https://github.com/vig-os/org-config/issues/112)
@@ -125,4 +125,12 @@ Hard invariant for every step: no numeric `*_APP_ID` secret is deleted while any
 _Posted on August 10, 2026 at 01:10 PM_
 
 Reopening: auto-closed by the #149 merge (linked development branch), but this tracker still owns the remaining phases — commit-action + sync-issues-action devkit-1.7 adoptions, h5v/scitadel re-scaffolds, then retirement of COMMIT_APP_ID / DEVKIT_UPGRADE_APP_ID / RELEASE_APP_ID, and the tessera + exo-pet legs. #149 completed only the consumer-list alignment + pre-seeding.
+
+---
+
+# [Comment #3]() by [c-vigo]()
+
+_Posted on September 30, 2026 at 08:19 PM_
+
+Status 2026-09-30: the devkit side of phase 4 is merged (vig-os/devkit#1366 via vig-os/devkit#1792). The scaffolded `devkit-upgrade.yml` no longer falls back to `DEVKIT_UPGRADE_APP_ID`. The remaining deletions for phase 3 and phase 4 step 4 are now tracked in **#315**, gated on adoption of that release and on scitadel leaving the 1.6.0 scaffold. scitadel is the last reader of `COMMIT_APP_ID`.
 
