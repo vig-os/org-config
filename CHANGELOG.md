@@ -111,6 +111,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Dependabot security updates are on for every [ADR-0008](docs/adr/0008-repository-protection-and-merge-policy.md) tier-A repo** ([#294](https://github.com/vig-os/org-config/issues/294)): `commit-action`, `devkit-smoke-test`, `h5v`, `org-config`, `qx`, `scitadel`, `sync-issues-action` and `tessera` now declare `dependabot_security_updates_enabled: true`, as `devkit` already did. Dependabot alerts were already on everywhere, so this only adds the automated fix PRs, and only on repos whose required aggregator checks them. Tier B (`nvd-mirror`, `vigos-mvp`, `vs-dolt`), `org-config-testbed` and `qms` stay on the vendored default (`false`). ADR-0008 records the policy under its repository settings.
 
+- **`tessera` now carries `Signed commits`** ([#305](https://github.com/vig-os/org-config/issues/305)): its ADR-0008 exception is lifted — `orgs.signedCommits()` is added to the `tessera` block in `otterdog/vig-os/vig-os.jsonnet` and the ADR-0008 exceptions row is dropped. `dev` still carries unsigned commits from 2026-09-29 (`49288e3`, `b9559e1`) and the repo's open PRs may still carry unsigned commits, so the ruleset (`~ALL`, no bypass) rejects any further unsigned push the moment it is applied; the Tag protection bypass exception is unaffected and stays.
+
 ## [v1.4.0](https://github.com/vig-os/org-config/releases/tag/v1.4.0) - 2026-09-23
 
 ### Added

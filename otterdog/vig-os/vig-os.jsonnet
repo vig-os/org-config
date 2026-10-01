@@ -926,12 +926,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         // (tessera `5281db2`, `ee277ad`, both unsigned); from here on a
         // promotion is a `dev` -> `main` PR.
         orgs.mainProtection(['15368:nix flake check']),
-        // EXCEPTION (ADR-0008) — no `Signed commits`: tessera's main
-        // contributor pushes unsigned commits (every commit on the open
-        // PRs, and the two promotion commits on `main`). Under merge-commit
-        // only, a signing rule would make each of those PRs unmergeable.
-        // Add `orgs.signedCommits()` once they sign.
-        //
+        orgs.signedCommits(),
         // EXCEPTION (ADR-0008) — the bypass is the org owners, not a release
         // App: `v0.1.0-alpha.1` was tagged by hand by a maintainer (an org
         // owner), and release-plz is wired for `release-pr` only, so no App
