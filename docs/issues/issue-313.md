@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-09-30T09:42:55Z
-updated: 2026-09-30T20:19:08Z
+updated: 2026-10-01T10:09:12Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/313
-comments: 1
+comments: 2
 labels: drift, critical, unmanaged-control
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-10-01T08:28:25.405Z
+synced: 2026-10-02T08:04:13.761Z
 ---
 
 # [Issue 313]: [Unmanaged control drift: org-secret reader lists diverge from the committed config](https://github.com/vig-os/org-config/issues/313)
@@ -23,7 +23,7 @@ synced: 2026-10-01T08:28:25.405Z
 
 - **Organization:** `vig-os`
 - **Change type:** `assert-failed`
-- **Last observed:** 2026-09-30 09:42 UTC
+- **Last observed:** 2026-10-01 10:09 UTC
 
 The live GitHub control diverges from the value asserted for it in `unmanaged-controls.toml`. Otterdog has no schema field for this control, so it appears in no plan diff — the assertion table is its only declaration. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -63,4 +63,12 @@ _Posted on September 30, 2026 at 08:19 PM_
 Consequence of this drift, seen from devkit: `vig-os/revkit` carries the scaffolded `devkit-upgrade.yml`, `sync-issues.yml` and release train. Because it is on none of these live reader lists, its `secrets.COMMIT_APP_*`, `secrets.DEVKIT_UPGRADE_APP_*` and `secrets.RELEASE_APP_*` all resolve to empty strings. So the weekly upgrade fails its App-identity preflight, and sync and release cannot mint tokens. Resolve it by applying the committed lists (adding revkit), not by removing it from config.
 
 When applying, only the client-ID and private-key secrets matter going forward. The numeric `COMMIT_APP_ID` / `RELEASE_APP_ID` are being retired in #315, so adding revkit to them is harmless but unnecessary.
+
+---
+
+# [Comment #2]() by [vig-os-org-config[bot]]()
+
+_Posted on October 1, 2026 at 10:09 AM_
+
+Drift still present as of 2026-10-01 10:09 UTC. Refreshed the report above.
 
