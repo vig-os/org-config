@@ -197,11 +197,18 @@ def _evaluate(path: Path) -> dict:
 def test_the_committed_config_declares_exactly_these_app_slugs() -> None:
     """Ground truth on the REAL config, in the spirit of ``DECLARED_REPOS``.
 
-    Two slugs, twenty-three sites, all ruleset bypass actors. The implicit
+    Two slugs, twenty-five sites, all ruleset bypass actors. The implicit
     `github-actions` slug of tessera's two un-prefixed classic
     branch-protection status checks left with those rules, which rulesets
     replaced (#294); the fixture tests above still cover that site. Update this
     set deliberately when the config declares a new App.
+
+    Twenty-three became twenty-five with the stepv declaration: a trunk-model
+    repo contributes exactly two bypass sites, `Release protection`'s
+    `commit-action-bot` and `Tag protection`'s `vig-os-release-app`. Its
+    `Main protection` and `Signed commits` declare no bypass, which is the
+    house standard. Expect +2 per trunk repo and +3 per gitflow one (the extra
+    is `Dev protection`).
     """
     config = _evaluate(REPO_ROOT / "otterdog" / "vig-os" / "vig-os.jsonnet")
     sites = extract_app_actor_sites(config)
@@ -212,7 +219,7 @@ def test_the_committed_config_declares_exactly_these_app_slugs() -> None:
     assert {site.site for site in sites} == {
         SITE_RULESET_BYPASS_ACTOR,
     }
-    assert len(sites) == 23
+    assert len(sites) == 25
 
 
 # --------------------------------------------------------------------------
