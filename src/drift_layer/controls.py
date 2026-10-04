@@ -51,6 +51,7 @@ from pathlib import Path
 from .github_client import ApiError, GitHubClient, TruncatedResponseError
 from .inventory import extract_declared_org_secrets
 from .models import DriftRecord
+from .secret_repositories import comparable_secrets, diff_secret_repositories
 
 # Namespaced fingerprint prefix — a sibling of the plan's block headers and the
 # sweep's ``repository-inventory:``, so all three populations share one dedup
@@ -727,16 +728,16 @@ def _compare_visibility(
 def _compare_selected_repositories(
     declared: dict[str, object], live: dict[str, dict], client: GitHubClient, org: str
 ) -> list[str]:
+    # The differ is shared with the plan-time report (#318), so the daily
+    # family and the review-time section can never disagree about a list.
     offenders = []
-    for name, secret in sorted(declared.items()):
-        if name not in live or live[name].get("visibility") != "selected":
-            continue  # only a `selected` secret HAS a reader list to compare
-        actual = set(client.list_org_secret_repositories(org, name))
-        wanted = set(secret.selected_repositories)
-        extra = sorted(actual - wanted)
-        absent = sorted(wanted - actual)
-        if extra or absent:
-            offenders.append(f"- {name}: live-only {extra or '[]'}, config-only {absent or '[]'}")
+    for secret in comparable_secrets(declared, live):
+        diff = diff_secret_repositories(client, org, secret)
+        if diff.diverges:
+            offenders.append(
+                f"- {diff.name}: live-only {list(diff.live_only) or '[]'}, "
+                f"config-only {list(diff.config_only) or '[]'}"
+            )
     return offenders
 
 

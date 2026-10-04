@@ -41,6 +41,7 @@ _NEW_REPO_RE = re.compile(r"\bnewRepo\(\s*'(?P<name>[^']+)'\s*\)")
 # to a different scope entirely (ten of them are committed today).
 _NEW_ORG_SECRET_RE = re.compile(r"\bnewOrgSecret\(\s*'(?P<name>[^']+)'\s*\)")
 _VISIBILITY_RE = re.compile(r"\bvisibility:\s*'(?P<value>[^']*)'")
+_VALUE_RE = re.compile(r"\bvalue:\s*'(?P<value>[^']*)'")
 _SELECTED_REPOS_RE = re.compile(r"\bselected_repositories\+?:\s*\[")
 _QUOTED_RE = re.compile(r"'(?P<value>[^']*)'")
 
@@ -91,11 +92,18 @@ class DeclaredOrgSecret:
     Secret *values* are never comparable (the API does not return them and nine
     of the ten committed declarations carry a `'********'` dummy), so the
     declaration's assertable content is exactly who may read it.
+
+    ``dummy_value`` records WHICH kind of declaration it is, because that decides
+    whether ``apply`` writes the rest of it at all: otterdog skips a dummy-valued
+    secret for live patching (``models/secret.py`` ``include_for_live_patch`` ->
+    ``has_dummy_secret``: set, non-empty, every character ``*``), so its
+    visibility and reader list are never written either (#318).
     """
 
     name: str
     visibility: str = _DEFAULT_VISIBILITY
     selected_repositories: tuple[str, ...] = ()
+    dummy_value: bool = False
 
     @property
     def live_visibility(self) -> str:
@@ -109,10 +117,10 @@ def extract_declared_org_secrets(jsonnet_text: str) -> dict[str, DeclaredOrgSecr
     Same strict-literal doctrine as :func:`extract_declared_repos` (see the
     module docstring), extended from ``newRepo`` to ``newOrgSecret``: comments
     are stripped first, each block is read from its constructor to its matching
-    closing brace, and only literal ``visibility`` / ``selected_repositories``
-    entries are taken. Faithful because the vendored ``newOrgSecret`` supplies
-    plain literal defaults and nothing in the committed file computes either
-    field, so the text IS the evaluated value — and ``jsonnetfmt --test`` is an
+    closing brace, and only literal ``visibility`` / ``selected_repositories`` /
+    ``value`` entries are taken. Faithful because the vendored ``newOrgSecret``
+    supplies plain literal defaults and nothing in the committed file computes
+    any of them, so the text IS the evaluated value — and ``jsonnetfmt --test`` is an
     L0 gate, so the block shape cannot drift underneath the reader.
     """
     secrets: dict[str, DeclaredOrgSecret] = {}
@@ -121,6 +129,7 @@ def extract_declared_org_secrets(jsonnet_text: str) -> dict[str, DeclaredOrgSecr
     visibility = _DEFAULT_VISIBILITY
     selected: list[str] = []
     in_list = False
+    dummy = False
 
     for raw_line in jsonnet_text.splitlines():
         line = _LINE_COMMENT_RE.sub("", raw_line)
@@ -129,7 +138,7 @@ def extract_declared_org_secrets(jsonnet_text: str) -> dict[str, DeclaredOrgSecr
             if match is None:
                 continue
             name = match.group("name")
-            visibility, selected, in_list = _DEFAULT_VISIBILITY, [], False
+            visibility, selected, in_list, dummy = _DEFAULT_VISIBILITY, [], False, False
             depth = line.count("{") - line.count("}")
             if depth <= 0:  # `newOrgSecret('X') {}` on one line
                 secrets[name] = DeclaredOrgSecret(name=name)
@@ -149,15 +158,26 @@ def extract_declared_org_secrets(jsonnet_text: str) -> dict[str, DeclaredOrgSecr
                 visibility_match = _VISIBILITY_RE.search(line)
                 if visibility_match is not None:
                     visibility = visibility_match.group("value")
+                value_match = _VALUE_RE.search(line)
+                if value_match is not None:
+                    dummy = _is_dummy(value_match.group("value"))
 
         depth += line.count("{") - line.count("}")
         if depth <= 0:
             secrets[name] = DeclaredOrgSecret(
-                name=name, visibility=visibility, selected_repositories=tuple(selected)
+                name=name,
+                visibility=visibility,
+                selected_repositories=tuple(selected),
+                dummy_value=dummy,
             )
             name = None
 
     return secrets
+
+
+def _is_dummy(value: str) -> bool:
+    """otterdog's ``Secret.has_dummy_secret``, transcribed: non-empty, all ``*``."""
+    return bool(value) and set(value) == {"*"}
 
 
 def sweep_inventory(
