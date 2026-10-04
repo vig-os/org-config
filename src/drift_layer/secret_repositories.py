@@ -118,7 +118,7 @@ def _describe(exc: ApiError) -> str:
     return f"{exc} — {limited}" if limited else str(exc)
 
 
-def check_secret_repositories(
+def check_reader_lists(
     jsonnet_text: str, client: GitHubClient, *, org: str
 ) -> SecretRepositoriesReport:
     """Compare every comparable declared secret's reader list against live."""

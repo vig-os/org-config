@@ -27,7 +27,7 @@ from drift_layer.cli import main
 from drift_layer.github_client import ApiError
 from drift_layer.inventory import extract_declared_org_secrets
 from drift_layer.secret_repositories import (
-    check_secret_repositories,
+    check_reader_lists,
     comparable_secrets,
     diff_secret_repositories,
     render_degraded_markdown,
@@ -94,7 +94,7 @@ def _unwrap(answer: object) -> object:
 
 def _check(text: str = DECLARED, **client: object):
     fake = FakeClient(**client)  # type: ignore[arg-type]
-    return check_secret_repositories(text, fake, org=ORG), fake
+    return check_reader_lists(text, fake, org=ORG), fake
 
 
 # --------------------------------------------------------------------------
@@ -299,7 +299,7 @@ def test_cli_org_secrets_report_exits_zero_when_the_check_raises(
     def explode(*args: object, **kwargs: object) -> object:
         raise RuntimeError("upstream changed shape")
 
-    monkeypatch.setattr(cli, "check_secret_repositories", explode)
+    monkeypatch.setattr(cli, "check_reader_lists", explode)
     monkeypatch.setenv("DRIFT_REPOS_TOKEN", "t")
     rc = main(["--org-secrets-report", "--config-jsonnet", _config(tmp_path), "--org", ORG])
     assert rc == 0

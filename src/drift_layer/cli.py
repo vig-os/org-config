@@ -83,9 +83,9 @@ from .reconcile import (
     extract_fingerprint,
     reconcile,
 )
-from .secret_repositories import check_secret_repositories
-from .secret_repositories import render_degraded_markdown as render_secrets_degraded
-from .secret_repositories import render_markdown as render_secrets
+from .secret_repositories import check_reader_lists
+from .secret_repositories import render_degraded_markdown as render_readers_degraded
+from .secret_repositories import render_markdown as render_readers
 
 DEFAULT_CONFIG_JSONNET = "otterdog/vig-os/vig-os.jsonnet"
 DEFAULT_UNMANAGED_CONTROLS = "unmanaged-controls.toml"
@@ -484,19 +484,19 @@ def _report_org_secrets(args: argparse.Namespace) -> int:
     elif config_path is None or not config_path.exists():
         reason = f"the committed config `{args.config_jsonnet}` does not exist"
     if reason is not None:
-        print(render_secrets_degraded(reason))
+        print(render_readers_degraded(reason))
         print(f"::warning::org-secret reader check skipped: {reason}", file=sys.stderr)
         return 0
 
     try:
-        report = check_secret_repositories(
+        report = check_reader_lists(
             config_path.read_text(),  # type: ignore[union-attr]
             RestGitHubClient(args.repo or "", token),
             org=args.org,
         )
-        rendered = render_secrets(report)
+        rendered = render_readers(report)
     except Exception as exc:  # noqa: BLE001 - an advisory check reports, never raises
-        print(render_secrets_degraded(f"the check did not complete ({exc!r})"))
+        print(render_readers_degraded(f"the check did not complete ({exc!r})"))
         print(f"::warning::org-secret reader check could not run: {exc!r}", file=sys.stderr)
         return 0
 
