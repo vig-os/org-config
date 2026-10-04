@@ -41,6 +41,14 @@ suppressed, not as a finding. The issues token is read from ``$GITHUB_TOKEN``
 plan drift is reconciled. ``--app-actors-report`` reads ``$DRIFT_REPOS_TOKEN``
 first for the same reason: `plan.yml` hands it the full installation token, and
 the narrowed name stays reserved for the narrowed credential.
+
+``--org-secrets-report`` is its sibling for org secrets (issue #318), on the same
+contract — read-only, ``$DRIFT_REPOS_TOKEN`` first, **always exits 0**: it diffs
+every ``selected`` org secret's committed reader list (from ``--config-jsonnet``)
+against live with the SAME differ as the ``org-secret-repositories`` family, and
+prints the markdown fragment `plan.yml` folds into its report — because `apply`
+never writes the reader list of a dummy-valued secret, so a declared reader is
+otherwise granted by nobody and reported by nothing until the next drift run.
 """
 
 from __future__ import annotations
@@ -75,6 +83,9 @@ from .reconcile import (
     extract_fingerprint,
     reconcile,
 )
+from .secret_repositories import check_reader_lists
+from .secret_repositories import render_degraded_markdown as render_readers_degraded
+from .secret_repositories import render_markdown as render_readers
 
 DEFAULT_CONFIG_JSONNET = "otterdog/vig-os/vig-os.jsonnet"
 DEFAULT_UNMANAGED_CONTROLS = "unmanaged-controls.toml"
@@ -276,6 +287,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="check every declared App slug against GET /apps/{slug}; prints markdown, exits 0",
     )
     parser.add_argument(
+        "--org-secrets-report",
+        action="store_true",
+        help="diff each selected org secret's readers against live; prints markdown, exits 0",
+    )
+    parser.add_argument(
         "--config-json",
         default=None,
         type=Path,
@@ -299,6 +315,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.app_actors_report:
         return _report_app_actors(args)
+
+    if args.org_secrets_report:
+        return _report_org_secrets(args)
 
     if args.controls_report:
         return _report_controls(args, config_jsonnet_text)
@@ -448,6 +467,49 @@ def _warn_app_actors(report) -> None:  # noqa: ANN001 - AppSlugReport, kept impo
         )
     for note in report.notes:
         print(f"::warning::app-slug: {note}", file=sys.stderr)
+
+
+def _report_org_secrets(args: argparse.Namespace) -> int:
+    """Diff the declared org-secret reader lists against live (#318).
+
+    Same exit contract as :func:`_report_app_actors`, for the same reason: it
+    **returns 0 unconditionally** and reports every failure — no token, no
+    config, an unforeseen exception — in its own fragment.
+    """
+    token = os.environ.get("DRIFT_REPOS_TOKEN") or os.environ.get("GITHUB_TOKEN") or ""
+    config_path = Path(args.config_jsonnet) if args.config_jsonnet else None
+    reason: str | None = None
+    if not token:
+        reason = "no token in `DRIFT_REPOS_TOKEN`/`GITHUB_TOKEN`"
+    elif config_path is None or not config_path.exists():
+        reason = f"the committed config `{args.config_jsonnet}` does not exist"
+    if reason is not None:
+        print(render_readers_degraded(reason))
+        print(f"::warning::org-secret reader check skipped: {reason}", file=sys.stderr)
+        return 0
+
+    try:
+        report = check_reader_lists(
+            config_path.read_text(),  # type: ignore[union-attr]
+            RestGitHubClient(args.repo or "", token),
+            org=args.org,
+        )
+        rendered = render_readers(report)
+    except Exception as exc:  # noqa: BLE001 - an advisory check reports, never raises
+        print(render_readers_degraded(f"the check did not complete ({exc!r})"))
+        print(f"::warning::org-secret reader check could not run: {exc!r}", file=sys.stderr)
+        return 0
+
+    print(rendered)
+    for diff in report.divergent:
+        print(
+            f"::warning::org secret `{diff.name}`: declared-not-live {list(diff.config_only)}, "
+            f"live-not-declared {list(diff.live_only)}",
+            file=sys.stderr,
+        )
+    if report.unreadable is not None:
+        print(f"::warning::org-secret reader check: {report.unreadable}", file=sys.stderr)
+    return 0
 
 
 def _report_controls(args: argparse.Namespace, config_jsonnet_text: str | None) -> int:

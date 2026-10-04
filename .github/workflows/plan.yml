@@ -303,13 +303,18 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${JOB_WORKFLOW_SHA}" ]; then
-            echo "::warning::job.workflow_sha is empty on a downstream run; skipping the App-slug check rather than checking out an unpinned engine tree (issue #169)"
+            echo "::warning::job.workflow_sha is empty on a downstream run; skipping the App-slug and org-secret reader checks rather than checking out an unpinned engine tree (issue #169)"
             echo "ok=false" >> "$GITHUB_OUTPUT"
             {
               echo '### Declared App slugs'
               echo
               echo '**The declared App slugs could not be checked** on this run: the engine checkout is unpinned (the job workflow SHA is empty), and an unpinned engine tree is refused. This is a harness gap, not a verdict — treat the slugs as unverified.'
             } > app-actors.md
+            {
+              echo '### Declared org-secret readers'
+              echo
+              echo '**The org-secret reader lists could not be checked** on this run: the engine checkout is unpinned (the job workflow SHA is empty), and an unpinned engine tree is refused. This is a harness gap, not a verdict — treat them as unverified.'
+            } > org-secret-readers.md
             exit 0
           fi
           echo "ok=true" >> "$GITHUB_OUTPUT"
@@ -418,6 +423,60 @@ jobs:
           cat app-actors.md
           exit 0
 
+      # The org-secret twin of the App-slug check (issue #318), same contract.
+      # `apply` never live-patches an org secret whose committed value is a
+      # `'********'` dummy (otterdog `models/secret.py` `include_for_live_patch`),
+      # so a repository added to such a secret's `selected_repositories` plans
+      # clean, merges, and is never granted — its workflows then read the
+      # secret as an empty string with no error (revkit #312, stepv #317; the
+      # daily drift run reported it days later, #313). This diffs every
+      # declared `selected` reader list against
+      # `GET /orgs/{org}/actions/secrets/{name}/repositories` with the SAME
+      # differ the drift layer's `org-secret-repositories` family uses, and
+      # prints the hand-grant command for each declared-not-live entry.
+      #
+      # Token: the full installation token minted above. Reading org secrets
+      # needs the App's Organization -> Secrets read; the org-management App
+      # holds it (it writes org secrets at apply), and drift.yml's controls leg
+      # already reads these endpoints with the same token. A downstream App
+      # without that grant gets a 403, which the mode renders as "could not
+      # read" — never a finding, never an exit code.
+      #
+      # ADVISORY + FAIL-SOFT, BINDING (#236, #268), exactly as the step above:
+      # `continue-on-error`, `if:`-gated on the engine guard, and the mode
+      # itself always exits 0.
+      - name: Check declared org-secret readers against live
+        id: org-secret-readers
+        continue-on-error: true
+        if: >-
+          always() && steps.plan.outcome != 'skipped'
+          && (github.repository == 'vig-os/org-config'
+              || steps.engine-pin.outputs.ok == 'true')
+        env:
+          # Same name and reasoning as the App-slug step above.
+          DRIFT_REPOS_TOKEN: ${{ steps.app-token.outputs.token }}
+          ORG_GITHUB_ID: ${{ inputs.org_github_id || 'vig-os' }}
+          DRIFT_PROJECT_DIR: ${{ github.repository != 'vig-os/org-config' && '.drift-engine' || '.' }}
+        run: |
+          # Deliberately no errexit: an advisory read must never redden a gate.
+          set -uo pipefail
+          # The committed jsonnet TEXT, from the config checkout (never the
+          # engine sub-checkout) — the input the drift family reads, so the two
+          # can never disagree about what is declared.
+          ORG_FILE="otterdog/${ORG_GITHUB_ID}/${ORG_GITHUB_ID}.jsonnet"
+          if ! uv run --project "${DRIFT_PROJECT_DIR}" drift-layer \
+              --org-secrets-report \
+              --org "${ORG_GITHUB_ID}" \
+              --config-jsonnet "${ORG_FILE}" > org-secret-readers.md; then
+            {
+              echo '### Declared org-secret readers'
+              echo
+              echo '**The org-secret reader lists could not be checked** on this run: the drift-layer check did not complete. This is a harness gap, not a verdict — treat them as unverified.'
+            } > org-secret-readers.md
+          fi
+          cat org-secret-readers.md
+          exit 0
+
       # AUXILIARY, so fail-soft (#276): this step renders cosmetics — the
       # marker-upserted comment body and the job summary — and contributes
       # nothing to the verdict, which `Fail on plan error` below carries alone.
@@ -442,13 +501,20 @@ jobs:
           set -euo pipefail
           MARKER='<!-- otterdog-plan-report -->'
           [ -f plan.txt ] || echo "(no plan output was produced — the plan step did not run to completion)" > plan.txt
-          # The App-slug fragment (#259), folded into BOTH artefacts below
-          # rather than posted as a second comment: this step is the one place
-          # that assembles the marker-upserted body and the job summary, so a
-          # reviewer sees the finding beside the diff it is invisible in. A
-          # missing file means that step did not run; the plan report is
-          # unchanged in that case.
-          [ -f app-actors.md ] || : > app-actors.md
+          # The App-slug (#259) and org-secret reader (#318) fragments, folded
+          # into BOTH artefacts below rather than posted as further comments:
+          # this step is the one place that assembles the marker-upserted body
+          # and the job summary, so a reviewer sees each finding beside the diff
+          # it is invisible in. A missing file means that step did not run; the
+          # plan report is unchanged in that case. `fragments.md` is the
+          # present ones, in order, each followed by a blank line.
+          : > fragments.md
+          for fragment in app-actors.md org-secret-readers.md; do
+            if [ -s "${fragment}" ]; then
+              cat "${fragment}" >> fragments.md
+              echo >> fragments.md
+            fi
+          done
 
           if [ "${PLAN_RC:-1}" = "0" ]; then
             status="Plan completed. A non-empty diff is drift for the PR author to decide on, **not** a failure."
@@ -468,31 +534,30 @@ jobs:
             cat plan.txt
             echo '```'
             echo
-            if [ -s app-actors.md ]; then
-              cat app-actors.md
-              echo
-            fi
+            cat fragments.md
             echo "[Run log](${RUN_URL})"
           } >> "$GITHUB_STEP_SUMMARY"
 
           # --- PR comment body (65536-char cap: truncate the plan text safely) ---
-          # The budget is shared, and the App-slug fragment is inside it (#259).
-          # An over-limit body makes the upsert's `gh api` return 422 under
-          # `set -euo pipefail`, failing this job — which downstream is a
+          # The budget is shared, and the check fragments are inside it (#259,
+          # #318). An over-limit body makes the upsert's `gh api` return 422
+          # under `set -euo pipefail`, failing this job — which downstream is a
           # required check on `main` (#268), i.e. the one failure this whole
-          # design forbids. So: cap the fragment first, then give the plan text
-          # whatever is left. Measured today the fragment is ~0.7 KB clean and
-          # ~1.5 KB with seven failing rows, so the cap is headroom, not a limit
-          # anything reaches.
+          # design forbids. So: cap the fragments first, then give the plan text
+          # whatever is left. Measured, the App-slug fragment is ~0.7 KB clean
+          # and ~1.5 KB with seven failing rows; the org-secret one is ~0.8 KB
+          # clean and ~0.3 KB more per divergent reader. The cap doubled when
+          # the second joined, and is still headroom, not a limit anything
+          # reaches.
           MAX_BODY_BYTES=55000
-          MAX_FRAGMENT_BYTES=8000
-          if [ "$(wc -c < app-actors.md)" -gt "${MAX_FRAGMENT_BYTES}" ]; then
-            head -c "${MAX_FRAGMENT_BYTES}" app-actors.md > app-actors.comment.md
-            printf '\n\n_App-slug fragment truncated for the comment; the full fragment is in the [job summary](%s)._\n' "${RUN_URL}" >> app-actors.comment.md
+          MAX_FRAGMENT_BYTES=16000
+          if [ "$(wc -c < fragments.md)" -gt "${MAX_FRAGMENT_BYTES}" ]; then
+            head -c "${MAX_FRAGMENT_BYTES}" fragments.md > fragments.comment.md
+            printf '\n\n_Check fragments truncated for the comment; the full fragments are in the [job summary](%s)._\n' "${RUN_URL}" >> fragments.comment.md
           else
-            cp app-actors.md app-actors.comment.md
+            cp fragments.md fragments.comment.md
           fi
-          fragment_bytes="$(wc -c < app-actors.comment.md)"
+          fragment_bytes="$(wc -c < fragments.comment.md)"
           MAX_PLAN_BYTES=$(( MAX_BODY_BYTES - fragment_bytes ))
           plan_note=""
           if [ "$(wc -c < plan.txt)" -gt "${MAX_PLAN_BYTES}" ]; then
@@ -520,10 +585,7 @@ jobs:
             echo
             echo '</details>'
             echo
-            if [ -s app-actors.comment.md ]; then
-              cat app-actors.comment.md
-              echo
-            fi
+            cat fragments.comment.md
             echo "[Run log](${RUN_URL}) · triggered by \`${EVENT_NAME}\`"
           } > comment-body.md
 

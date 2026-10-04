@@ -58,6 +58,13 @@ authoring.
 > The pass path may contain `/` but **no `:`** — otterdog splits a secret value
 > on the single `:` into `provider:path`, so a second colon breaks resolution.
 
+## Grant a repository an org secret
+
+Adding a repo to a `'********'`-valued secret's `selected_repositories` is **not**
+applied (otterdog never live-patches a dummy-valued secret, #318): the PR's plan
+comment section **Declared org-secret readers** lists every declared-not-live
+reader with the exact `gh api -X PUT …/repositories/<repo_id>` to run after merge.
+
 ## Rotate a value
 
 A rotation is a normal change: `sops secrets/vig-os.yaml`, replace the value,
