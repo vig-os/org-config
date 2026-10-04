@@ -72,6 +72,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'org-config',
         'revkit',
         'scitadel',
+        'stepv',
         'sync-issues-action',
         'tessera',
       ],
@@ -85,7 +86,10 @@ orgs.newOrg('vig-os', 'vig-os') {
     // numeric form in their pre-1.7 `sync-issues.yml`; h5v
     // (DEVCONTAINER_VERSION=0.3.1) and scitadel (0.3.3) are legacy throughout.
     // Each entry retires with its repo's 1.7 adoption or re-scaffold; the
-    // secret retires entirely at the end (#112).
+    // secret retires entirely at the end (#112). stepv, like tessera, is on
+    // the client-ID form FROM DAY ONE (a devkit 1.17.0 scaffold) and is
+    // deliberately absent here and from the three other numeric `*_APP_ID`
+    // lists below — it leaves nothing for #112 to retire.
     orgs.newOrgSecret('COMMIT_APP_ID') {
       selected_repositories+: [
         'commit-action',
@@ -109,6 +113,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'org-config',
         'revkit',
         'scitadel',
+        'stepv',
         'sync-issues-action',
         'tessera',
       ],
@@ -239,6 +244,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'org-config',
         'revkit',
         'scitadel',
+        'stepv',
         'sync-issues-action',
         'tessera',
       ],
@@ -276,6 +282,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'org-config',
         'revkit',
         'scitadel',
+        'stepv',
         'sync-issues-action',
         'tessera',
       ],
@@ -307,6 +314,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'org-config',
         'revkit',
         'scitadel',
+        'stepv',
         'sync-issues-action',
       ],
       value: '********',
@@ -333,6 +341,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'org-config',
         'revkit',
         'scitadel',
+        'stepv',
         'sync-issues-action',
       ],
       value: '********',
@@ -823,6 +832,63 @@ orgs.newOrg('vig-os', 'vig-os') {
       environments: [
         orgs.newEnvironment('crates-io'),
       ],
+    },
+    orgs.newRepo('stepv') {
+      allow_auto_merge: true,
+      // On so the "Update branch" button (and auto-merge's auto-update) can
+      // satisfy Main protection's `strict` requirement without a manual rebase
+      // (#188) — the same reason sync-issues-action carries it.
+      allow_update_branch: true,
+      custom_properties+: {
+        type: ['tools'],
+      },
+      description: 'Fast STEP/IGES/BREP preview and thumbnails for macOS Quick Look and Linux file managers — OCCT-backed, sandboxed',
+      private_vulnerability_reporting_enabled: true,
+      // DECLARED AFTER THE FACT: this repo was created with `gh repo create`
+      // rather than by `otterdog apply`, the bypass the org settings comment
+      // at the top of this file warns about. Nothing was lost — apply never
+      // deletes what the config omits — but stepv sat as an inventory drift
+      // finding (#21) until this declaration landed. Creating the next one
+      // config-first avoids the gap entirely.
+      //
+      // Tier A (ADR-0008): a devkit 1.17.0 trunk scaffold (`.vig-os`
+      // DEVKIT_WORKFLOW=trunk) — no `dev` branch, so no `Dev protection`;
+      // releases fork `release/X.Y.Z` from `main` and merge back through the
+      // release PR. The same shapes as h5v, which is the same scaffold.
+      // `CI Summary` is `ci.yml`'s aggregator job, reported by github-actions
+      // on every PR into `main` and `release/**`.
+      rulesets: [
+        // House standard, no bot bypass. Unlike h5v (whose vig-os/h5v#9 is
+        // still open), stepv ships `DEVKIT_SYNC_TARGET=sync/issue-mirror` from
+        // its first scaffold, so the nightly `sync-issues.yml` never attempts
+        // the direct `main` push this ruleset would refuse
+        // (vig-os/devkit#1227). The mirror branch is deliberately
+        // unprotected, diverges permanently, and is never merged back.
+        orgs.mainProtection(['15368:CI Summary']),
+        // The trunk release train writes `release/X.Y.Z` as the Commit App
+        // only: `prepare-release.yml` creates the branch and commits the
+        // freeze, `release-core.yml` commits the finalize.
+        // `abandon-release.yml` deletes it with the Release App, which the
+        // shape's `allows_deletions` already permits.
+        orgs.releaseProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        // Every automated branch writer commits through the API, so GitHub
+        // signs it: the Commit App (commit-action), the devkit-upgrade App and
+        // Renovate.
+        orgs.signedCommits(),
+        // The only tag writer is the release train: `release-publish.yml`
+        // creates the release tag and `promote-release.yml` prunes RC tags,
+        // both as the Release App. stepv has no tags yet.
+        orgs.tagProtection(['vig-os-release-app']),
+      ],
+      // NOT DECLARED YET, on purpose: the `crates-io` environment and the
+      // `CARGO_REGISTRY_TOKEN` repo secret that scitadel carries. stepv's
+      // first crates.io publish is step S6 of its own plan.md and the live
+      // token does not exist — declaring a repo secret whose value is a
+      // `'********'` dummy with nothing behind it is how an apply goes wrong.
+      // Add both in the same PR as the first release, mirroring scitadel.
     },
     orgs.newRepo('sync-issues-action') {
       allow_auto_merge: true,
