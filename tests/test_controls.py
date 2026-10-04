@@ -591,6 +591,10 @@ def test_selected_repository_gain_and_loss_are_reported_in_both_directions() -> 
     assert record.resource == f"{RESOURCE_PREFIX}:org:org-secret-repositories"
     assert "rogue" in record.detail  # live-only: an unreviewed reader
     assert "devkit" in record.detail  # config-only: a consumer that lost access
+    # The exact offender line is part of the issue body the reconciler diffs;
+    # pinned so routing the comparison through the shared helper (#318) cannot
+    # silently rewrite every open drift issue.
+    assert "- ALPHA: live-only ['rogue'], config-only ['devkit']" in record.detail
 
 
 def test_undeclared_live_secret_is_its_own_family() -> None:
