@@ -22,6 +22,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
+from drift_layer.cli import main
+from drift_layer.github_client import ApiError
+from drift_layer.inventory import extract_declared_org_secrets
 from drift_layer.secret_repositories import (
     check_secret_repositories,
     comparable_secrets,
@@ -29,10 +33,6 @@ from drift_layer.secret_repositories import (
     render_degraded_markdown,
     render_markdown,
 )
-
-from drift_layer.cli import main
-from drift_layer.github_client import ApiError
-from drift_layer.inventory import extract_declared_org_secrets
 
 ORG = "fixture-org"
 
