@@ -65,7 +65,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
     ),
     "COMMIT_APP_ID": (
         "selected",
-        ("commit-action", "h5v", "revkit", "scitadel", "sync-issues-action"),
+        ("commit-action", "h5v", "scitadel", "sync-issues-action"),
     ),
     "COMMIT_APP_PRIVATE_KEY": (
         "selected",
@@ -129,7 +129,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "sync-issues-action",
         ),
     ),
-    "RELEASE_APP_ID": ("selected", ("h5v", "revkit", "scitadel")),
+    "RELEASE_APP_ID": ("selected", ("h5v", "scitadel")),
     "RELEASE_APP_PRIVATE_KEY": (
         "selected",
         (
