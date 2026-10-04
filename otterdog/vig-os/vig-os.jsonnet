@@ -89,12 +89,16 @@ orgs.newOrg('vig-os', 'vig-os') {
     // secret retires entirely at the end (#112). stepv, like tessera, is on
     // the client-ID form FROM DAY ONE (a devkit 1.17.0 scaffold) and is
     // deliberately absent here and from the three other numeric `*_APP_ID`
-    // lists below — it leaves nothing for #112 to retire.
+    // lists below — it leaves nothing for #112 to retire. revkit is the same
+    // case (devkit 1.17.0, client-ID only, no `secrets.*_APP_ID` read): its
+    // entries here and on RELEASE_APP_ID, copied from scitadel's lists in
+    // #312, were never granted live and are dropped rather than granted, so
+    // they add no reader for the numeric-secret retirement to clear (#313,
+    // #315).
     orgs.newOrgSecret('COMMIT_APP_ID') {
       selected_repositories+: [
         'commit-action',
         'h5v',
-        'revkit',
         'scitadel',
         'sync-issues-action',
       ],
@@ -322,10 +326,11 @@ orgs.newOrg('vig-os', 'vig-os') {
     },
     // Only the two legacy-scaffold repos still using the numeric App ID form.
     // This secret retires entirely once both are re-scaffolded (#112).
+    // revkit reads only RELEASE_APP_CLIENT_ID and is deliberately absent
+    // (#313, #315; see COMMIT_APP_ID above).
     orgs.newOrgSecret('RELEASE_APP_ID') {
       selected_repositories+: [
         'h5v',
-        'revkit',
         'scitadel',
       ],
       value: '********',
