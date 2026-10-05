@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-09-30T09:42:55Z
-updated: 2026-10-03T09:09:53Z
+updated: 2026-10-04T21:31:26Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/313
-comments: 4
+comments: 5
 labels: drift, critical, unmanaged-control
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-10-04T07:54:04.808Z
+synced: 2026-10-05T08:44:33.880Z
 ---
 
 # [Issue 313]: [Unmanaged control drift: org-secret reader lists diverge from the committed config](https://github.com/vig-os/org-config/issues/313)
@@ -23,7 +23,7 @@ synced: 2026-10-04T07:54:04.808Z
 
 - **Organization:** `vig-os`
 - **Change type:** `assert-failed`
-- **Last observed:** 2026-10-03 09:09 UTC
+- **Last observed:** 2026-10-04 09:49 UTC
 
 The live GitHub control diverges from the value asserted for it in `unmanaged-controls.toml`. Otterdog has no schema field for this control, so it appears in no plan diff — the assertion table is its only declaration. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -87,4 +87,12 @@ Drift still present as of 2026-10-02 09:46 UTC. Refreshed the report above.
 _Posted on October 3, 2026 at 09:09 AM_
 
 Drift still present as of 2026-10-03 09:09 UTC. Refreshed the report above.
+
+---
+
+# [Comment #5]() by [vig-os-org-config[bot]]()
+
+_Posted on October 4, 2026 at 09:49 AM_
+
+Drift still present as of 2026-10-04 09:49 UTC. Refreshed the report above.
 

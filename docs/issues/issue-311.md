@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-09-29T14:46:57Z
-updated: 2026-09-29T15:28:51Z
+updated: 2026-10-04T21:25:40Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/org-config/issues/311
-comments: 2
+comments: 3
 labels: chore, priority:medium, area:workflow
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-30T08:09:21.850Z
+synced: 2026-10-05T08:44:34.303Z
 ---
 
 # [Issue 311]: [chore(config): declare revkit — decide visibility (public → Tier A like scitadel), rulesets, train Apps](https://github.com/vig-os/org-config/issues/311)
@@ -104,4 +104,20 @@ _Posted on September 29, 2026 at 03:28 PM_
 revkit PR CI is green now (vig-os/revkit#2, #5: `CI Summary` passes). One more manual step was needed: **Dependency Review** 403'd because the org creates new repos with the dependency graph off (`dependency_graph_enabled_for_new_repositories: false`). Enabled with `gh api -X PUT repos/vig-os/revkit/vulnerability-alerts`, per devkit's MIGRATION.md ("Enable the dependency graph on new public consumers").
 
 **#312 is unblocked.** Worth considering: flip that org default, or add a new-repo control for it in `unmanaged-controls.toml`, so the next public repo doesn't hit this.
+
+---
+
+# [Comment #3]() by [c-vigo]()
+
+_Posted on October 4, 2026 at 09:25 PM_
+
+All tasks done, verified live 2026-10-04:
+
+- **Visibility:** public → Tier A (ADR-0008), declared in #312.
+- **Rulesets:** all five active (Dev / Main / Release protection, Signed commits, Tag protection). `main` requires `CI Summary` + signed commits. Merge-commit only, delete-on-merge, auto-merge and update-branch on.
+- **Train Apps:** `commit-action-bot` and `vig-os-release-app` are installed org-wide (`repository_selection: all`), so revkit is covered.
+- **`pull_request` CI trigger:** resolved by the Actions reset above. Today's PR runs (CI, CodeQL, flake, guards) trigger normally.
+- **Dependency graph:** on for revkit. The org default for new repos is now `true` live and is already asserted by `unmanaged-controls.toml` (`new-repo-dependency-graph`), so the follow-up suggestion needs no further change.
+
+The org-secret reader-list follow-up is tracked in #313 / #318. Hosted mode (its own App, `cloudflare` environment) will come as a separate change request, as noted above.
 
