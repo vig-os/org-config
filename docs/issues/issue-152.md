@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-10-05T01:45:15Z
+updated: 2026-10-05T13:37:05Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,24 +13,22 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-10-05T08:44:34.860Z
+synced: 2026-10-06T08:41:52.818Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
 
 This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.<br>[View this repository on the Mend.io Web Portal](https://developer.mend.io/github/vig-os/org-config).
 
-## Open
+## Awaiting Schedule
 
-The following updates have all been created. To force a retry/rebase of any, click on a checkbox below.
+The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
- - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update dependency ruff to v0.16.10](../pull/322)
- - [ ] <!-- rebase-branch=renovate/lock-file-maintenance -->[build(pip): lock file maintenance](../pull/323)
- - [ ] <!-- rebase-all-open-prs -->**Click on this checkbox to rebase all open PRs at once**
+ - [ ] <!-- unschedule-branch=renovate/lock-file-maintenance -->build(pip): lock file maintenance
 
 ## Detected Dependencies
 
-<details><summary>github-actions (24)</summary>
+<details><summary>github-actions (25)</summary>
 <blockquote>
 
 <details><summary>.github/actions/setup-devkit-toolchain/action.yml</summary>
@@ -108,6 +106,13 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
 <details><summary>.github/workflows/promote-release.yml</summary>
 
+
+</details>
+
+<details><summary>.github/workflows/publish-release-extension.yml (2)</summary>
+
+ - `ubuntu 26.04`
+ - `ubuntu 26.04`
 
 </details>
 
@@ -196,7 +201,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
  - `pytest ==9.1.1`
  - `pytest-cov ==7.1.0`
- - `ruff ==0.16.9` → [Updates: `==0.16.10`]
+ - `ruff ==0.16.10`
 
 </details>
 
