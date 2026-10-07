@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-10-04T13:57:45Z
-updated: 2026-10-04T13:57:45Z
+updated: 2026-10-06T23:02:38Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/org-config/issues/319
-comments: 0
+comments: 1
 labels: discussion, priority:medium, area:docs
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-10-05T08:44:32.851Z
+synced: 2026-10-07T08:17:25.205Z
 ---
 
 # [Issue 319]: [AX: onboarding a new repo is a three-file change discoverable only by failing CI — findings from declaring stepv](https://github.com/vig-os/org-config/issues/319)
@@ -169,3 +169,17 @@ finding with live consequences and the one that caused three of the other five.
 
 Happy to open PRs for any of these, but wanted the discussion first — several touch conventions
 that are yours to set, not mine.
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on October 6, 2026 at 11:02 PM_
+
+A second data point, this time from a **consumer** org: an agent provisioned `exo-pet/MPECT` on 2026-10-07. Full write-up: exo-pet/org-config#102.
+
+The same pattern as stepv, which suggests these are engine-level template questions rather than one repo's quirks:
+
+- **§1 confirmed and worse:** with no `CLAUDE.md` in the consumer org-config, the agent (rooted in the *new* repo) didn't know creation is config-first and ran `gh repo create`. The repo had to be deleted before `apply` could create it. A template `CLAUDE.md` for downstream org-config repos would carry the rule wherever the engine is consumed.
+- **§2 has a consumer variant:** exo-pet has no `tests/conftest.py` sets, but a new repo still needs seven touches, two of them **hand ops after apply**: the team→repo grant (not modelled) and the `selected` org-secret reader list (otterdog skips dummy-valued secrets). The drift controls already know the desired state. Having the engine's control runner print the remediation `gh api` command for a red row would turn both into copy-paste.
+- **#209 is still live** for every creation (see the comment there).
+

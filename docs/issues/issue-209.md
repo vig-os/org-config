@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-08-31T09:58:00Z
-updated: 2026-08-31T09:58:00Z
+updated: 2026-10-06T23:02:39Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/org-config/issues/209
-comments: 0
+comments: 1
 labels: bug, priority:medium, area:workflow
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-09-01T07:25:55.195Z
+synced: 2026-10-07T08:17:25.874Z
 ---
 
 # [Issue 209]: [otterdog 1.4.0: creating a repository always fails the first apply when Code Security is unavailable](https://github.com/vig-os/org-config/issues/209)
@@ -128,4 +128,16 @@ Same family, different subsystem: #107 is the read-side plan gate that makes
 repo rulesets undeclarable below Enterprise. Both are otterdog assuming a
 capability tier that downstream orgs do not have; both are worked around rather
 than fixed here.
+
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on October 6, 2026 at 11:02 PM_
+
+Status update and another hit:
+
+- **Upstream fix:** eclipse-csi/otterdog PR #791 ("only disable code scanning of new repos when it is configured"), merged **2026-10-02**. It is **not in a release yet**: the latest is v1.6.1 (2026-09-24), which is what engine v2.0.0 pins. So every downstream creation still goes red on the first apply.
+- **Hit again:** exo-pet/MPECT on 2026-10-07 (exo-pet/org-config run 37541889106 red, re-run 37542018430 green). That's the second exo-pet creation, after data-analysis (exo-pet/org-config#51).
+- **Ask:** until a release carrying #791 lands and Renovate bumps the pin (#250), could the engine's `apply` summary recognise this exact error (`code-scanning/default-setup` + `Code Security must be enabled`) after a successful ADD and say "known otterdog#738: repo created, re-run apply once" instead of the generic "mutation was partial or aborted"?
 
