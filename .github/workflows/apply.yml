@@ -9,8 +9,9 @@
 #
 # HUMAN GATE ON MUTATIONS (ADR-0007 §Public-repo credential rules, BINDING):
 #   - The job runs in the `production` environment, which on this repo requires
-#     reviewer `c-vigo` and restricts deployments to the `main` branch. Entering
-#     that environment pauses the run until the reviewer approves — this wait IS
+#     one approval from a listed reviewer (`c-vigo` or `gerchowl`) and restricts
+#     deployments to the `main` branch. Entering that environment pauses the
+#     run until a reviewer approves — this wait IS
 #     the designed manual gate before any write token touches live `vig-os`. No
 #     `apply` mutates without a human first approving the deployment.
 #   - `apply` runs ONLY from trunk `main`: the trigger now lives in
@@ -208,7 +209,7 @@ jobs:
     if: github.repository == format('{0}/{1}', inputs.org_github_id || 'vig-os', inputs.config_repo || 'org-config')
     runs-on: ubuntu-26.04
     timeout-minutes: 30
-    # The production environment (required reviewer c-vigo, main-only deployment
+    # The production environment (required reviewer c-vigo or gerchowl, main-only deployment
     # branch policy) is the human approval gate on mutations — the run pauses
     # here until the deployment is approved.
     environment: production

@@ -655,8 +655,12 @@ orgs.newOrg('vig-os', 'vig-os') {
             'main',
           ],
           deployment_branch_policy: 'selected',
+          // Either listed maintainer can approve an apply (GitHub needs one
+          // approval from any reviewer); a single reviewer stalled every apply
+          // whenever they were away, leaving only the admin bypass (#329).
           reviewers+: [
             '@c-vigo',
+            '@gerchowl',
           ],
         },
       ],
