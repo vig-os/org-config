@@ -208,7 +208,8 @@ def test_the_committed_config_declares_exactly_these_app_slugs() -> None:
     `commit-action-bot` and `Tag protection`'s `vig-os-release-app`. Its
     `Main protection` and `Signed commits` declare no bypass, which is the
     house standard. Expect +2 per trunk repo and +3 per gitflow one (the extra
-    is `Dev protection`).
+    is `Dev protection`). Twenty-five became twenty-eight with vigil, a
+    gitflow repo (#327).
     """
     config = _evaluate(REPO_ROOT / "otterdog" / "vig-os" / "vig-os.jsonnet")
     sites = extract_app_actor_sites(config)
@@ -219,7 +220,7 @@ def test_the_committed_config_declares_exactly_these_app_slugs() -> None:
     assert {site.site for site in sites} == {
         SITE_RULESET_BYPASS_ACTOR,
     }
-    assert len(sites) == 25
+    assert len(sites) == 28
 
 
 # --------------------------------------------------------------------------
