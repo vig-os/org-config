@@ -36,6 +36,7 @@ DECLARED_REPOS: frozenset[str] = frozenset(
         "stepv",
         "sync-issues-action",
         "tessera",
+        "vigil",
         "vigos-mvp",
         "vs-dolt",
     }
@@ -61,6 +62,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "stepv",
             "sync-issues-action",
             "tessera",
+            "vigil",
         ),
     ),
     "COMMIT_APP_ID": (
@@ -80,6 +82,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "stepv",
             "sync-issues-action",
             "tessera",
+            "vigil",
         ),
     ),
     "DEVKIT_UPGRADE_APP_CLIENT_ID": (
@@ -94,6 +97,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "stepv",
             "sync-issues-action",
             "tessera",
+            "vigil",
         ),
     ),
     "DEVKIT_UPGRADE_APP_ID": (
@@ -112,6 +116,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "stepv",
             "sync-issues-action",
             "tessera",
+            "vigil",
         ),
     ),
     "ORG_CONFIG_CANARY": ("selected", ("org-config",)),
@@ -127,6 +132,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "scitadel",
             "stepv",
             "sync-issues-action",
+            "vigil",
         ),
     ),
     "RELEASE_APP_ID": ("selected", ("h5v", "scitadel")),
@@ -142,6 +148,7 @@ DECLARED_ORG_SECRETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "scitadel",
             "stepv",
             "sync-issues-action",
+            "vigil",
         ),
     ),
 }

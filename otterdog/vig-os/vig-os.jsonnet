@@ -75,6 +75,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'stepv',
         'sync-issues-action',
         'tessera',
+        'vigil',
       ],
       value: '********',
       visibility: 'selected',
@@ -120,6 +121,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'stepv',
         'sync-issues-action',
         'tessera',
+        'vigil',
       ],
       value: '********',
       visibility: 'selected',
@@ -251,6 +253,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'stepv',
         'sync-issues-action',
         'tessera',
+        'vigil',
       ],
       value: '********',
       visibility: 'selected',
@@ -289,6 +292,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'stepv',
         'sync-issues-action',
         'tessera',
+        'vigil',
       ],
       value: '********',
       visibility: 'selected',
@@ -320,6 +324,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'scitadel',
         'stepv',
         'sync-issues-action',
+        'vigil',
       ],
       value: '********',
       visibility: 'selected',
@@ -348,6 +353,7 @@ orgs.newOrg('vig-os', 'vig-os') {
         'scitadel',
         'stepv',
         'sync-issues-action',
+        'vigil',
       ],
       value: '********',
       visibility: 'selected',
@@ -1006,6 +1012,48 @@ orgs.newOrg('vig-os', 'vig-os') {
         // top of this list).
         orgs.tagProtection(['#OrganizationAdmin']),
       ],
+    },
+    orgs.newRepo('vigil') {
+      allow_auto_merge: true,
+      // On so the "Update branch" button (and auto-merge's auto-update) can
+      // satisfy Main protection's `strict` requirement without a manual rebase
+      // (#188) — the same reason stepv and sync-issues-action carry it.
+      allow_update_branch: true,
+      custom_properties+: {
+        type: ['tools'],
+      },
+      description: 'vigil — Verifiable Integrity-Guarded Instrumentation & Logging: opinionated OpenTelemetry (OTLP/JSONL) logs, metrics and traces for Rust, plus a hash-chained, signed audit trail',
+      private_vulnerability_reporting_enabled: true,
+      // DECLARED CONFIG-FIRST (#327): this block creates the repo on apply —
+      // no `gh repo create`, so it never sits as an undeclared-inventory
+      // drift finding the way stepv did (#317).
+      //
+      // Tier A (ADR-0008): a devkit gitflow scaffold (`.vig-os`
+      // DEVKIT_WORKFLOW unset, devkit 1.18.0) that releases through the
+      // devkit train, so the same shapes as revkit (#311) and scitadel.
+      // `CI Summary` is the managed `ci.yml` aggregator (job `summary`),
+      // reported on PRs into `dev`, `release/**` and `main`.
+      rulesets: [
+        // Direct pushes to `dev` are the Commit App's only (sync-issues
+        // mirror, prepare-release); everything else lands by PR.
+        orgs.devProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        // House standard, no bot bypass: the release PR is merged by the
+        // Release App after the human approval.
+        orgs.mainProtection(['15368:CI Summary']),
+        orgs.releaseProtection(
+          checks=['15368:CI Summary'],
+          bypass=['commit-action-bot'],
+        ),
+        orgs.signedCommits(),
+        orgs.tagProtection(['vig-os-release-app']),
+      ],
+      // Not yet declared, on purpose (as stepv): the `crates-io` environment
+      // and `CARGO_REGISTRY_TOKEN` land in the same PR as the first release —
+      // declaring a repo secret whose live value does not exist is how an
+      // apply goes wrong.
     },
     orgs.newRepo('vigos-mvp') {
       description: 'MVP with basic functions',
