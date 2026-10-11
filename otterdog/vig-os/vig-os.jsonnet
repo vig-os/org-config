@@ -879,7 +879,19 @@ orgs.newOrg('vig-os', 'vig-os') {
         // the direct `main` push this ruleset would refuse
         // (vig-os/devkit#1227). The mirror branch is deliberately
         // unprotected, diverges permanently, and is never merged back.
-        orgs.mainProtection(['15368:CI Summary']),
+        orgs.mainProtection(['15368:CI Summary']) {
+          required_pull_request+: {
+            // EXCEPTION (ADR-0008) — no required approval (#334): stepv has
+            // one maintainer, who authors every PR, and GitHub refuses an
+            // author's own approval, so the house count of 1 left the admin
+            // `pull_request` bypass as the routine merge. The operative gate
+            // is the required, strict `CI Summary`, as on devkit-smoke-test
+            // and the house Dev/Release shapes (#167). Stale dismissal and
+            // thread resolution stay on. Exit: a second maintainer reviews
+            // stepv PRs.
+            required_approving_review_count: 0,
+          },
+        },
         // The trunk release train writes `release/X.Y.Z` as the Commit App
         // only: `prepare-release.yml` creates the branch and commits the
         // freeze, `release-core.yml` commits the finalize.
