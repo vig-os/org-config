@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-10-06T10:19:02Z
-updated: 2026-10-09T10:34:20Z
+updated: 2026-10-10T09:51:25Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/326
-comments: 3
+comments: 4
 labels: drift, critical
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-10-10T08:12:37.000Z
+synced: 2026-10-11T08:25:13.526Z
 ---
 
 # [Issue 326]: [Drift: repo_ruleset[name="Main protection", repository=stepv]](https://github.com/vig-os/org-config/issues/326)
@@ -71,4 +71,12 @@ Drift still present as of 2026-10-08 10:35 UTC. Refreshed the report above.
 _Posted on October 9, 2026 at 10:34 AM_
 
 Drift still present as of 2026-10-09 10:34 UTC. Refreshed the report above.
+
+---
+
+# [Comment #4]() by [vig-os-org-config[bot]]()
+
+_Posted on October 10, 2026 at 09:51 AM_
+
+Drift resolved as of 2026-10-10 09:51 UTC: the divergence no longer appears in the plan (config and live state reconciled). Closing automatically.
 
