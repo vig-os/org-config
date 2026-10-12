@@ -910,12 +910,40 @@ orgs.newOrg('vig-os', 'vig-os') {
         // both as the Release App. stepv has no tags yet.
         orgs.tagProtection(['vig-os-release-app']),
       ],
-      // NOT DECLARED YET, on purpose: the `crates-io` environment and the
-      // `CARGO_REGISTRY_TOKEN` repo secret that scitadel carries. stepv's
-      // first crates.io publish is step S6 of its own plan.md and the live
-      // token does not exist — declaring a repo secret whose value is a
-      // `'********'` dummy with nothing behind it is how an apply goes wrong.
-      // Add both in the same PR as the first release, mirroring scitadel.
+      // The release train's credentials (vig-os/stepv#10,
+      // `release-extension.yml`), set by hand with `gh secret set` BEFORE this
+      // declaration merged (#336): a `'********'` dummy with no live secret
+      // behind it is how an apply goes wrong. The six Apple secrets sign and
+      // notarise the macOS DMG; a final release refuses to ship without them.
+      // CARGO_REGISTRY_TOKEN is for the FIRST crates.io publish only, read by
+      // the gated `crates-io` environment's job, as on scitadel; once crates.io
+      // Trusted Publishing is configured, delete it here and live.
+      secrets: [
+        orgs.newRepoSecret('MACOS_SIGNING_P12') {
+          value: '********',
+        },
+        orgs.newRepoSecret('MACOS_SIGNING_P12_PASSWORD') {
+          value: '********',
+        },
+        orgs.newRepoSecret('MACOS_SIGNING_IDENTITY') {
+          value: '********',
+        },
+        orgs.newRepoSecret('APPLE_NOTARY_KEY_P8') {
+          value: '********',
+        },
+        orgs.newRepoSecret('APPLE_NOTARY_KEY_ID') {
+          value: '********',
+        },
+        orgs.newRepoSecret('APPLE_NOTARY_ISSUER') {
+          value: '********',
+        },
+        orgs.newRepoSecret('CARGO_REGISTRY_TOKEN') {
+          value: '********',
+        },
+      ],
+      environments: [
+        orgs.newEnvironment('crates-io'),
+      ],
     },
     orgs.newRepo('sync-issues-action') {
       allow_auto_merge: true,
