@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-10-10T09:51:26Z
-updated: 2026-10-10T09:51:26Z
+updated: 2026-10-11T14:12:41Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/333
-comments: 0
+comments: 2
 labels: drift, critical, unmanaged-control
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-10-11T08:25:12.990Z
+synced: 2026-10-12T08:46:31.275Z
 ---
 
 # [Issue 333]: [Unmanaged control drift: org-secret reader lists diverge from the committed config](https://github.com/vig-os/org-config/issues/333)
@@ -23,7 +23,7 @@ synced: 2026-10-11T08:25:12.990Z
 
 - **Organization:** `vig-os`
 - **Change type:** `assert-failed`
-- **Last observed:** 2026-10-10 09:51 UTC
+- **Last observed:** 2026-10-11 10:01 UTC
 
 The live GitHub control diverges from the value asserted for it in `unmanaged-controls.toml`. Otterdog has no schema field for this control, so it appears in no plan diff — the assertion table is its only declaration. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -52,3 +52,19 @@ it, what reads it, or when it should be rotated.
 ```
 
 </details>
+---
+
+# [Comment #1]() by [vig-os-org-config[bot]]()
+
+_Posted on October 11, 2026 at 10:01 AM_
+
+Drift still present as of 2026-10-11 10:01 UTC. Refreshed the report above.
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on October 11, 2026 at 02:12 PM_
+
+Fixed by hand, 2026-10-11: granted vigil (repo id 1411864490) on all six config-only secrets via `PUT /orgs/vig-os/actions/secrets/{name}/repositories/1411864490`: COMMIT_APP_CLIENT_ID, COMMIT_APP_PRIVATE_KEY, DEVKIT_UPGRADE_APP_CLIENT_ID, DEVKIT_UPGRADE_APP_PRIVATE_KEY, RELEASE_APP_CLIENT_ID, RELEASE_APP_PRIVATE_KEY. Re-read after: vigil is listed on each. There were no live-only readers. The next daily drift run should find nothing.
+
