@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-10-13T01:40:37Z
+updated: 2026-10-15T19:44:15Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-10-13T09:04:58.950Z
+synced: 2026-10-16T06:51:28.565Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
@@ -31,7 +31,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 The following updates have all been created. To force a retry/rebase of any, click on a checkbox below.
 
  - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/338) (`actions/upload-artifact`, `astral-sh/setup-uv`)
- - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update dependency ruff to v0.17.0](../pull/339)
+ - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update dependency ruff to v0.17.1](../pull/339)
  - [ ] <!-- rebase-branch=renovate/lock-file-maintenance -->[build(pip): lock file maintenance](../pull/340)
  - [ ] <!-- rebase-all-open-prs -->**Click on this checkbox to rebase all open PRs at once**
 
@@ -210,7 +210,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
  - `pytest ==9.1.1`
  - `pytest-cov ==7.1.0`
- - `ruff ==0.16.10` → [Updates: `==0.17.0`]
+ - `ruff ==0.16.10` → [Updates: `==0.17.1`]
 
 </details>
 
