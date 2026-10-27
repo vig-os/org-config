@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-10-13T10:37:05Z
-updated: 2026-10-25T08:25:58Z
+updated: 2026-10-26T08:56:25Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/346
-comments: 12
+comments: 13
 labels: drift, critical, unmanaged-control
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-10-26T07:31:09.159Z
+synced: 2026-10-27T07:27:00.010Z
 ---
 
 # [Issue 346]: [Unmanaged control drift: Fork-PR workflow approval required org-wide](https://github.com/vig-os/org-config/issues/346)
@@ -23,7 +23,7 @@ synced: 2026-10-26T07:31:09.159Z
 
 - **Organization:** `vig-os`
 - **Change type:** `assert-failed`
-- **Last observed:** 2026-10-25 08:25 UTC
+- **Last observed:** 2026-10-26 08:56 UTC
 
 The live GitHub control diverges from the value asserted for it in `unmanaged-controls.toml`. Otterdog has no schema field for this control, so it appears in no plan diff — the assertion table is its only declaration. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -138,4 +138,12 @@ Drift still present as of 2026-10-24 08:08 UTC. Refreshed the report above.
 _Posted on October 25, 2026 at 08:25 AM_
 
 Drift still present as of 2026-10-25 08:25 UTC. Refreshed the report above.
+
+---
+
+# [Comment #13]() by [vig-os-org-config[bot]]()
+
+_Posted on October 26, 2026 at 08:56 AM_
+
+Drift still present as of 2026-10-26 08:56 UTC. Refreshed the report above.
 
