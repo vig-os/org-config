@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-10-27T01:01:09Z
+updated: 2026-10-27T21:37:00Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-10-27T07:27:02.991Z
+synced: 2026-10-28T08:01:21.835Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
@@ -24,7 +24,7 @@ This issue lists Renovate updates and detected dependencies. Read the [Dependenc
 
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
- - [ ] <!-- unschedule-branch=renovate/otterdog-1.x -->ci(otterdog): update dependency otterdog to v1.7.0
+ - [ ] <!-- unschedule-branch=renovate/otterdog-1.x -->ci(otterdog): update dependency otterdog to v1.7.1
 
 ## Open
 
@@ -32,7 +32,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
  - [ ] <!-- rebase-branch=renovate/actions-create-github-app-token-digest -->[chore(deps): update actions/create-github-app-token digest to 64ab729](../pull/348)
  - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/338) (`actions/upload-artifact`, `astral-sh/setup-uv`)
- - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update dependency ruff to v0.17.3](../pull/339)
+ - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python (minor and patch)](../pull/339) (`pytest`, `ruff`)
  - [ ] <!-- rebase-branch=renovate/lock-file-maintenance -->[build(pip): lock file maintenance](../pull/340)
  - [ ] <!-- rebase-all-open-prs -->**Click on this checkbox to rebase all open PRs at once**
 
@@ -209,7 +209,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
 <details><summary>pyproject.toml (3)</summary>
 
- - `pytest ==9.1.1`
+ - `pytest ==9.1.1` → [Updates: `==9.2.0`]
  - `pytest-cov ==7.1.0`
  - `ruff ==0.16.10` → [Updates: `==0.17.3`]
 
@@ -223,31 +223,31 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
 <details><summary>.github/workflows/apply.yml (1)</summary>
 
- - `otterdog 1.6.1` → [Updates: `1.7.0`]
+ - `otterdog 1.6.1` → [Updates: `1.7.1`]
 
 </details>
 
 <details><summary>.github/workflows/drift.yml (1)</summary>
 
- - `otterdog 1.6.1` → [Updates: `1.7.0`]
+ - `otterdog 1.6.1` → [Updates: `1.7.1`]
 
 </details>
 
 <details><summary>.github/workflows/plan.yml (1)</summary>
 
- - `otterdog 1.6.1` → [Updates: `1.7.0`]
+ - `otterdog 1.6.1` → [Updates: `1.7.1`]
 
 </details>
 
 <details><summary>justfile.project (1)</summary>
 
- - `otterdog 1.6.1` → [Updates: `1.7.0`]
+ - `otterdog 1.6.1` → [Updates: `1.7.1`]
 
 </details>
 
 <details><summary>template/.github/workflows/import.yml (1)</summary>
 
- - `otterdog 1.6.1` → [Updates: `1.7.0`]
+ - `otterdog 1.6.1` → [Updates: `1.7.1`]
 
 </details>
 
