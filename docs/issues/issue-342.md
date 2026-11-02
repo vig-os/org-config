@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-10-13T10:37:02Z
-updated: 2026-10-31T09:39:54Z
+updated: 2026-11-01T10:28:15Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/342
-comments: 24
+comments: 25
 labels: drift, critical
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-01T08:52:08.173Z
+synced: 2026-11-02T09:00:00.061Z
 ---
 
 # [Issue 342]: [Drift: remove repository[name="ksb-ci-smoke"]](https://github.com/vig-os/org-config/issues/342)
@@ -23,7 +23,7 @@ synced: 2026-11-01T08:52:08.173Z
 
 - **Organization:** `vig-os`
 - **Change type:** `delete`
-- **Last observed:** 2026-10-31 09:39 UTC
+- **Last observed:** 2026-11-01 10:28 UTC
 
 The live GitHub state diverges from the committed Otterdog config. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -268,4 +268,12 @@ Drift still present as of 2026-10-30 10:01 UTC. Refreshed the report above.
 _Posted on October 31, 2026 at 09:39 AM_
 
 Drift still present as of 2026-10-31 09:39 UTC. Refreshed the report above.
+
+---
+
+# [Comment #25]() by [vig-os-org-config[bot]]()
+
+_Posted on November 1, 2026 at 10:28 AM_
+
+Drift still present as of 2026-11-01 10:28 UTC. Refreshed the report above.
 

@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-10-28T19:03:00Z
+updated: 2026-11-02T05:36:41Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,18 +13,12 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-10-29T08:10:34.585Z
+synced: 2026-11-02T09:00:00.582Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
 
 This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.<br>[View this repository on the Mend.io Web Portal](https://developer.mend.io/github/vig-os/org-config).
-
-## Awaiting Schedule
-
-The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
-
- - [ ] <!-- unschedule-branch=renovate/otterdog-1.x -->ci(otterdog): update dependency otterdog to v1.7.1
 
 ## Open
 
@@ -33,6 +27,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - [ ] <!-- rebase-branch=renovate/actions-create-github-app-token-digest -->[chore(deps): update actions/create-github-app-token digest to 64ab729](../pull/348)
  - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/338) (`actions/upload-artifact`, `astral-sh/setup-uv`)
  - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python (minor and patch)](../pull/339) (`pytest`, `ruff`)
+ - [ ] <!-- rebase-branch=renovate/otterdog-1.x -->[ci(otterdog): update dependency otterdog to v1.7.1](../pull/354)
  - [ ] <!-- rebase-branch=renovate/lock-file-maintenance -->[build(pip): lock file maintenance](../pull/340)
  - [ ] <!-- rebase-all-open-prs -->**Click on this checkbox to rebase all open PRs at once**
 
