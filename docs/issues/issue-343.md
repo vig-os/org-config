@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-10-13T10:37:03Z
-updated: 2026-11-01T10:28:17Z
+updated: 2026-11-02T13:39:23Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/343
-comments: 25
+comments: 29
 labels: drift, critical
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-02T08:59:59.499Z
+synced: 2026-11-03T09:08:47.518Z
 ---
 
 # [Issue 343]: [Drift: remove repo_variable[name="CACHIX_CACHE", repository=stepv]](https://github.com/vig-os/org-config/issues/343)
@@ -23,7 +23,7 @@ synced: 2026-11-02T08:59:59.499Z
 
 - **Organization:** `vig-os`
 - **Change type:** `delete`
-- **Last observed:** 2026-11-01 10:28 UTC
+- **Last observed:** 2026-11-02 13:39 UTC
 
 The live GitHub state diverges from the committed Otterdog config. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -236,4 +236,36 @@ Drift still present as of 2026-10-31 09:39 UTC. Refreshed the report above.
 _Posted on November 1, 2026 at 10:28 AM_
 
 Drift still present as of 2026-11-01 10:28 UTC. Refreshed the report above.
+
+---
+
+# [Comment #26]() by [vig-os-org-config[bot]]()
+
+_Posted on November 2, 2026 at 11:08 AM_
+
+Drift still present as of 2026-11-02 11:08 UTC. Refreshed the report above.
+
+---
+
+# [Comment #27]() by [vig-os-org-config[bot]]()
+
+_Posted on November 2, 2026 at 01:38 PM_
+
+Drift still present as of 2026-11-02 13:38 UTC. Refreshed the report above.
+
+---
+
+# [Comment #28]() by [vig-os-org-config[bot]]()
+
+_Posted on November 2, 2026 at 01:39 PM_
+
+Drift still present as of 2026-11-02 13:38 UTC. Refreshed the report above.
+
+---
+
+# [Comment #29]() by [vig-os-org-config[bot]]()
+
+_Posted on November 2, 2026 at 01:39 PM_
+
+Drift still present as of 2026-11-02 13:39 UTC. Refreshed the report above.
 
