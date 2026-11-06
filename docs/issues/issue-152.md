@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-11-02T05:36:41Z
+updated: 2026-11-05T20:46:48Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-02T09:00:00.582Z
+synced: 2026-11-06T09:00:36.292Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
@@ -33,18 +33,8 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
 ## Detected Dependencies
 
-<details><summary>github-actions (25)</summary>
+<details><summary>github-actions (13)</summary>
 <blockquote>
-
-<details><summary>.github/actions/setup-devkit-toolchain/action.yml</summary>
-
-
-</details>
-
-<details><summary>.github/workflows/abandon-release.yml</summary>
-
-
-</details>
 
 <details><summary>.github/workflows/apply-reminder.yml (1)</summary>
 
@@ -59,21 +49,6 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1` → [Updates: `v3`]
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1` → [Updates: `v3`]
  - `ubuntu 26.04`
-
-</details>
-
-<details><summary>.github/workflows/ci.yml</summary>
-
-
-</details>
-
-<details><summary>.github/workflows/codeql.yml</summary>
-
-
-</details>
-
-<details><summary>.github/workflows/devkit-upgrade.yml</summary>
-
 
 </details>
 
@@ -104,16 +79,6 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
 </details>
 
-<details><summary>.github/workflows/prepare-release.yml</summary>
-
-
-</details>
-
-<details><summary>.github/workflows/promote-release.yml</summary>
-
-
-</details>
-
 <details><summary>.github/workflows/publish-release-extension.yml (2)</summary>
 
  - `ubuntu 26.04`
@@ -121,34 +86,9 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
 </details>
 
-<details><summary>.github/workflows/release-core.yml</summary>
-
-
-</details>
-
 <details><summary>.github/workflows/release-extension.yml (1)</summary>
 
  - `ubuntu 26.04`
-
-</details>
-
-<details><summary>.github/workflows/release-publish.yml</summary>
-
-
-</details>
-
-<details><summary>.github/workflows/release.yml</summary>
-
-
-</details>
-
-<details><summary>.github/workflows/scorecard.yml</summary>
-
-
-</details>
-
-<details><summary>.github/workflows/sync-issues.yml</summary>
-
 
 </details>
 
@@ -206,7 +146,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
  - `pytest ==9.1.1` → [Updates: `==9.2.0`]
  - `pytest-cov ==7.1.0`
- - `ruff ==0.16.10` → [Updates: `==0.17.3`]
+ - `ruff ==0.16.10` → [Updates: `==0.17.4`]
 
 </details>
 
