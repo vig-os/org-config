@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-10-13T10:37:04Z
-updated: 2026-11-07T10:10:38Z
+updated: 2026-11-08T10:23:57Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/345
-comments: 25
+comments: 26
 labels: drift, critical, inventory
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-08T08:42:22.463Z
+synced: 2026-11-09T09:20:01.868Z
 ---
 
 # [Issue 345]: [Undeclared repository: ksb-ci-smoke](https://github.com/vig-os/org-config/issues/345)
@@ -23,7 +23,7 @@ synced: 2026-11-08T08:42:22.463Z
 
 - **Organization:** `vig-os`
 - **Change type:** `undeclared`
-- **Last observed:** 2026-11-07 10:10 UTC
+- **Last observed:** 2026-11-08 10:23 UTC
 
 The live GitHub state diverges from the committed Otterdog config. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -237,4 +237,12 @@ Drift still present as of 2026-11-06 10:53 UTC. Refreshed the report above.
 _Posted on November 7, 2026 at 10:10 AM_
 
 Drift still present as of 2026-11-07 10:10 UTC. Refreshed the report above.
+
+---
+
+# [Comment #26]() by [vig-os-org-config[bot]]()
+
+_Posted on November 8, 2026 at 10:23 AM_
+
+Drift still present as of 2026-11-08 10:23 UTC. Refreshed the report above.
 
