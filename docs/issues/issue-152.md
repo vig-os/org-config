@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-11-05T20:46:48Z
+updated: 2026-11-10T16:09:25Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-06T09:00:36.292Z
+synced: 2026-11-11T08:58:54.588Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
@@ -27,7 +27,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - [ ] <!-- rebase-branch=renovate/actions-create-github-app-token-digest -->[chore(deps): update actions/create-github-app-token digest to 64ab729](../pull/348)
  - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/338) (`actions/upload-artifact`, `astral-sh/setup-uv`)
  - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python (minor and patch)](../pull/339) (`pytest`, `ruff`)
- - [ ] <!-- rebase-branch=renovate/otterdog-1.x -->[ci(otterdog): update dependency otterdog to v1.7.1](../pull/354)
+ - [ ] <!-- rebase-branch=renovate/otterdog-1.x -->[ci(otterdog): update dependency otterdog to v1.8.0](../pull/354)
  - [ ] <!-- rebase-branch=renovate/lock-file-maintenance -->[build(pip): lock file maintenance](../pull/340)
  - [ ] <!-- rebase-all-open-prs -->**Click on this checkbox to rebase all open PRs at once**
 
@@ -158,31 +158,31 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
 <details><summary>.github/workflows/apply.yml (1)</summary>
 
- - `otterdog 1.6.1` → [Updates: `1.7.1`]
+ - `otterdog 1.6.1` → [Updates: `1.8.0`]
 
 </details>
 
 <details><summary>.github/workflows/drift.yml (1)</summary>
 
- - `otterdog 1.6.1` → [Updates: `1.7.1`]
+ - `otterdog 1.6.1` → [Updates: `1.8.0`]
 
 </details>
 
 <details><summary>.github/workflows/plan.yml (1)</summary>
 
- - `otterdog 1.6.1` → [Updates: `1.7.1`]
+ - `otterdog 1.6.1` → [Updates: `1.8.0`]
 
 </details>
 
 <details><summary>justfile.project (1)</summary>
 
- - `otterdog 1.6.1` → [Updates: `1.7.1`]
+ - `otterdog 1.6.1` → [Updates: `1.8.0`]
 
 </details>
 
 <details><summary>template/.github/workflows/import.yml (1)</summary>
 
- - `otterdog 1.6.1` → [Updates: `1.7.1`]
+ - `otterdog 1.6.1` → [Updates: `1.8.0`]
 
 </details>
 
