@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-10-13T10:37:03Z
-updated: 2026-11-10T11:13:18Z
+updated: 2026-11-11T10:58:25Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/343
-comments: 40
+comments: 41
 labels: drift, critical
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-11T08:58:53.509Z
+synced: 2026-11-12T09:25:53.828Z
 ---
 
 # [Issue 343]: [Drift: remove repo_variable[name="CACHIX_CACHE", repository=stepv]](https://github.com/vig-os/org-config/issues/343)
@@ -23,7 +23,7 @@ synced: 2026-11-11T08:58:53.509Z
 
 - **Organization:** `vig-os`
 - **Change type:** `delete`
-- **Last observed:** 2026-11-10 11:13 UTC
+- **Last observed:** 2026-11-11 10:58 UTC
 
 The live GitHub state diverges from the committed Otterdog config. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -356,4 +356,12 @@ Drift still present as of 2026-11-09 14:01 UTC. Refreshed the report above.
 _Posted on November 10, 2026 at 11:13 AM_
 
 Drift still present as of 2026-11-10 11:13 UTC. Refreshed the report above.
+
+---
+
+# [Comment #41]() by [vig-os-org-config[bot]]()
+
+_Posted on November 11, 2026 at 10:58 AM_
+
+Drift still present as of 2026-11-11 10:58 UTC. Refreshed the report above.
 
