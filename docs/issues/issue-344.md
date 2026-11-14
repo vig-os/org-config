@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-10-13T10:37:04Z
-updated: 2026-11-12T11:11:49Z
+updated: 2026-11-13T10:59:24Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/344
-comments: 42
+comments: 43
 labels: drift, critical
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-13T09:13:37.135Z
+synced: 2026-11-14T08:43:42.243Z
 ---
 
 # [Issue 344]: [Drift: remove repo_secret[name="CACHIX_AUTH_TOKEN", repository=stepv]](https://github.com/vig-os/org-config/issues/344)
@@ -23,7 +23,7 @@ synced: 2026-11-13T09:13:37.135Z
 
 - **Organization:** `vig-os`
 - **Change type:** `delete`
-- **Last observed:** 2026-11-12 11:11 UTC
+- **Last observed:** 2026-11-13 10:59 UTC
 
 The live GitHub state diverges from the committed Otterdog config. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -371,4 +371,12 @@ Drift still present as of 2026-11-11 10:58 UTC. Refreshed the report above.
 _Posted on November 12, 2026 at 11:11 AM_
 
 Drift still present as of 2026-11-12 11:11 UTC. Refreshed the report above.
+
+---
+
+# [Comment #43]() by [vig-os-org-config[bot]]()
+
+_Posted on November 13, 2026 at 10:59 AM_
+
+Drift still present as of 2026-11-13 10:59 UTC. Refreshed the report above.
 

@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-10-26T08:56:17Z
-updated: 2026-11-12T11:11:50Z
+updated: 2026-11-13T10:59:26Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/351
-comments: 26
+comments: 27
 labels: drift, critical
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-13T09:13:33.719Z
+synced: 2026-11-14T08:43:39.258Z
 ---
 
 # [Issue 351]: [Drift: remove org_variable[name="CI_RUNNER_SMALL"]](https://github.com/vig-os/org-config/issues/351)
@@ -23,7 +23,7 @@ synced: 2026-11-13T09:13:33.719Z
 
 - **Organization:** `vig-os`
 - **Change type:** `delete`
-- **Last observed:** 2026-11-12 11:11 UTC
+- **Last observed:** 2026-11-13 10:59 UTC
 
 The live GitHub state diverges from the committed Otterdog config. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -246,4 +246,12 @@ Drift still present as of 2026-11-11 10:58 UTC. Refreshed the report above.
 _Posted on November 12, 2026 at 11:11 AM_
 
 Drift still present as of 2026-11-12 11:11 UTC. Refreshed the report above.
+
+---
+
+# [Comment #27]() by [vig-os-org-config[bot]]()
+
+_Posted on November 13, 2026 at 10:59 AM_
+
+Drift still present as of 2026-11-13 10:59 UTC. Refreshed the report above.
 
