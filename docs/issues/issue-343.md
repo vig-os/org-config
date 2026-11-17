@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-10-13T10:37:03Z
-updated: 2026-11-15T10:54:27Z
+updated: 2026-11-16T13:47:21Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/343
-comments: 45
+comments: 49
 labels: drift, critical
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-16T09:08:30.720Z
+synced: 2026-11-17T10:20:20.514Z
 ---
 
 # [Issue 343]: [Drift: remove repo_variable[name="CACHIX_CACHE", repository=stepv]](https://github.com/vig-os/org-config/issues/343)
@@ -23,7 +23,7 @@ synced: 2026-11-16T09:08:30.720Z
 
 - **Organization:** `vig-os`
 - **Change type:** `delete`
-- **Last observed:** 2026-11-15 10:54 UTC
+- **Last observed:** 2026-11-16 13:47 UTC
 
 The live GitHub state diverges from the committed Otterdog config. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -396,4 +396,36 @@ Drift still present as of 2026-11-14 10:26 UTC. Refreshed the report above.
 _Posted on November 15, 2026 at 10:54 AM_
 
 Drift still present as of 2026-11-15 10:54 UTC. Refreshed the report above.
+
+---
+
+# [Comment #46]() by [vig-os-org-config[bot]]()
+
+_Posted on November 16, 2026 at 11:18 AM_
+
+Drift still present as of 2026-11-16 11:18 UTC. Refreshed the report above.
+
+---
+
+# [Comment #47]() by [vig-os-org-config[bot]]()
+
+_Posted on November 16, 2026 at 01:46 PM_
+
+Drift still present as of 2026-11-16 13:46 UTC. Refreshed the report above.
+
+---
+
+# [Comment #48]() by [vig-os-org-config[bot]]()
+
+_Posted on November 16, 2026 at 01:47 PM_
+
+Drift still present as of 2026-11-16 13:46 UTC. Refreshed the report above.
+
+---
+
+# [Comment #49]() by [vig-os-org-config[bot]]()
+
+_Posted on November 16, 2026 at 01:47 PM_
+
+Drift still present as of 2026-11-16 13:47 UTC. Refreshed the report above.
 
