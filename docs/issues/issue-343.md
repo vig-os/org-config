@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-10-13T10:37:03Z
-updated: 2026-11-17T11:53:06Z
+updated: 2026-11-18T11:42:59Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/343
-comments: 50
+comments: 51
 labels: drift, critical
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-18T09:51:24.547Z
+synced: 2026-11-19T09:59:07.887Z
 ---
 
 # [Issue 343]: [Drift: remove repo_variable[name="CACHIX_CACHE", repository=stepv]](https://github.com/vig-os/org-config/issues/343)
@@ -436,4 +436,12 @@ Drift still present as of 2026-11-16 13:47 UTC. Refreshed the report above.
 _Posted on November 17, 2026 at 11:53 AM_
 
 Drift still present as of 2026-11-17 11:52 UTC. Refreshed the report above.
+
+---
+
+# [Comment #51]() by [vig-os-org-config[bot]]()
+
+_Posted on November 18, 2026 at 11:42 AM_
+
+Drift resolved as of 2026-11-18 11:42 UTC: the divergence no longer appears in the plan (config and live state reconciled). Closing automatically.
 
