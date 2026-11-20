@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-08-11T11:29:21Z
-updated: 2026-11-18T18:40:21Z
+updated: 2026-11-19T20:30:14Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/org-config/issues/152
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-19T09:59:08.933Z
+synced: 2026-11-20T09:47:36.579Z
 ---
 
 # [Issue 152]: [Dependency Dashboard](https://github.com/vig-os/org-config/issues/152)
@@ -146,7 +146,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
  - `pytest ==9.1.1` → [Updates: `==9.2.0`]
  - `pytest-cov ==7.1.0`
- - `ruff ==0.16.10` → [Updates: `==0.17.5`]
+ - `ruff ==0.16.10` → [Updates: `==0.17.6`]
 
 </details>
 
