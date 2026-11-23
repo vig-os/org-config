@@ -2,18 +2,18 @@
 type: issue
 state: open
 created: 2026-11-15T10:54:22Z
-updated: 2026-11-21T11:02:03Z
+updated: 2026-11-22T11:25:45Z
 author: vig-os-org-config[bot]
 author_url: https://github.com/vig-os-org-config[bot]
 url: https://github.com/vig-os/org-config/issues/358
-comments: 9
+comments: 10
 labels: drift, critical
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-11-22T09:28:31.889Z
+synced: 2026-11-23T10:26:15.326Z
 ---
 
 # [Issue 358]: [Drift: repository[name="tessera"]](https://github.com/vig-os/org-config/issues/358)
@@ -23,7 +23,7 @@ synced: 2026-11-22T09:28:31.889Z
 
 - **Organization:** `vig-os`
 - **Change type:** `change`
-- **Last observed:** 2026-11-21 11:01 UTC
+- **Last observed:** 2026-11-22 11:25 UTC
 
 The live GitHub state diverges from the committed Otterdog config. This is **issue-only** (ADR-0002): nothing is auto-reverted — a human decides whether to revert the change or adopt it into config, then closes this issue (it also closes automatically once the divergence is resolved).
 
@@ -108,4 +108,12 @@ Drift still present as of 2026-11-20 11:40 UTC. Refreshed the report above.
 _Posted on November 21, 2026 at 11:02 AM_
 
 Drift still present as of 2026-11-21 11:01 UTC. Refreshed the report above.
+
+---
+
+# [Comment #10]() by [vig-os-org-config[bot]]()
+
+_Posted on November 22, 2026 at 11:25 AM_
+
+Drift still present as of 2026-11-22 11:25 UTC. Refreshed the report above.
 
